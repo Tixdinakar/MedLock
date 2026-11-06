@@ -572,7 +572,10 @@ function viewKurul(g) {
   if (sec) { const el = document.getElementById("sec-" + sec); if (el) el.scrollIntoView(); }
 }
 function kurulSection(g, kind, title, id) {
-  const its = S.cat.items.filter(i => i.g === g && i.k === kind);
+  // Çıkmıştan dönüştürülen çözülebilir testler (cx) "Çıkmışlar" altında, belgelerden önce durur.
+  const its = kind === "cikmis"
+    ? S.cat.items.filter(i => i.g === g && i.k === "test" && i.cx).concat(S.cat.items.filter(i => i.g === g && i.k === "cikmis"))
+    : S.cat.items.filter(i => i.g === g && i.k === kind && !i.cx);
   return its.length ? '<h2 class="sec" id="sec-' + id + '">' + title + '</h2><div class="card list">' + its.map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>" : "";
 }
 function viewCourse(g, cs) {

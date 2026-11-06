@@ -45,6 +45,7 @@ def build(test_html):
     d = s.index("const DATA = ", ce)
     _, de = dec.raw_decode(s, d + len("const DATA = "))
     pre, post = s[:a], s[de:]
+    pre = re.sub(r"<html(?![^>]*\blang=)", '<html lang="tr"', pre, count=1)  # Türkçe büyük harf (i → İ)
     pre = re.sub(r"<title>.*?</title>", "<title>Test</title>", pre, count=1, flags=re.S)
     pre = rep(pre, "<body>", "<body>\n<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();</script>\n"
               + BRIDGE_CSS, ) if pre.count("<body>") == 1 else sys.exit("body?")
