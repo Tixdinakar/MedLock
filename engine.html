@@ -1,0 +1,736 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();</script>
+<style>
+.ml-go{display:flex;align-items:center;gap:8px;margin-top:10px;width:100%;text-align:left;font:600 13px/1.35 var(--f-ui,system-ui);
+  color:var(--form,#0f5c63);background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:10px;padding:9px 12px;cursor:pointer}
+.ml-go:hover{border-color:var(--form,#0f5c63)}
+.ml-go .ml-ic{flex:none;width:18px;height:18px}
+.ml-go .ml-t{flex:1;min-width:0}
+.ml-go .ml-t small{display:block;font-weight:500;color:var(--muted,#666);font-size:12px}
+.ml-go .ml-arrow{flex:none;font-weight:700}
+.ml-decks{display:grid;gap:10px}
+.ml-deck{border:1px solid var(--line,#ddd);border-radius:10px;padding:10px 12px}
+.ml-deck b{display:block;font-size:14px;margin-bottom:6px}
+.ml-deck .ml-n{font-weight:500;color:var(--muted,#666);font-size:12.5px;margin-left:6px}
+.ml-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ml-chip{font:600 12.5px var(--f-mono,monospace);border:1px solid var(--line,#ddd);background:var(--surface,#fff);color:var(--ink,#111);
+  border-radius:999px;padding:5px 10px;cursor:pointer}
+.ml-chip:hover{border-color:var(--form,#0f5c63);color:var(--form,#0f5c63)}
+.ml-chip.est{border-style:dashed}
+.ml-note{font-size:12.5px;color:var(--muted,#666);margin:8px 0 0}
+</style>
+<title>Test</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: soru kitapçığı tek sütun; optik form düğmeyle açılan panel. Ortak deneme motoru. */
+:root{
+  --bg:#EDF0F4; --surface:#FFFFFF; --surface-2:#F5F7FA; --ink:#16202C; --muted:#5A6676; --line:#D5DBE3;
+  --form:#B23A62; --form-soft:#F8E8EE;      /* optik form mürekkebi */
+  --graphite:#2B3038;                       /* kurşun kalem işareti */
+  --k0:#2E4C8C; --k0-soft:#E4EAF6;
+  --k1:#8A5710; --k1-soft:#F4EBDC;
+  --ok:#1E7748; --ok-soft:#E1F1E7;
+  --bad:#BE3A2C; --bad-soft:#FAE5E1;
+  --focus:#2E4C8C;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-stem:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F141A; --surface:#161D26; --surface-2:#1B242F; --ink:#E5EAF1; --muted:#9BA7B6; --line:#2B3643;
+    --form:#E3809F; --form-soft:#3A2230; --graphite:#D8DDE5;
+    --k0:#93ACE8; --k0-soft:#1E2A44; --k1:#E2B263; --k1-soft:#352A18;
+    --ok:#62CC90; --ok-soft:#163326; --bad:#F2887A; --bad-soft:#3E201D; --focus:#93ACE8;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F141A; --surface:#161D26; --surface-2:#1B242F; --ink:#E5EAF1; --muted:#9BA7B6; --line:#2B3643;
+  --form:#E3809F; --form-soft:#3A2230; --graphite:#D8DDE5;
+  --k0:#93ACE8; --k0-soft:#1E2A44; --k1:#E2B263; --k1-soft:#352A18;
+  --ok:#62CC90; --ok-soft:#163326; --bad:#F2887A; --bad-soft:#3E201D; --focus:#93ACE8;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 48px}
+.app{max-width:1140px;margin:0 auto}
+h1,h2,h3,h4,h5{text-wrap:balance}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.muted{color:var(--muted)}
+:focus-visible{outline:2.5px solid var(--focus);outline-offset:2px}
+
+/* buttons & chips */
+.btn{font:inherit;font-weight:600;font-size:14px;line-height:1.2;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.primary:hover:not(:disabled){opacity:.9}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover:not(:disabled){color:var(--ink);border-color:var(--line)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);white-space:nowrap}
+.timer{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.cchip{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:5px;padding:2px 7px;color:var(--k0);background:var(--k0-soft);white-space:nowrap}
+.cchip.k1{color:var(--k1);background:var(--k1-soft)}
+kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--surface);color:var(--ink)}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;padding-block:18px 14px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:4px 12px;flex-wrap:wrap}
+.brand b{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.03em;text-transform:uppercase}
+.brand span{color:var(--muted);font-size:13px}
+.tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* cover / start */
+.cover{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-areas:"intro setup" "dist setup";grid-template-rows:auto 1fr;gap:26px 32px;align-items:start;padding-top:30px}
+.intro{grid-area:intro;min-width:0}.setup{grid-area:setup}.dist{grid-area:dist}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--form);margin:0 0 8px}
+.cover h1{font-family:var(--f-display);font-weight:700;font-size:clamp(42px,6.4vw,70px);line-height:.95;margin:0 0 14px;text-transform:uppercase;letter-spacing:.01em}
+.lede{font-size:16px;color:var(--muted);max-width:56ch;margin:0}
+.dist{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.dist .col{border-top:3px solid var(--k0);padding-top:10px;min-width:0}
+.dist .col.k1{border-top-color:var(--k1)}
+.dist h3{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:15px;margin:0 0 6px}
+.dist h3 span{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-weight:500}
+.dist ul{list-style:none;margin:0;padding:0;font-size:13.5px}
+.dist li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.dist li span:last-child{font-family:var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.setup{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:18px}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+legend{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:0;margin-bottom:8px}
+.choice{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:11px 13px;cursor:pointer;background:var(--surface-2)}
+.choice:hover{border-color:var(--muted)}
+.choice.on{border-color:var(--ink);background:var(--surface);box-shadow:inset 0 0 0 1px var(--ink)}
+.choice input{accent-color:var(--ink);width:16px;height:16px;margin:0}
+.choice b{display:block;font-size:14.5px}
+.choice small{display:block;color:var(--muted);font-size:12.5px;line-height:1.4}
+.choice .n{font-family:var(--f-mono);font-weight:600;font-size:13px;color:var(--muted)}
+.check{display:flex;gap:9px;align-items:center;font-size:14px;cursor:pointer}
+.check input{accent-color:var(--ink);width:16px;height:16px;margin:0}
+.setup .go{justify-content:center;padding:12px 16px;font-size:15px}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.resume{border-top:1px dashed var(--line);padding-top:16px;display:grid;gap:6px;justify-items:start}
+
+/* quiz */
+.quiz{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+.booklet{min-width:0}
+.qhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.topic{font-size:13px;color:var(--muted);font-weight:500}
+.count{margin-left:auto;font-family:var(--f-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.progress{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:16px}
+.progress i{display:block;height:100%;background:var(--graphite)}
+.reviewbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px;font-size:13px;color:var(--muted)}
+.toggle[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.qcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 22px 20px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 18px}
+.qnum{font-family:var(--f-display);font-weight:700;font-size:36px;line-height:1;color:var(--muted);min-width:2ch;font-variant-numeric:tabular-nums}
+.qbody{min-width:0}
+.passage{font-family:var(--f-stem);font-size:16px;line-height:1.65;background:var(--surface-2);border-left:3px solid var(--form);padding:12px 16px;margin:0 0 14px;border-radius:0 8px 8px 0;max-width:68ch}
+.stem{font-family:var(--f-stem);font-size:18px;line-height:1.5;margin:2px 0 18px;font-weight:500;max-width:68ch;text-wrap:pretty}
+.stem.lead{margin-bottom:10px}
+.roman{list-style:none;margin:0 0 18px;padding:0;display:grid;gap:6px;font-family:var(--f-stem);font-size:16.5px;line-height:1.45;max-width:68ch}
+.roman li{display:grid;grid-template-columns:34px minmax(0,1fr)}
+.roman b{font-weight:600;color:var(--form)}
+.stem u{text-decoration-thickness:2px;text-underline-offset:3px;font-weight:600}
+.opts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.opt{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;align-items:center;text-align:left;font-family:var(--f-stem);font-size:16px;line-height:1.4;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}
+.opt:hover:not(:disabled){border-color:var(--muted);background:var(--surface-2)}
+.opt:disabled{cursor:default}
+.bub{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--form);color:var(--form);display:grid;place-items:center;font-family:var(--f-mono);font-weight:600;font-size:13px;line-height:1}
+.opt.sel{border-color:var(--graphite)}
+.opt.sel .bub{background:var(--graphite);border-color:var(--graphite);color:var(--surface)}
+.opt.ok{border-color:var(--ok);background:var(--ok-soft)}
+.opt.ok .bub{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.opt.bad{border-color:var(--bad);background:var(--bad-soft)}
+.opt.bad .bub{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+.opt.key{border-color:var(--ok);border-style:dashed}
+.opt.key .bub{border:2px solid var(--ok);color:var(--ok)}
+.opt.dim{color:var(--muted)}
+.fb{margin-top:16px;border-radius:10px;padding:12px 14px;border:1px solid var(--line);background:var(--surface-2);font-size:14.5px;max-width:72ch}
+.fb.ok{border-color:var(--ok);background:var(--ok-soft)}
+.fb.bad{border-color:var(--bad);background:var(--bad-soft)}
+.fb h4{margin:0 0 4px;font-size:14.5px}
+.fb.ok h4{color:var(--ok)}
+.fb.bad h4{color:var(--bad)}
+.fb p{margin:0}
+.fb .src{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted);margin:12px 0 0}
+.qnav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
+.keys{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+@media (hover:none){.keys{display:none}}
+.confirm{margin-top:14px;border:1.5px solid var(--ink);border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface)}
+.confirm p{margin:0;flex:1 1 220px}
+
+/* optik form */
+.sheet{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 14px);background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.sheet-head{all:unset;box-sizing:border-box;display:block;width:100%;background:var(--form);color:var(--surface);padding:9px 14px 8px;cursor:default}
+.sheet-head b{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--f-display);font-weight:700;letter-spacing:.1em;font-size:15px}
+.sheet-head b span{font-family:var(--f-mono);font-weight:500;letter-spacing:0;font-size:12px}
+.sheet-head small{display:block;font-size:11px;opacity:.85;letter-spacing:.02em}
+.sheet-head .arrow{display:none}
+.sheet-body{max-height:calc(100vh - 150px);overflow:auto;padding:10px 12px 14px;overscroll-behavior:contain}
+.blk{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin-bottom:12px}
+.colm{display:grid;gap:2px;align-content:start;min-width:0}
+.colm h5{margin:2px 0 3px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--form);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row{display:grid;grid-template-columns:26px repeat(5,17px);gap:3px;align-items:center;border-radius:5px;padding:1px 2px}
+.row.cur{background:var(--form-soft)}
+.no{all:unset;box-sizing:border-box;font-family:var(--f-mono);font-size:11px;color:var(--muted);text-align:right;padding-right:4px;border-right:2px solid var(--k0);cursor:pointer;font-variant-numeric:tabular-nums}
+.row.k1 .no{border-right-color:var(--k1)}
+.row.cur .no{color:var(--ink);font-weight:600}
+.b{all:unset;box-sizing:border-box;width:17px;height:17px;border-radius:50%;border:1.2px solid var(--form);font-family:var(--f-mono);font-size:8.5px;line-height:1;color:var(--form);display:grid;place-items:center;cursor:pointer}
+.b.sel{background:var(--graphite);border-color:var(--graphite);color:transparent}
+.b.ok{background:var(--ok);border-color:var(--ok);color:transparent}
+.b.bad{background:var(--bad);border-color:var(--bad);color:transparent}
+.b.key{border:2px solid var(--ok);color:var(--ok);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--muted);padding-top:8px;border-top:1px dashed var(--line)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block;border:1.2px solid var(--form)}
+.legend i.s{background:var(--graphite);border-color:var(--graphite)}
+.legend i.o{background:var(--ok);border-color:var(--ok)}
+.legend i.x{background:var(--bad);border-color:var(--bad)}
+.legend i.k{border:2px solid var(--ok)}
+
+/* results */
+.result{display:grid;grid-template-columns:minmax(0,1fr);gap:22px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+.panel h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+.score{display:grid;grid-template-columns:auto minmax(0,1fr);gap:20px 32px;align-items:center}
+.big{font-family:var(--f-display);font-weight:700;font-size:72px;line-height:.9;font-variant-numeric:tabular-nums}
+.big small{font-size:26px;color:var(--muted);font-weight:600}
+.runlabel{font-size:13px;color:var(--muted);margin-top:6px}
+.kv{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.kv div{border-left:3px solid var(--line);padding-left:10px;min-width:0}
+.kv b{display:block;font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.kv span{font-size:12px;color:var(--muted)}
+.kv .o{border-left-color:var(--ok)} .kv .x{border-left-color:var(--bad)} .kv .n{border-left-color:var(--form)}
+.split{display:grid;gap:12px}
+.srow{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:14px;align-items:center;font-size:14px}
+.srow .lbl{font-weight:600}
+.srow .num{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stack{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--surface-2);border:1px solid var(--line)}
+.stack i{display:block;height:100%}
+.stack .o{background:var(--ok)} .stack .x{background:var(--bad)}
+.tablewrap{overflow-x:auto}
+table.topics{width:100%;border-collapse:collapse;font-size:14px;min-width:520px}
+table.topics th{text-align:left;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.topics td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.topics td.n{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums;width:44px}
+table.topics th.n{text-align:right}
+table.topics td.bar{width:34%}
+table.topics tr.weak td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+.tname{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.wl{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.wl button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--surface)}
+.wl button:hover{border-color:var(--muted)}
+.wl .k{font-family:var(--f-display);font-weight:700;font-size:20px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.wl .t{min-width:0}
+.wl .t p{margin:2px 0 0;font-family:var(--f-stem);font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.wl .ans{font-family:var(--f-mono);font-size:12.5px;text-align:right;white-space:nowrap}
+.wl .ans .x{color:var(--bad)} .wl .ans .o{color:var(--ok)}
+.empty{font-size:14px;color:var(--muted);margin:0}
+
+@media (max-width: 900px){
+  .cover{grid-template-columns:minmax(0,1fr);grid-template-areas:"intro" "setup" "dist";grid-template-rows:auto;padding-top:22px}
+  .quiz{grid-template-columns:1fr}
+  .sheet{position:static}
+  .sheet-head{cursor:pointer}
+  .sheet-head .arrow{display:inline}
+  .sheet:not(.open) .sheet-body{display:none}
+  .sheet-body{max-height:none}
+  .kv{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width: 560px){
+  .dist{grid-template-columns:1fr}
+  .keys{display:none}
+  .qcard{grid-template-columns:1fr;padding:16px}
+  .qnum{font-size:26px}
+  .stem{font-size:16.5px}
+  .opt{font-size:15px;padding:9px 10px;gap:10px}
+  .score{grid-template-columns:1fr}
+  .big{font-size:60px}
+  .kv{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .srow{grid-template-columns:1fr;gap:6px}
+  .srow .num{text-align:left}
+  .wl button{grid-template-columns:30px minmax(0,1fr)}
+  .wl .ans{grid-column:2;text-align:left}
+}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+/* --- ortak motor eklemeleri --- */
+/* optik form: her ekranda düğmeyle açılan yüzen panel; kapalıyken yalnızca küçük bir düğme */
+.quiz{grid-template-columns:minmax(0,1fr);max-width:780px;margin:0 auto;padding-bottom:84px}
+.sheet{position:fixed;top:auto;left:auto;right:max(16px, env(safe-area-inset-right, 0px));bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:30;width:auto;max-width:calc(100vw - 32px);border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.22)}
+.sheet .sheet-head{cursor:pointer;padding:10px 16px}
+.sheet .sheet-head small{display:none}
+.sheet .sheet-head .arrow{display:inline}
+.sheet:not(.open) .sheet-body{display:none}
+.sheet.open{width:420px;border-radius:14px}
+.sheet.open .sheet-head small{display:block}
+.sheet.open .sheet-body{display:block;max-height:min(62vh, 560px)}
+
+.dist{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.dist-h{grid-column:1/-1;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 -8px}
+.topicpick{display:grid;gap:4px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.topicpick[hidden]{display:none}
+.topicpick .tp{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+.topicpick .tp:last-child{border-bottom:0}
+.topicpick .n{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.tp-h{margin:8px 0 2px;font-size:12px;font-weight:700;color:var(--muted)}
+.tp-actions{display:flex;gap:8px;margin-bottom:4px}
+.btn.sm{padding:5px 10px;font-size:12.5px}
+.minrow{display:flex;align-items:center;gap:10px;font-size:14px;padding:4px 2px}
+.minrow[hidden]{display:none}
+.minrow label{font-weight:600}
+.minrow input{width:90px;font:inherit;font-family:var(--f-mono);font-size:15px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.warn{margin:0;color:var(--bad);font-size:13.5px;font-weight:600}
+.warn[hidden]{display:none}
+.timer.low{color:var(--bad);font-weight:700}
+.timeup{background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad);border-radius:10px;padding:10px 14px;font-weight:600;margin-bottom:14px}
+.wtag{font-size:11px;font-weight:700;color:var(--bad);background:var(--bad-soft);border-radius:4px;padding:1px 6px;margin-left:6px;white-space:nowrap}
+.fb .src{margin-top:8px;font-size:12.5px;color:var(--muted);font-family:var(--f-mono)}
+</style>
+<div class="app">
+  <header class="top" id="top"></header>
+  <main id="view"></main>
+</div>
+<script>
+(function(){
+"use strict";
+/*ML_DATA*/;
+const L = ["A","B","C","D","E"];
+const KEY = CFG.key;
+const byId = {}; DATA.forEach(q => { byId[q.id] = q; });
+const COURSES = {}; CFG.courses.forEach((c, i) => { COURSES[c.code] = Object.assign({ k:"k" + (i % 4) }, c); });
+const multi = CFG.courses.length > 1;
+const tkey = q => q.c + "|" + q.t;
+const TOPICS = []; const tcount = {};
+DATA.forEach(q => { const k = tkey(q); if(!(k in tcount)){ tcount[k] = 0; TOPICS.push(k); } tcount[k]++; });
+
+function setIds(set){
+  if(set === "all") return DATA.map(q => q.id);
+  if(set === "custom") return DATA.filter(q => S.topics.indexOf(tkey(q)) >= 0).map(q => q.id);
+  return DATA.filter(q => q.c === set).map(q => q.id);
+}
+function setLabel(set){
+  if(set === "all") return "Hepsi";
+  if(set === "custom") return S.topics.length === 1 ? S.topics[0].split("|")[1] : S.topics.length + " konu";
+  return COURSES[set].short;
+}
+
+function blank(){ return { v:2, view:"start", set:"all", topics:TOPICS.slice(), mode:"study", minutes:0, shuffle:false, run:null }; }
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY); if(!raw) return null;
+    const s = JSON.parse(raw); if(!s || s.v !== 2) return null;
+    if(s.run){
+      if(!Array.isArray(s.run.ids)) s.run = null;
+      else {
+        s.run.ids = s.run.ids.filter(id => byId[id]);
+        if(!s.run.ids.length) s.run = null;
+        else { s.run.ans = s.run.ans || {}; s.run.cur = Math.min(Math.max(0, s.run.cur|0), s.run.ids.length - 1); }
+      }
+    }
+    if(!(s.set === "all" || s.set === "custom" || COURSES[s.set])) s.set = "all";
+    if(["study","exam","timed"].indexOf(s.mode) < 0) s.mode = "study";
+    s.topics = Array.isArray(s.topics) ? s.topics.filter(k => k in tcount) : TOPICS.slice();
+    return s;
+  }catch(e){ return null; }
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} try{ window.ML && ML.save(S); }catch(e){} }
+
+let S = load() || blank();
+let sheetOpen = false;
+
+/* ---------- helpers ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const plain = s => String(s).replace(/<[^>]+>/g, "");
+const num = n => n.toLocaleString("tr-TR", { maximumFractionDigits:2 });
+const pct = (a, b) => b ? "%" + num(Math.round(a / b * 1000) / 10) : "%0";
+const CC = c => (COURSES[c] || { k:"k0" }).k;
+function fmtTime(sec){
+  sec = Math.max(0, sec|0);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  const mm = String(m).padStart(2, "0"), ss = String(s).padStart(2, "0");
+  return h ? h + ":" + mm + ":" + ss : mm + ":" + ss;
+}
+function shuffle(a){ a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const answered = r => r.ids.filter(id => r.ans[id] !== undefined).length;
+const revealed = (r, id) => r.finished || (r.mode === "study" && r.ans[id] !== undefined);
+function status(r, id){ const a = r.ans[id]; if(a === undefined) return "blank"; return a === byId[id].a ? "ok" : "bad"; }
+function stats(r, ids){
+  ids = ids || r.ids; let ok = 0, bad = 0, empty = 0;
+  ids.forEach(id => { const s = status(r, id); if(s === "ok") ok++; else if(s === "bad") bad++; else empty++; });
+  return { ok, bad, empty, total:ids.length, net: ok - bad / 4 };
+}
+function visible(){
+  const r = S.run, all = r.ids.map((_, i) => i);
+  if(!(r.finished && r.onlyWrong)) return all;
+  return all.filter(i => status(r, r.ids[i]) !== "ok");
+}
+function optClass(r, id, i){
+  const q = byId[id], a = r.ans[id];
+  if(revealed(r, id)){
+    if(i === q.a && a === i) return "ok";
+    if(i === a) return "bad";
+    if(i === q.a) return "key";
+    return "";
+  }
+  return a === i ? "sel" : "";
+}
+const MODE_NAME = { study:"Çalışma modu", exam:"Sınav modu", timed:"Zamana karşı" };
+const remaining = r => Math.max(0, (r.limit || 0) - r.elapsed);
+function timerText(r){ return r.mode === "timed" && !r.finished ? fmtTime(remaining(r)) : fmtTime(r.elapsed); }
+function suggestMinutes(n){ return Math.max(1, Math.round(n * (CFG.perQuestion || 1))); }
+
+/* ---------- views ---------- */
+function headerHTML(){
+  const r = S.run;
+  let h = '<div class="brand"><b>' + esc(CFG.title) + '</b><span>' + esc(CFG.sub) + '</span></div>';
+  if(S.view === "quiz" && r){
+    const timed = r.mode === "timed" && !r.finished;
+    h += '<div class="tools"><span class="chip">' + MODE_NAME[r.mode] + '</span>'
+      + '<span class="chip" title="' + (timed ? "Kalan süre" : "Geçen süre") + '">' + (timed ? "Kalan" : "Süre") + ' <span class="timer' + (timed && remaining(r) <= 60 ? " low" : "") + '" id="timer">' + timerText(r) + '</span></span>'
+      + '<button class="btn ghost" type="button" data-act="home">Kapak</button>'
+      + (r.finished ? '<button class="btn" type="button" data-act="to-result">Sonuç</button>' : '<button class="btn" type="button" data-act="finish-ask">Bitir</button>')
+      + '</div>';
+  } else if(S.view === "result" && r){
+    h += '<div class="tools"><button class="btn ghost" type="button" data-act="home">Kapak</button></div>';
+  }
+  return h;
+}
+
+function distHTML(c){
+  const qs = DATA.filter(q => q.c === c.code);
+  const ts = TOPICS.filter(k => k.split("|")[0] === c.code);
+  return '<div class="col ' + CC(c.code) + '"><h3>' + esc(c.short) + '<span>' + qs.length + ' soru</span></h3><ul>'
+    + ts.map(k => '<li><span>' + esc(k.split("|")[1]) + '</span><span>' + tcount[k] + '</span></li>').join("") + '</ul></div>';
+}
+
+function topicPickHTML(){
+  const groups = CFG.courses.map(c => {
+    const ts = TOPICS.filter(k => k.split("|")[0] === c.code);
+    return (multi ? '<p class="tp-h">' + esc(c.short) + '</p>' : '')
+      + ts.map(k => '<label class="check tp"><input type="checkbox" name="topic" value="' + esc(k) + '"' + (S.topics.indexOf(k) >= 0 ? " checked" : "") + '><span>' + esc(k.split("|")[1]) + '</span><span class="n">' + tcount[k] + '</span></label>').join("");
+  }).join("");
+  return '<div class="topicpick" id="topicpick"' + (S.set === "custom" ? "" : " hidden") + '>'
+    + '<div class="tp-actions"><button class="btn ghost sm" type="button" data-act="tp-all">Hepsini seç</button><button class="btn ghost sm" type="button" data-act="tp-none">Temizle</button></div>'
+    + groups + '</div>';
+}
+
+function startHTML(){
+  const r = S.run;
+  const keys = ["all"].concat(multi ? CFG.courses.map(c => c.code) : []).concat(["custom"]);
+  const desc = k => k === "all" ? (multi ? CFG.courses.map(c => c.short).join(" + ") : "Bütün konular, " + TOPICS.length + " başlık")
+    : k === "custom" ? "İstediğin konuları işaretle" : (COURSES[k].long || COURSES[k].short);
+  const sets = keys.map(k =>
+    '<label class="choice' + (S.set === k ? " on" : "") + '"><input type="radio" name="set" value="' + k + '"' + (S.set === k ? " checked" : "") + '>'
+    + '<span><b>' + (k === "custom" ? "Konu seç" : esc(k === "all" ? "Hepsi" : COURSES[k].short)) + '</b><small>' + esc(desc(k)) + '</small></span><span class="n" id="n-' + k + '">' + setIds(k).length + '</span></label>').join("")
+    + topicPickHTML();
+  const nSel = setIds(S.set).length;
+  const mins = S.minutes > 0 ? S.minutes : suggestMinutes(nSel);
+  const modes = [
+    ["study","Çalışma modu","Her cevaptan sonra doğru şık ve açıklama görünür."],
+    ["exam","Sınav modu","Cevaplar en sonda değerlendirilir; işaretini değiştirebilirsin."],
+    ["timed","Zamana karşı","Süreyi sen belirlersin; süre bitince deneme kendiliğinden biter ve değerlendirilir."]
+  ].map(m => '<label class="choice' + (S.mode === m[0] ? " on" : "") + '"><input type="radio" name="mode" value="' + m[0] + '"' + (S.mode === m[0] ? " checked" : "") + '>'
+    + '<span><b>' + m[1] + '</b><small>' + m[2] + '</small></span><span></span></label>').join("")
+    + '<div class="minrow" id="minrow"' + (S.mode === "timed" ? "" : " hidden") + '><label for="minutes">Süre</label><input id="minutes" type="number" inputmode="numeric" min="1" max="600" step="1" value="' + mins + '"><span>dakika</span></div>';
+  let resume = "";
+  if(r && !r.finished){
+    resume = '<div class="resume"><button class="btn" type="button" data-act="resume">Kaldığın yerden devam et</button>'
+      + '<p class="note">' + esc(r.label) + ' · ' + MODE_NAME[r.mode] + ' · ' + answered(r) + '/' + r.ids.length + ' cevaplı · ' + (r.mode === "timed" ? "kalan " + fmtTime(remaining(r)) : fmtTime(r.elapsed)) + '</p>'
+      + '<p class="note">Yeni deneme başlatırsan bu ilerleme silinir.</p></div>';
+  } else if(r && r.finished){
+    const st = stats(r);
+    resume = '<div class="resume"><button class="btn" type="button" data-act="to-result">Son denemenin sonucunu gör</button>'
+      + '<p class="note">' + esc(r.label) + ' · ' + st.ok + ' doğru, ' + st.bad + ' yanlış, ' + st.empty + ' boş</p></div>';
+  }
+  return '<section class="cover">'
+    + '<div class="intro"><p class="eyebrow">' + esc(CFG.eyebrow) + ' · ' + DATA.length + ' soru</p>'
+    + '<h1>' + esc(CFG.title) + '</h1>'
+    + '<p class="lede">' + esc(CFG.lede) + '</p></div>'
+    + '<form class="setup" id="setup" novalidate>'
+    + '<fieldset><legend>Hangi sorular?</legend>' + sets + '</fieldset>'
+    + '<fieldset><legend>Nasıl çözmek istersin?</legend>' + modes + '</fieldset>'
+    + '<label class="check"><input type="checkbox" id="opt-shuffle"' + (S.shuffle ? " checked" : "") + '> Soru sırasını karıştır</label>'
+    + '<p class="warn" id="warn" hidden></p>'
+    + '<button class="btn primary go" type="submit">Denemeye başla</button>'
+    + resume
+    + '</form>'
+    + '<div class="dist"><p class="dist-h">Konu dağılımı</p>' + CFG.courses.map(distHTML).join("") + '</div></section>';
+}
+
+function sheetHTML(){
+  const r = S.run;
+  const rows = (ids, start) => ids.map((id, j) => {
+    const k = start + j, q = byId[id];
+    const bs = L.map((l, i) => {
+      const c = optClass(r, id, i);
+      return '<button type="button" class="b' + (c ? " " + c : "") + '" data-act="bubble" data-k="' + k + '" data-i="' + i + '" tabindex="-1" aria-label="Soru ' + (k + 1) + ', ' + l + ' şıkkı">' + l + '</button>';
+    }).join("");
+    return '<div class="row ' + CC(q.c) + (k === r.cur ? " cur" : "") + '"><button type="button" class="no" data-act="jump" data-k="' + k + '" tabindex="-1" aria-label="Soru ' + (k + 1) + '">' + (k + 1) + '</button>' + bs + '</div>';
+  }).join("");
+  let blocks = "";
+  for(let g = 0; g < r.ids.length; g += 40){
+    const chunk = r.ids.slice(g, g + 40);
+    const cols = [chunk.slice(0, 20), chunk.slice(20, 40)].filter(c => c.length);
+    blocks += '<div class="blk">' + cols.map((c, ci) => {
+      const start = g + ci * 20, cs = Array.from(new Set(c.map(id => byId[id].c)));
+      const head = (start + 1) + "–" + (start + c.length) + (multi && cs.length === 1 ? " · " + COURSES[cs[0]].short : "");
+      return '<div class="colm"><h5>' + head + '</h5>' + rows(c, start) + '</div>';
+    }).join("") + '</div>';
+  }
+  const leg = r.finished || r.mode === "study"
+    ? '<span><i class="s"></i>işaretli</span><span><i class="o"></i>doğru</span><span><i class="x"></i>yanlış</span><span><i class="k"></i>doğru şık</span>'
+    : '<span><i class="s"></i>işaretli</span><span><i></i>boş</span>';
+  return '<aside class="sheet' + (sheetOpen ? " open" : "") + '" aria-label="Optik form">'
+    + '<button type="button" class="sheet-head" data-act="sheet" aria-expanded="' + sheetOpen + '"><b>CEVAP KÂĞIDI <span>' + answered(r) + '/' + r.ids.length + ' <span class="arrow">' + (sheetOpen ? "▴" : "▾") + '</span></span></b>'
+    + '<small>Numaraya dokun, o soruya git</small></button>'
+    + '<div class="sheet-body">' + blocks + '<div class="legend">' + leg + '</div></div></aside>';
+}
+
+function quizHTML(){
+  const r = S.run, k = r.cur, id = r.ids[k], q = byId[id], a = r.ans[id], rev = revealed(r, id);
+  const opts = q.o.map((t, i) => {
+    const c = optClass(r, id, i);
+    const dim = rev && !c ? " dim" : "";
+    return '<li><button type="button" class="opt' + (c ? " " + c : "") + dim + '" data-act="choose" data-i="' + i + '"' + (rev ? " disabled" : "") + ' aria-pressed="' + (a === i) + '">'
+      + '<span class="bub" aria-hidden="true">' + L[i] + '</span><span><span class="sr">' + L[i] + ' şıkkı: </span>' + t + '</span></button></li>';
+  }).join("");
+  let fb = "";
+  if(rev){
+    const st = status(r, id);
+    const title = st === "ok" ? "Doğru." : st === "bad" ? "Yanlış. Doğru cevap: " + L[q.a] : "Boş bıraktın. Doğru cevap: " + L[q.a];
+    fb = '<div class="fb ' + (st === "ok" ? "ok" : st === "bad" ? "bad" : "") + '" role="status"><h4>' + title + '</h4><p>' + q.e + '</p><div class="src">Kaynak: ' + esc(q.s) + '</div>' + (window.ML ? ML.btn(q.id) : '') + '</div>';
+  } else if(r.mode !== "study"){
+    fb = '<p class="hint">İşaretini değiştirmek için başka bir şıkka, silmek için aynı şıkka dokun.</p>';
+  }
+  const vis = visible(), hasPrev = vis.some(i => i < k), hasNext = vis.some(i => i > k);
+  let nextBtn;
+  if(hasNext) nextBtn = '<button class="btn primary" type="button" data-act="next">Sonraki →</button>';
+  else if(!r.finished) nextBtn = '<button class="btn primary" type="button" data-act="finish-ask">Bitir</button>';
+  else nextBtn = '<button class="btn primary" type="button" data-act="to-result">Sonuca dön</button>';
+  const nav = '<nav class="qnav" aria-label="Soru gezinme"><button class="btn" type="button" data-act="prev"' + (hasPrev ? "" : " disabled") + '>← Önceki</button>'
+    + '<span class="keys"><kbd>A</kbd>–<kbd>E</kbd> şık seç · <kbd>←</kbd><kbd>→</kbd> soru değiştir</span>' + nextBtn + '</nav>';
+  let confirm = "";
+  if(r.confirm && !r.finished){
+    const empty = r.ids.length - answered(r);
+    confirm = '<div class="confirm" id="confirm" role="group" aria-label="Denemeyi bitir"><p><b>Denemeyi bitirmek istiyor musun?</b> '
+      + (empty ? empty + " soru boş." : "Bütün soruları cevapladın.") + '</p>'
+      + '<button class="btn primary" type="button" data-act="finish">Evet, bitir</button><button class="btn" type="button" data-act="finish-cancel">Devam et</button></div>';
+  }
+  const review = r.finished
+    ? '<div class="reviewbar">Cevapları inceliyorsun.<button class="btn toggle" type="button" data-act="only-wrong" aria-pressed="' + !!r.onlyWrong + '">Sadece yanlış ve boşlar</button><button class="btn ghost" type="button" data-act="to-result">Sonuca dön</button></div>'
+    : "";
+  const done = answered(r);
+  return '<section class="quiz"><div class="booklet" id="booklet">'
+    + review
+    + '<div class="qhead">' + (multi ? '<span class="cchip ' + CC(q.c) + '">' + esc(COURSES[q.c].short) + '</span>' : '') + '<span class="topic">' + esc(q.t) + '</span><span class="count">Soru ' + (k + 1) + ' / ' + r.ids.length + '</span></div>'
+    + '<div class="progress" aria-hidden="true"><i style="width:' + (done / r.ids.length * 100).toFixed(1) + '%"></i></div>'
+    + '<article class="qcard"><div class="qnum">' + (k + 1) + '</div><div class="qbody">'
+    + (q.p ? '<div class="passage">' + q.p + '</div>' : "")
+    + '<p class="stem' + (q.l ? ' lead' : '') + '" id="stem" tabindex="-1">' + q.q + '</p>'
+    + (q.l ? '<ol class="roman">' + q.l.map((x, i) => '<li><b>' + ['I','II','III','IV','V'][i] + '.</b><span>' + x + '</span></li>').join('') + '</ol>' : '')
+    + (q.q2 ? '<p class="stem">' + q.q2 + '</p>' : '')
+    + '<ol class="opts">' + opts + '</ol>' + fb + '</div></article>'
+    + nav + confirm
+    + '</div>' + sheetHTML() + '</section>';
+}
+
+function stackHTML(s){
+  return '<div class="stack" role="img" aria-label="' + s.ok + ' doğru, ' + s.bad + ' yanlış, ' + s.empty + ' boş"><i class="o" style="width:' + (s.ok / s.total * 100).toFixed(2) + '%"></i><i class="x" style="width:' + (s.bad / s.total * 100).toFixed(2) + '%"></i></div>';
+}
+
+function resultHTML(){
+  const r = S.run, st = stats(r);
+  const courses = Array.from(new Set(r.ids.map(id => byId[id].c)));
+  let split = "";
+  if(courses.length > 1){
+    split = '<div class="panel"><h2>Derslere göre</h2><div class="split">' + courses.map(c => {
+      const s = stats(r, r.ids.filter(id => byId[id].c === c));
+      return '<div class="srow"><span class="lbl">' + esc(COURSES[c].short) + '</span>' + stackHTML(s) + '<span class="num">' + s.ok + 'D · ' + s.bad + 'Y · ' + s.empty + 'B · net ' + num(s.net) + '</span></div>';
+    }).join("") + '</div></div>';
+  }
+  const groups = {}, order = [];
+  r.ids.forEach(id => { const q = byId[id], key = tkey(q); if(!groups[key]){ groups[key] = []; order.push(key); } groups[key].push(id); });
+  const topics = order.map(key => { const s = stats(r, groups[key]); return { key, c:key.split("|")[0], t:key.split("|")[1], s, p: s.ok / s.total }; })
+    .sort((x, y) => x.p - y.p || y.s.total - x.s.total);
+  const weakN = topics.filter(o => o.p < 0.6).length;
+  const trows = topics.map(o => '<tr class="' + (o.p < 0.6 ? "weak" : "") + '"><td><span class="tname">' + (multi ? '<span class="cchip ' + CC(o.c) + '">' + esc(COURSES[o.c].short) + '</span>' : '') + esc(o.t) + (o.p < 0.6 ? ' <span class="wtag">zayıf</span>' : '') + '</span></td>'
+    + '<td class="n">' + o.s.ok + '</td><td class="n">' + o.s.bad + '</td><td class="n">' + o.s.empty + '</td><td class="bar">' + stackHTML(o.s) + '</td><td class="n">' + pct(o.s.ok, o.s.total) + '</td></tr>').join("");
+  const wrong = r.ids.map((id, k) => ({ id, k })).filter(o => status(r, o.id) !== "ok");
+  const wl = wrong.length ? '<ul class="wl">' + wrong.map(o => {
+    const q = byId[o.id], a = r.ans[o.id];
+    const ans = a === undefined ? '<span>Boş</span> · <span class="o">Doğru ' + L[q.a] + '</span>' : '<span class="x">Senin ' + L[a] + '</span> · <span class="o">Doğru ' + L[q.a] + '</span>';
+    return '<li><button type="button" data-act="review" data-k="' + o.k + '" data-only="1"><span class="k">' + (o.k + 1) + '</span><span class="t"><span class="meta">' + (multi ? '<span class="cchip ' + CC(q.c) + '">' + esc(COURSES[q.c].short) + '</span>' : '') + esc(q.t) + '</span><p>' + esc(plain(q.q)) + '</p></span><span class="ans">' + ans + '</span></button></li>';
+  }).join("") + '</ul>' : '<p class="empty">Yanlış ya da boş sorun yok. Bütün soruları doğru cevapladın.</p>';
+  return '<section class="result">'
+    + (r.timeUp ? '<div class="timeup">Süre doldu; deneme kendiliğinden bitirildi.</div>' : '')
+    + '<div class="panel score"><div><div class="big">' + st.ok + '<small> / ' + st.total + '</small></div><div class="runlabel">' + esc(r.label) + ' · ' + MODE_NAME[r.mode] + ' · ' + fmtTime(r.elapsed) + (r.mode === "timed" ? " / " + fmtTime(r.limit) : "") + '</div></div>'
+    + '<div class="kv"><div class="o"><b>' + st.ok + '</b><span>Doğru</span></div><div class="x"><b>' + st.bad + '</b><span>Yanlış</span></div><div><b>' + st.empty + '</b><span>Boş</span></div>'
+    + '<div class="n"><b>' + num(st.net) + '</b><span>Net (4 yanlış 1 doğruyu götürür)</span></div><div><b>' + pct(st.ok, st.total) + '</b><span>Başarı</span></div></div></div>'
+    + '<div class="actions"><button class="btn primary" type="button" data-act="review" data-k="' + (wrong.length ? wrong[0].k : 0) + '" data-only="1"' + (wrong.length ? "" : " disabled") + '>Sadece yanlış ve boşları incele</button>'
+    + '<button class="btn" type="button" data-act="retry"' + (wrong.length ? "" : " disabled") + '>Yanlış ve boşları yeniden çöz (' + wrong.length + ')</button>'
+    + '<button class="btn" type="button" data-act="review" data-k="0" data-only="0">Bütün cevapları incele</button>'
+    + '<button class="btn ghost" type="button" data-act="home">Yeni deneme</button></div>'
+    + split
+    + '<div class="panel"><h2>Konu analizi · en zayıftan güçlüye</h2>' + (weakN ? '<p class="note">%60\'ın altındaki ' + weakN + ' konu zayıf olarak işaretli.</p>' : '') + '<div class="tablewrap"><table class="topics"><thead><tr><th>Konu</th><th class="n">D</th><th class="n">Y</th><th class="n">B</th><th></th><th class="n">%</th></tr></thead><tbody>' + trows + '</tbody></table></div></div>'
+    + (window.ML ? ML.panel(wrong.map(o => o.id)) : '')
+    + '<div class="panel"><h2>Yanlış ve boş sorular</h2>' + wl + '</div>'
+    + '</section>';
+}
+
+/* ---------- render ---------- */
+function render(toTop){
+  const v = document.getElementById("view");
+  if(S.view === "quiz" && S.run) v.innerHTML = quizHTML();
+  else if(S.view === "result" && S.run && S.run.finished) v.innerHTML = resultHTML();
+  else { S.view = "start"; v.innerHTML = startHTML(); }
+  const top = document.getElementById("top");
+  top.hidden = S.view === "start";
+  top.innerHTML = S.view === "start" ? "" : headerHTML();
+  if(toTop) window.scrollTo(0, 0);
+}
+function bringCardIntoView(){
+  const b = document.getElementById("booklet"); if(!b) return;
+  const t = b.getBoundingClientRect().top;
+  if(t < 0 || t > window.innerHeight * 0.6) b.scrollIntoView({ block:"start" });
+}
+function refreshCounts(){
+  ["all","custom"].concat(CFG.courses.map(c => c.code)).forEach(k => { const el = document.getElementById("n-" + k); if(el) el.textContent = setIds(k).length; });
+  const m = document.getElementById("minutes");
+  if(m && !(S.minutes > 0)) m.value = suggestMinutes(setIds(S.set).length);
+}
+
+/* ---------- actions ---------- */
+function startRun(ids, label, mode, minutes){
+  const list = S.shuffle ? shuffle(ids) : ids.slice();
+  S.run = { mlid: Date.now(), label, ids:list, ans:{}, cur:0, finished:false, elapsed:0, mode, limit: mode === "timed" ? minutes * 60 : 0, onlyWrong:false, confirm:false, timeUp:false };
+  S.view = "quiz"; sheetOpen = false; save(); render(true);
+}
+function choose(i){
+  const r = S.run;
+  if(!r || r.finished) return;
+  const id = r.ids[r.cur];
+  if(r.mode === "study"){ if(r.ans[id] !== undefined) return; r.ans[id] = i; }
+  else { if(r.ans[id] === i) delete r.ans[id]; else r.ans[id] = i; }
+  r.confirm = false; save(); render();
+}
+function go(d){
+  const r = S.run, vis = visible();
+  const next = d > 0 ? vis.find(i => i > r.cur) : vis.slice().reverse().find(i => i < r.cur);
+  if(next === undefined) return;
+  r.cur = next; r.confirm = false; save(); render(); bringCardIntoView();
+}
+function finish(timeUp){ const r = S.run; r.finished = true; r.timeUp = !!timeUp; r.confirm = false; r.onlyWrong = false; S.view = "result"; save(); render(true); }
+
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]"); if(!el) return;
+  const act = el.dataset.act, r = S.run;
+  switch(act){
+    case "resume": S.view = "quiz"; save(); render(true); break;
+    case "to-result": if(r && r.finished){ S.view = "result"; save(); render(true); } break;
+    case "home": S.view = "start"; save(); render(true); break;
+    case "choose": choose(+el.dataset.i); break;
+    case "prev": go(-1); break;
+    case "next": go(1); break;
+    case "finish-ask":
+      if(r && !r.finished){ r.confirm = true; S.view = "quiz"; save(); render(); const c = document.getElementById("confirm"); if(c) c.scrollIntoView({ block:"center" }); }
+      break;
+    case "finish-cancel": if(r){ r.confirm = false; save(); render(); } break;
+    case "finish": finish(false); break;
+    case "jump": r.cur = +el.dataset.k; r.confirm = false; save(); render(); bringCardIntoView(); break;
+    case "bubble": {
+      const k = +el.dataset.k, i = +el.dataset.i; r.cur = k; r.confirm = false;
+      if(r.mode !== "study" && !r.finished){ const id = r.ids[k]; if(r.ans[id] === i) delete r.ans[id]; else r.ans[id] = i; }
+      save(); render(); if(r.mode === "study" || r.finished) bringCardIntoView();
+      break;
+    }
+    case "sheet": sheetOpen = !sheetOpen; render(); break;
+    case "only-wrong": {
+      r.onlyWrong = !r.onlyWrong;
+      if(r.onlyWrong){ const vis = visible(); if(vis.length && vis.indexOf(r.cur) < 0) r.cur = vis[0]; }
+      save(); render(); break;
+    }
+    case "review": {
+      r.onlyWrong = el.dataset.only === "1";
+      r.cur = Math.min(+el.dataset.k || 0, r.ids.length - 1);
+      S.view = "quiz"; save(); render(true); break;
+    }
+    case "retry": {
+      const ids = r.ids.filter(id => status(r, id) !== "ok");
+      if(ids.length){ const m = r.mode === "timed" ? "exam" : r.mode; startRun(ids, "Yanlış ve boş tekrarı · " + ids.length + " soru", m, 0); }
+      break;
+    }
+    case "tp-all": S.topics = TOPICS.slice(); save(); document.querySelectorAll('input[name="topic"]').forEach(i => { i.checked = true; }); refreshCounts(); break;
+    case "tp-none": S.topics = []; save(); document.querySelectorAll('input[name="topic"]').forEach(i => { i.checked = false; }); refreshCounts(); break;
+  }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if(t.name === "set" || t.name === "mode"){
+    S[t.name] = t.value; save();
+    document.querySelectorAll('input[name="' + t.name + '"]').forEach(inp => inp.closest(".choice").classList.toggle("on", inp.checked));
+    const tp = document.getElementById("topicpick"); if(tp) tp.hidden = S.set !== "custom";
+    const mr = document.getElementById("minrow"); if(mr) mr.hidden = S.mode !== "timed";
+    refreshCounts();
+  } else if(t.name === "topic"){
+    S.topics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(i => i.value); save(); refreshCounts();
+  } else if(t.id === "minutes"){
+    const v = parseInt(t.value, 10); S.minutes = v > 0 ? Math.min(600, v) : 0; save();
+  } else if(t.id === "opt-shuffle"){ S.shuffle = t.checked; save(); }
+});
+document.addEventListener("submit", e => {
+  if(e.target.id !== "setup") return;
+  e.preventDefault();
+  const ids = setIds(S.set), w = document.getElementById("warn");
+  if(!ids.length){ w.textContent = "En az bir konu seç."; w.hidden = false; return; }
+  let minutes = 0;
+  if(S.mode === "timed"){
+    const m = document.getElementById("minutes"), v = parseInt(m && m.value, 10);
+    if(!(v > 0)){ w.textContent = "Süreyi dakika olarak gir."; w.hidden = false; return; }
+    minutes = Math.min(600, v); S.minutes = minutes;
+  }
+  startRun(ids, setLabel(S.set) + " · " + ids.length + " soru", S.mode, minutes);
+});
+document.addEventListener("keydown", e => {
+  if(S.view !== "quiz" || !S.run) return;
+  if(e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target && e.target.tagName || "").toLowerCase();
+  if(tag === "input" || tag === "textarea" || tag === "select") return;
+  const key = (e.key || "").toLowerCase();
+  let i = ["a","b","c","d","e"].indexOf(key); if(i < 0) i = ["1","2","3","4","5"].indexOf(key);
+  if(i >= 0){ e.preventDefault(); choose(i); return; }
+  if(e.key === "ArrowRight"){ e.preventDefault(); go(1); }
+  else if(e.key === "ArrowLeft"){ e.preventDefault(); go(-1); }
+});
+setInterval(() => {
+  const r = S.run;
+  if(S.view === "quiz" && r && !r.finished && document.visibilityState === "visible"){
+    r.elapsed++;
+    if(r.mode === "timed" && r.elapsed >= r.limit){ finish(true); return; }
+    const t = document.getElementById("timer");
+    if(t){ t.textContent = timerText(r); t.classList.toggle("low", r.mode === "timed" && remaining(r) <= 60); }
+    if(r.elapsed % 10 === 0) save();
+  }
+}, 1000);
+window.addEventListener("pagehide", save);
+
+function boot(data){
+  if(data && data.S && data.S.v === 2) S = data.S;
+  render();
+}
+const hot = window.claude && window.claude.hot;
+if(hot && typeof hot.snapshot === "function") hot.snapshot(() => ({ S }));
+if(hot && typeof hot.ready === "function") hot.ready(boot); else boot((hot && hot.data) || {});
+})();
+
+</script>
+
+</body></html>

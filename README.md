@@ -1,3 +1,3 @@
 # MedLock
 
-Dönem 1'den itibaren ders çalışma arşivi.
+Özel ders arşivi. İçerik şifrelidir.
