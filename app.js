@@ -446,6 +446,9 @@ function viewCourse(g, cs) {
     if (rows) rows += "</div>";
     $("#flt").innerHTML = (hocas.length > 1 ? '<div class="flabel">Hoca</div><div class="chips">' + chip("h", "", "Tümü", items.length) + hocas.map(h => chip("h", h, h, items.filter(i => i.h === h).length)).join("") + "</div>" : "")
       + (kinds.length > 1 ? '<div class="flabel">Tür</div><div class="chips">' + chip("k", "", "Tümü", null) + kinds.map(kk => chip("k", kk, KIND[kk].l, items.filter(i => i.k === kk && (!F.h || i.h === F.h)).length)).join("") + "</div>" : "");
+    const pend = (S.cat.todo || []).filter(t => t.g === g && slug(t.c) === cs && (!F.k || t.kind === F.k) && (!F.h || t.h === F.h));
+    if (pend.length) rows += '<div class="month">Eklenmeyi bekleyen</div><div class="card list">' + pend.map(t => '<div class="it pend">' + kindBox(t.kind)
+      + '<div class="txt"><div class="t">' + esc(t.t) + '</div><div class="m"><span>Drive’da · ' + Math.round((t.kb || 0) / 1024) + " MB</span><span>Dosya büyük olduğu için otomatik çekilemedi; sohbete ek olarak gönderilince eklenir.</span></div></div></div>").join("") + "</div>";
     $("#rows").innerHTML = rows || '<div class="card empty">Bu filtreye uyan öğe yok.</div>';
   };
   const chip = (f, v, l, n) => '<button class="chip' + (F[f] === v ? " on" : "") + '" data-f="' + f + '" data-v="' + esc(v) + '">' + esc(l) + (n != null ? '<span class="n">' + n + "</span>" : "") + "</button>";
@@ -474,7 +477,7 @@ function mountDoc(el, it, page, opts) {
   const hl = new Set(opts.highlight || []);
   let html = "";
   for (let p = 1; p <= it.n; p++) {
-    html += '<figure class="pg' + (hl.has(p) ? " hl" : "") + '" data-p="' + p + '"' + (hl.has(p) ? ' data-hl="' + (opts.est ? "Tahmini sayfa" : "Soruyla ilgili") + '"' : "")
+    html += '<figure class="pg' + ((it.r || 1.333) < 1 ? " portrait" : "") + (hl.has(p) ? " hl" : "") + '" data-p="' + p + '"' + (hl.has(p) ? ' data-hl="' + (opts.est ? "Tahmini sayfa" : "Soruyla ilgili") + '"' : "")
       + '><div class="ph" style="--ar:' + (it.r || 1.333) + '">' + p + '</div><span class="pn">' + p + " / " + it.n + "</span></figure>";
   }
   el.innerHTML = html + (opts.foot || "");

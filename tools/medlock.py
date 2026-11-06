@@ -212,26 +212,31 @@ def ocr_pages(pdf, idxs):
         return dict(ex.map(one, idxs))
 
 
-def render_pdf(pdf, out):
-    """pdf -> out/1.webp, 2.webp ... + out/text.json ; returns (n, ratio)"""
+# Sayfa görsel ayarları: yatay slaytlar 1100 px; dikey A4 (notlar, özetler, çıkmışlar) küçük yazı içerdiği için 1800 px.
+LANDSCAPE = (1100, 52)
+PORTRAIT = (1800, 62)
+
+
+def render_pdf(pdf, out, ocr=True):
+    """pdf -> out/1.webp, 2.webp ... + out/text.json ; returns n"""
     from PIL import Image
     os.makedirs(out, exist_ok=True)
     info = subprocess.run(["pdfinfo", pdf], capture_output=True, text=True).stdout
     size = [l for l in info.splitlines() if l.startswith("Page size:")][0].split(":", 1)[1].split("pts")[0]
     w, h = (float(x) for x in size.split("x"))
-    tw = 1100 if w >= h else 950
+    tw, quality = LANDSCAPE if w >= h else PORTRAIT
     tmp = tempfile.mkdtemp()
     subprocess.run(["pdftoppm", "-scale-to-x", str(tw), "-scale-to-y", "-1", "-jpeg", "-jpegopt", "quality=92",
                     pdf, os.path.join(tmp, "p")], check=True)
     files = sorted(glob.glob(os.path.join(tmp, "p-*.jpg")), key=lambda p: int(p.rsplit("-", 1)[1][:-4]))
     for i, p in enumerate(files, 1):
-        Image.open(p).convert("RGB").save(os.path.join(out, f"{i}.webp"), "WEBP", quality=52, method=5)
+        Image.open(p).convert("RGB").save(os.path.join(out, f"{i}.webp"), "WEBP", quality=quality, method=5)
     shutil.rmtree(tmp)
     txt = subprocess.run(["pdftotext", "-enc", "UTF-8", pdf, "-"], capture_output=True, text=True).stdout
     pages = txt.split("\f")[: len(files)]
     pages += [""] * (len(files) - len(pages))
     empty = [i for i, t in enumerate(pages, 1) if len(t.strip()) < 30]
-    if empty and shutil.which("tesseract"):
+    if ocr and empty and shutil.which("tesseract"):
         for i, t in ocr_pages(pdf, empty).items():
             pages[i - 1] = t
     json.dump(pages, open(os.path.join(out, "text.json"), "w"), ensure_ascii=False)
@@ -242,16 +247,19 @@ def render_pdf(pdf, out):
 def add_doc(V, pdf=None, rendered=None, **meta):
     """meta: kind, kurul, course, hoca, title, date, id, src, approx"""
     tmp = None
+    ident = meta.get("id") or V.new_id(meta["title"])
+    old = V.item(ident) or {}
+    keep = meta.get("keep_text") and old
     if rendered is None:
         tmp = tempfile.mkdtemp()
-        render_pdf(pdf, tmp)
+        render_pdf(pdf, tmp, ocr=not keep)
         rendered = tmp
     n = int(open(os.path.join(rendered, "done")).read())
     texts = json.load(open(os.path.join(rendered, "text.json")))
+    if keep and old.get("n") == n:      # yalnız görseller yenileniyor: eski (OCR'lı) metinleri koru
+        texts = V.get_json(f"d/{old['x']}/t")
     from PIL import Image
     w, h = Image.open(os.path.join(rendered, "1.webp")).size
-    ident = meta.get("id") or V.new_id(meta["title"])
-    old = V.item(ident) or {}
     x = V.hid("doc:" + ident)
     hv = hashlib.sha256()
     size = 0

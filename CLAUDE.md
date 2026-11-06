@@ -61,4 +61,4 @@ Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama 
 Eski merkez sayfa (claude.ai artifact) da güncel tutuluyor: yeni test ve notlar ikisine birden eklenir. Drive'dan gelen slaytlar sadece MedLock'a girer.
 
 ## Boyut
-GitHub Pages sitesi 1 GB'ı geçmemeli. Sayfalar ~40 KB (WebP q52). Ne kadar yer kaldığını izle (`du -sh d`).
+GitHub Pages sitesi 1 GB'ı geçmemeli. Yatay slaytlar 1100 px WebP q52 (~40 KB/sayfa); dikey A4 sayfalar (not, özet, çıkmış) küçük yazı yüzünden 1800 px q62 (~60–250 KB/sayfa). Ne kadar yer kaldığını izle (`du -sh d`). Yalnız görselleri yenilemek için `add_doc(..., keep_text=True)` eski OCR metnini korur.

@@ -157,6 +157,8 @@ h2.sec{font:700 13px var(--f-ui);letter-spacing:.06em;text-transform:uppercase;c
 .it .m .sc{color:var(--ok);font-weight:600}
 .it .m .ip{color:var(--flame);font-weight:600}
 .it .chev{color:var(--faint)}
+.it.pend{opacity:.62}
+.it.pend:hover{background:none}
 .kind{flex:none;display:inline-grid;place-items:center;width:42px;height:42px;border-radius:10px;font:700 10.5px var(--f-ui);letter-spacing:.02em;text-transform:uppercase;
   background:color-mix(in srgb,var(--kc) 13%,var(--surface));color:var(--kc);border:1px solid color-mix(in srgb,var(--kc) 25%,transparent)}
 .kind .ic{width:20px;height:20px}
@@ -169,6 +171,7 @@ h2.sec{font:700 13px var(--f-ui);letter-spacing:.06em;text-transform:uppercase;c
 .doc{position:relative;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;background:var(--bg);padding:10px 8px 60px}
 .pg{position:relative;margin:0 auto 10px;max-width:1100px;width:100%;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .pg img{width:100%;height:auto}
+.pg.portrait{max-width:920px}
 .pg .pn{position:absolute;left:8px;bottom:8px;font:600 11.5px var(--f-mono);background:rgba(18,26,51,.72);color:#fff;border-radius:6px;padding:2px 7px;pointer-events:none}
 .pg.hl{outline:3px solid var(--hl);outline-offset:0}
 .pg.hl::after{content:attr(data-hl);position:absolute;top:8px;right:8px;font:700 11.5px var(--f-ui);background:var(--hl);color:#3b2c00;border-radius:6px;padding:3px 8px}
