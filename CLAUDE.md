@@ -66,6 +66,12 @@ Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama 
 - İçeriği bu yılın kaynaklarında olmayan sorular `drop:1` ile teste girmez (Buğra'nın kuralı). Biyokimya çıkmışındaki enzim, lipit, karbonhidrat, membran ve protein yönlendirme soruları planda Kurul 2–3 konusu: o slaytlar gelince `drop`u kaldır, `sd`/`sp`/`quote` ekle; başka kurulun sorularıysa ayrı test olarak kur (ör. `bk-k2-cikmis`, SPEC'e ekle).
 - Her açıklama: doğru cevap, slayttan alıntı ("Slayta git" çalışsın diye `s` = "Deste adı, slayt N"), çıkmışın asıl sayfası. Cevap anahtarı yanlışsa doğrusunu yaz ve açıklamada belirt.
 
+## Anatomi Latincesi (#/sozluk)
+`tools/anatomi.py`: genel anatomi Latincesi (ders kaynağı değil, uygulamada böyle yazıyor; Buğra bunu açıkça istedi): kelimeler (isim/sıfat, kategori, Türkçe anlam ve -in/iyelik biçimleri), örnek terimler (`EX`, Latince + doğru Türkçe adı), dilbilgisi dersleri. `python3 tools/anatomi.py` örneklerin hepsi çözülüyor mu diye bakar.
+- Blob `d/<hid("anatomi")>`, katalogda `lat`. `index`/`add-doc` her seferinde yeniden kurar ve slaytlardaki Latince terimleri tarar (`sl`, sayfa dizini `pg`; slayt görünümünde sözlük düğmesi çıkar).
+- Anatomi/Histoloji slaytları gelince: slaytta geçen ama çözülemeyen kelimeleri (`anatomi.py` içinde N/A listelerine) ekle; testlerde yine yalnız slayt kaynak olur.
+- Eski kök sözlüğü (`kokler.py`, `lex`) "Kökler" sekmesinde durur. Tekrar anahtarları: `lex|<kök>`, `lat|w:<kelime>`, `lat|t:<terim>`.
+
 ## Denetim
 `MEDLOCK_PASS=... bash tools/check_site.sh` bütün blobları çözer, siteyi yerelde sunar ve telefon/tablet boyutunda giriş, slayt, test ("Slayta git"), sonuç, tekrar ve arama akışını dener (Playwright gerekir). Çıktıdaki `fails` boş olmalı.
 

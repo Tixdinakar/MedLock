@@ -349,3 +349,41 @@ mark{background:color-mix(in srgb,var(--hl) 70%,transparent);color:inherit;borde
 .mp-kok{background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
 .mp-son{background:color-mix(in srgb,var(--flame) 13%,var(--surface));color:var(--flame);border-color:color-mix(in srgb,var(--flame) 30%,transparent)}
 b.mp{font-size:14px;padding:2px 8px}
+/* anatomi Latincesi */
+.seg.scroll{flex-wrap:wrap}
+.seg.scroll a{flex:1 1 auto;padding:7px 10px;white-space:nowrap}
+.seg.sub{background:none;border:0;padding:0;gap:6px}
+.seg.sub a{flex:none;border:1px solid var(--line-2);border-radius:999px;padding:5px 12px;font-size:13px}
+.seg.sub a.on{box-shadow:none;border-color:var(--accent);color:var(--accent)}
+.chip.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.lxdec{padding:14px 16px;margin-bottom:12px}
+.lxterm{font:600 18px var(--f-ui);font-style:italic;margin-bottom:4px;overflow-wrap:anywhere}
+.lxread{font-size:16px;font-weight:600;color:var(--accent);margin-bottom:10px}
+.lxread .tag{font:600 11px var(--f-ui);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line-2);border-radius:999px;padding:1px 7px;margin-right:8px;vertical-align:2px}
+.lxw{display:grid;gap:0;border-top:1px solid var(--line)}
+.lxwr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.45}
+.lxwr:last-child{border-bottom:0}
+.lxwr .a b{font-style:italic;overflow-wrap:anywhere}
+.lxwr .gr{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.lxwr.miss .a b{color:var(--muted)}
+@media (max-width:420px){.lxwr{grid-template-columns:1fr;gap:2px}}
+.lxgrp{margin-bottom:8px;padding:0}
+.lxgrp summary,.lxles summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style-position:inside}
+.lxa{display:flex;flex-direction:column;gap:2px;color:var(--ink)}
+.lxa b{font-style:italic;font-weight:600}
+.lxles{margin-bottom:10px;padding:0}
+.lxbody{padding:0 16px 14px;font-size:15px;line-height:1.55}
+.lxbody p{margin:8px 0}
+.lxbody ul{padding-left:18px;margin:8px 0}
+.lxbody li{margin:4px 0}
+.lxex{background:var(--surface-2);border-left:3px solid var(--accent);padding:8px 12px;border-radius:6px;font-size:14.5px}
+.lxt{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+.lxt th,.lxt td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.lxt th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.lxstem{font-size:18px}
+.lxfb .lxdec{margin:8px 0 0;background:var(--surface);box-shadow:none}
+.lxfb{font-size:14.5px}
+.sheet-bg{position:fixed;inset:0;z-index:60;background:rgba(10,14,30,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:720px;max-height:80vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.25);padding-bottom:var(--sab,0px)}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;padding:10px 8px 6px 16px;border-bottom:1px solid var(--line)}
+.sheet-b{overflow:auto;padding:12px 12px 16px}

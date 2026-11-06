@@ -504,6 +504,7 @@ def build_index(V):
                 Q.append([it["id"], i, strip_html(c[1]) + " — " + strip_html(c[2])])
     V.put_json("d/s", {"d": D, "q": Q})
     build_lexicon(V)
+    build_latin(V)
     return len(D), len(Q)
 
 
@@ -606,6 +607,13 @@ def _segmenter():
     return ROOTS, analyse
 
 
+def build_latin(V):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import importlib, anatomi
+    importlib.reload(anatomi)
+    return anatomi.build(V)
+
+
 def build_lexicon(V):
     roots, analyse = _segmenter()
     terms, docs, vocab = {}, [], set()
@@ -656,6 +664,10 @@ def check(V):
                 V.get(f"d/{it['x']}/{i}")
                 n += 1
     V.get_json("d/s")
+    for k in ("lex", "lat"):
+        if V.cat.get(k):
+            V.get_json(f"d/{V.cat[k]['x']}")
+            n += 1
     return n
 
 

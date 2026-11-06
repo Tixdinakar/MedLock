@@ -177,7 +177,7 @@ function loadLex() {
   });
   return lexP;
 }
-const loadTest = async it => it.k === "lex" ? loadLex() : S.tests[it.id] || (S.tests[it.id] = await fetchJSON("d/" + it.x, it.v));
+const loadTest = async it => it.k === "lex" ? loadLex() : it.k === "lat" ? loadLat() : S.tests[it.id] || (S.tests[it.id] = await fetchJSON("d/" + it.x, it.v));
 const loadTexts = async it => S.texts[it.id] || (S.texts[it.id] = await fetchJSON("d/" + it.x + "/t", it.v));
 let engineP = null;
 const engineTpl = () => engineP || (engineP = fetch("engine.html").then(r => { if (!r.ok) throw new Error("engine"); return r.text(); }));
@@ -205,7 +205,7 @@ function srsDue(all) {
   const s = srsLoad(), t = today();
   return Object.keys(s).filter(k => !s[k].m && (all || s[k].due <= t));
 }
-function srsKeyItem(k) { const id = k.split("|")[0]; return id === "lex" ? (S.cat.lex ? LEXITEM : null) : S.byId[id]; }
+function srsKeyItem(k) { const id = k.split("|")[0]; return id === "lex" ? (S.cat.lex ? LEXITEM : null) : id === "lat" ? (S.cat.lat ? LATITEM : null) : S.byId[id]; }
 const testRes = () => Object.assign({}, PS.get("tres", {}));
 const bmLoad = () => Object.values(PS.get("bm", {})).filter(b => !b.x).sort((a, b) => b.at - a.at);
 const bmHas = (id, p) => { const b = PS.get("bm", {})[id + "|" + p]; return !!b && !b.x; };
@@ -375,7 +375,7 @@ function shell() {
     + '<a data-nav="tekrar" href="#/tekrar">' + icon("rep") + 'Tekrar<span class="badge" data-badge hidden></span></a>'
     + '<a data-nav="ilerleme" href="#/ilerleme">' + icon("chart") + 'İlerleme</a>'
     + '<a data-nav="karma" href="#/karma">' + icon("mix") + 'Karma deneme</a>'
-    + (S.cat.lex ? '<a data-nav="sozluk" href="#/sozluk">' + icon("lex") + 'Tıbbi terimler</a>' : "")
+    + (S.cat.lex || S.cat.lat ? '<a data-nav="sozluk" href="#/sozluk">' + icon("lex") + 'Anatomi Latincesi</a>' : "")
     + '<a data-nav="ara" href="#/ara">' + icon("search") + 'Ara</a>'
     + '<div class="sep"></div><a data-nav="ayarlar" href="#/ayarlar">' + icon("set") + 'Ayarlar</a></nav>'
     + '<div class="foot" id="side-foot"></div></aside>'
@@ -510,7 +510,7 @@ function viewHome() {
     + '<a class="card tile" href="#/ilerleme"><span class="big">' + streak + '</span><span class="txt"><b>günlük seri</b><span class="muted small">Bugün ' + dayN(days, t) + " soru çözdün</span></span>" + icon("chev", "chev") + "</a>"
     + '<a class="card tile" href="#/karma"><span class="big">' + icon("mix") + '</span><span class="txt"><b>Karma deneme</b><span class="muted small">Seçtiğin derslerden karışık sorular</span></span>' + icon("chev", "chev") + "</a>"
     + '<a class="card tile" href="#/ara"><span class="big">' + icon("search") + '</span><span class="txt"><b>Her yerde ara</b><span class="muted small">Slaytlar, notlar ve sorular</span></span>' + icon("chev", "chev") + "</a>"
-    + (S.cat.lex ? '<a class="card tile" href="#/sozluk"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Tıbbi terimler</b><span class="muted small">Latince ve Yunanca kökler, ' + S.cat.lex.n + " terim</span></span>" + icon("chev", "chev") + "</a>" : "")
+    + (S.cat.lex || S.cat.lat ? '<a class="card tile" href="#/sozluk"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Anatomi Latincesi</b><span class="muted small">' + (S.cat.lat ? "Terim çözücü, " + S.cat.lat.n + " kelime, alıştırma" : "Latince ve Yunanca kökler") + "</span></span>" + icon("chev", "chev") + "</a>" : "")
     + "</div>"
     + installCard()
     + (cont.length ? '<h2 class="sec">Kaldığın yer</h2><div class="card list">' + cont.map(c => c.html).join("") + "</div>" : "")
@@ -549,7 +549,7 @@ function viewLib() {
   };
   const hasOrtak = S.cat.items.some(i => i.g === "ortak");
   main().innerHTML = bar({ title: "Kütüphane", crumb: "Tıp · Dönem I" }) + '<div class="page">'
-    + (S.cat.lex ? '<a class="card tile" href="#/sozluk" style="margin-bottom:12px"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Tıbbi terim sözlüğü</b><span class="muted small">Slaytlarındaki terimler Latince ve Yunanca köklerine ayrılmış hâlde</span></span>' + icon("chev", "chev") + "</a>" : "")
+    + (S.cat.lex || S.cat.lat ? '<a class="card tile" href="#/sozluk" style="margin-bottom:12px"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Anatomi Latincesi</b><span class="muted small">Terim çözücü, kelimeler, dilbilgisi, alıştırma ve kökler</span></span>' + icon("chev", "chev") + "</a>" : "")
     + '<div class="grid">'
     + started.map(k => card(k)).join("") + (hasOrtak ? card(kurulById("ortak")) : "") + future.map(k => card(k, "future")).join("")
     + "</div></div>";
@@ -676,7 +676,7 @@ function viewDoc(id, page, q) {
   const back = "#/lib/" + it.g + "/" + slug(it.c);
   main().innerHTML = '<div class="fill">' + bar({
     title: it.t, solid: 1, back, crumb: esc(it.c) + (it.h ? " · " + esc(it.h) : ""),
-    actions: '<button class="ibtn" id="rotb" title="Sayfayı döndür">' + icon("rot") + '</button><button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
+    actions: (S.cat.lat && (S.cat.lat.ids || []).includes(it.id) ? '<button class="ibtn" id="latb" title="Bu sayfadaki Latince terimler">' + icon("lex") + "</button>" : "") + '<button class="ibtn" id="rotb" title="Sayfayı döndür">' + icon("rot") + '</button><button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
   }) + '<div class="doc" id="doc" tabindex="-1"></div></div>';
   const rel = S.cat.items.filter(t => t.k === "test" && (t.dk || []).some(d => d[0] === it.id));
   const foot = rel.length ? '<div class="doc-foot"><b>Bu ' + (it.k === "slayt" ? "slayttan" : "dosyadan") + " soru olan testler</b><div class=\"row-btns\">"
@@ -695,6 +695,12 @@ function viewDoc(id, page, q) {
   setLast("doc", { id: it.id, p: page });
   S.cleanup.push(() => V.destroy());
   $("#doc").focus({ preventScroll: true });
+  const lb = $("#latb");
+  if (lb) lb.onclick = async () => {
+    const pg = V.page, { D, terms } = await latPageTerms(it.id, pg);
+    if (!terms.length) return toast((it.k === "slayt" ? "Bu slaytta" : "Bu sayfada") + " Latince terim bulunamadı");
+    latSheet((it.k === "slayt" ? "Slayt " : "Sayfa ") + pg + " · Latince terimler", terms.map(t => latDecodeHTML(D, t)).join(""));
+  };
   $("#rotb").onclick = () => {
     const rk = it.x + "/" + V.page, R = Object.assign({}, PS.get("rot", {}));
     R[rk] = { a: (((R[rk] || {}).a || 0) + 90) % 360, at: Date.now() };
@@ -979,9 +985,10 @@ async function viewSession(q) {
   keys.sort(() => Math.random() - .5);
   main().innerHTML = '<div class="fill">' + bar({ title: "Tekrar", solid: 1, back: "#/tekrar", crumb: cf ? esc(cf) : all ? "Bütün liste" : "Bugünün soruları" })
     + '<div class="doc" style="padding:16px 12px 60px"><div class="page narrow" id="rv" style="padding:0"><div class="loading"><div class="spin"></div></div></div></div></div>';
-  const items = Array.from(new Set(keys.map(k => k.split("|")[0]))).map(id => id === "lex" ? LEXITEM : S.byId[id]);
+  const items = Array.from(new Set(keys.map(k => k.split("|")[0]))).map(id => id === "lex" ? LEXITEM : id === "lat" ? LATITEM : S.byId[id]);
   await Promise.all(items.map(loadTest));
   if (items.some(i => i.k === "lex")) S.lex = await loadLex();
+  if (items.some(i => i.k === "lat")) S.lat = await loadLat();
   const queue = keys.map(k => ({ k, again: false }));
   let pos = 0, nOk = 0, nBad = 0;
   const draw = () => {
@@ -991,10 +998,11 @@ async function viewSession(q) {
       box.innerHTML = '<div class="card empty"><div style="font:700 26px var(--f-cond);color:var(--ink)">Bitti</div><p>' + nOk + " doğru · " + nBad + ' yanlış</p><div class="row-btns" style="justify-content:center"><a class="btn primary" href="#/tekrar">Tekrar sayfası</a><a class="btn" href="#/">Ana sayfa</a></div></div>';
       updateBadge(); return;
     }
-    const cur = queue[pos], [tid, qid] = cur.k.split("|"), it = srsKeyItem(cur.k), blob = tid === "lex" ? S.lex : S.tests[tid];
+    const cur = queue[pos], [tid, qid] = cur.k.split("|"), it = srsKeyItem(cur.k), blob = tid === "lex" ? S.lex : tid === "lat" ? S.lat : S.tests[tid];
     const head = '<div class="qprog"><span>' + (pos + 1) + " / " + queue.length + '</span><div class="prog"><i style="width:' + Math.round(100 * pos / queue.length) + '%;background:var(--flame)"></i></div></div>';
-    if (it.k === "kart" || it.k === "lex") {
-      const c = blob.cards[+qid];
+    if (it.k === "kart" || it.k === "lex" || it.k === "lat") {
+      const c = it.k === "lat" ? blob.card(qid) : blob.cards[+qid];
+      if (!c) { pos++; return draw(); }
       let back = false;
       const dc = () => {
         box.innerHTML = head + '<div class="card flash' + (back ? " back" : "") + '" id="fl"><div><div class="side-l">' + esc(it.c) + " · " + esc(c[0]) + '</div><div class="fx" style="margin-top:10px">' + (back ? c[2] : c[1]) + "</div></div></div>"
@@ -1159,12 +1167,297 @@ async function viewMix(q) {
   draw();
 }
 
-/* ---------- lexicon ---------- */
+/* ---------- anatomi Latincesi ---------- */
+const LATITEM = { id: "lat", k: "lat", c: "Anatomi Latincesi", t: "Kelime ve terimler", g: "" };
+const GR = { ns: "tekil", gs: "tekil, -in hâli", np: "çoğul", gp: "çoğul, -in hâli" };
+const GN = { m: "eril", f: "dişil", n: "nötr" };
+let latP = null;
+function loadLat() {
+  if (!latP) latP = fetchJSON("d/" + S.cat.lat.x, S.cat.lat.v).then(D => {
+    D.byL = {}; D.w.forEach((e, i) => { if (!(e.l in D.byL)) D.byL[e.l] = i; });
+    D.exBy = {}; D.ex.forEach((e, i) => { D.exBy[e[0]] = i; });
+    D.catName = Object.fromEntries(D.cats);
+    D.card = qid => latCard(D, qid);
+    return D;
+  });
+  return latP;
+}
+const lastVowel = s => { const m = s.match(/[aıoueiöü](?=[^aıoueiöü]*$)/); return m ? m[0] : "e"; };
+const trPlPos = s => s + ("aıou".includes(lastVowel(s)) ? "ı" : "i");
+function latDecode(D, input) {
+  const raw = input.toLowerCase().replace(/[(),;:]/g, " ").split(/\s+/).filter(Boolean);
+  const toks = raw.map(r => {
+    const w0 = r.replace(/\.+$/, ""), ab = r.endsWith(".") && D.ab[w0];
+    const w = ab || w0;
+    return { raw: r, w, abbr: !!ab, c: D.f[w] || [] };
+  });
+  const W = c => D.w[c[0]], isGen = g => g === "gs" || g === "gp";
+  let head = null;
+  toks.forEach((t, i) => {
+    const C = t.c;
+    if (!C.length) { t.pick = null; return; }
+    let p = null;
+    if (i === 0 || !head) p = C.find(c => W(c).k === "n" && (c[1] === "ns" || c[1] === "np")) || C[0];
+    else {
+      const hg = D.w[head[0]].g + head[1];
+      p = C.find(c => W(c).k === "s" && c[1] === hg);
+      for (let j = i - 1; j > 0 && !p; j--) {
+        const q = toks[j].pick;
+        if (q && W(q).k === "n" && isGen(q[1])) p = C.find(c => W(c).k === "s" && c[1] === W(q).g + q[1]);
+      }
+      if (!p) p = C.find(c => W(c).k === "n" && isGen(c[1]) && t.w !== W(c).l) || C.find(c => W(c).k === "n" && isGen(c[1]));
+      if (!p) p = C.find(c => W(c).c === "islev") || C.find(c => W(c).k === "s") || C[0];
+    }
+    t.pick = p;
+    if (!head && p && W(p).k === "n") head = p;
+  });
+  return { toks, head };
+}
+function latReading(D, dec) {
+  const T = dec.toks;
+  if (!T.length || !T[0].pick || D.w[T[0].pick[0]].k !== "n" || T.some(t => !t.pick)) return "";
+  const h = T[0].pick, hw = D.w[h[0]], plural = h[1] === "np", gens = [], mods = [];
+  let last = null;
+  T.slice(1).forEach(t => {
+    const w = D.w[t.pick[0]], g = t.pick[1];
+    if (w.k === "n" && (g === "gs" || g === "gp")) { last = { tr: g === "gs" ? w.tg : w.tgp, adj: [] }; gens.push(last); }
+    else if (w.k === "s" && last && (g.slice(1) === "gs" || g.slice(1) === "gp")) last.adj.push(w.s);
+    else mods.push(w.s);
+  });
+  const genPart = gens.slice().reverse().map(g => g.adj.slice().reverse().concat(g.tr).join(" ")).join(" ");
+  const headTr = gens.length ? (plural ? trPlPos(hw.tpl) : hw.tp) : (plural ? hw.tpl : hw.s);
+  return [genPart, mods.slice().reverse().join(" "), headTr].filter(Boolean).join(" ");
+}
+function latGloss(D, t) {
+  if (!t.pick) {
+    const af = D.af.find(a => a[2].some(p => t.w.startsWith(p) && t.w.length > p.length + 3));
+    return { lat: t.raw, lem: "", gram: "", tr: af ? '<span class="muted">Sözlükte yok. Ön ek: <b>' + esc(af[0]) + "</b> " + esc(af[1]) + "</span>" : '<span class="muted">Sözlükte yok</span>', miss: 1 };
+  }
+  const w = D.w[t.pick[0]], g = t.pick[1];
+  let tr;
+  if (w.k === "n") tr = g === "gs" ? "“" + w.tg + "”" : g === "gp" ? "“" + w.tgp + "”" : g === "np" ? w.tpl : w.s;
+  else tr = w.s;
+  const gram = w.k === "n" ? GR[g] : GN[g[0]] + " · " + GR[g.slice(1)];
+  const full = w.tr;
+  if (w.k === "s" || (w.k === "n" && g === "ns")) {          // kısa ad tam anlamın başıysa tek satır yeter
+    if (full.startsWith(tr)) return { lat: t.abbr ? t.raw + " (" + t.w + ")" : t.w, lem: w.l, gram, tr: esc(full), note: w.n };
+  }
+  return { lat: t.abbr ? t.raw + " (" + t.w + ")" : t.w, lem: w.l, gram, tr: esc(tr), full, note: w.n };
+}
+function latDecodeHTML(D, input, opts) {
+  opts = opts || {};
+  const dec = latDecode(D, input);
+  if (!dec.toks.length) return "";
+  const norm = dec.toks.map(t => t.w).join(" "), ei = D.exBy[norm];
+  const read = ei != null ? D.ex[ei][1] : latReading(D, dec);
+  const rows = dec.toks.map(t => latGloss(D, t));
+  return '<div class="card lxdec">' + (opts.title === false ? "" : '<div class="lxterm">' + esc(norm) + "</div>")
+    + (read ? '<div class="lxread">' + (ei != null ? "" : '<span class="tag">kabaca</span>') + esc(read) + "</div>" : "")
+    + '<div class="lxw">' + rows.map(r => '<div class="lxwr' + (r.miss ? " miss" : "") + '"><div class="a"><b>' + esc(r.lat) + "</b>"
+      + (r.lem && r.lem !== r.lat ? '<span class="muted"> ← ' + esc(r.lem) + "</span>" : "") + (r.gram ? '<span class="gr">' + esc(r.gram) + "</span>" : "") + "</div>"
+      + '<div class="b">' + r.tr + (r.full && r.full !== r.tr ? '<span class="muted small"> · ' + esc(r.full) + "</span>" : "") + (r.note ? '<div class="muted small">' + esc(r.note) + "</div>" : "") + "</div></div>").join("") + "</div></div>";
+}
+function latCard(D, qid) {
+  const [t, key] = [qid.slice(0, 1), qid.slice(2)];
+  if (t === "w") {
+    const i = D.byL[key]; if (i == null) return null;
+    const w = D.w[i];
+    return [D.catName[w.c] || "Kelime", "<b>" + esc(w.l) + '</b><div class="muted small" style="margin-top:8px">' + esc(w.d) + "</div>", esc(w.tr) + (w.n ? '<div class="muted small" style="margin-top:6px">' + esc(w.n) + "</div>" : "")];
+  }
+  const i = D.exBy[key]; if (i == null) return null;
+  const e = D.ex[i];
+  return [e[2], "<b>" + esc(e[0]) + "</b>", esc(e[1]) + '<div class="small" style="margin-top:10px;text-align:left">' + latDecodeHTML(D, e[0], { title: false }) + "</div>"];
+}
+function srsMarkWrong(key) {
+  const S2 = srsLoad(), e = S2[key];
+  S2[key] = { b: 0, due: addDays(today(), 1), w: (e ? e.w : 0) + 1, t: Date.now(), u: Date.now() };
+  srsSave(S2); updateBadge();
+}
+const shuf = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const rnd = a => a[Math.floor(Math.random() * a.length)];
+function latQuestion(D, mode) {
+  const mk = (stem, right, wrong, exp, key, sub) => {
+    const o = shuf([right].concat(wrong.slice(0, 4)));
+    return { stem, sub, o, a: o.indexOf(right), exp, key };
+  };
+  if (mode === "lt" || mode === "tl") {
+    const i = Math.floor(Math.random() * D.ex.length), me = new Set(D.ex[i][0].split(" "));
+    const near = D.ex.map((e, j) => [j, e[0].split(" ").filter(x => me.has(x)).length + (e[2] === D.ex[i][2] ? 0.6 : 0) + Math.random() * 0.5])
+      .filter(([j]) => j !== i && D.ex[j][1] !== D.ex[i][1] && D.ex[j][0] !== D.ex[i][0]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    const plain = t => t.replace(/\s*\([^)]*\)/g, "");
+    const seen = new Set([plain(D.ex[i][1])]), pick = [];
+    near.forEach(j => { const v = mode === "lt" ? plain(D.ex[j][1]) : D.ex[j][0]; if (!seen.has(v) && pick.length < 4) { seen.add(v); pick.push(v); } });
+    const e = D.ex[i];
+    return mode === "lt" ? mk("<i>" + esc(e[0]) + "</i>", plain(e[1]), pick, latDecodeHTML(D, e[0], { title: false }), "t:" + e[0], "Bu terim ne demek?")
+      : mk(esc(e[1]), e[0], pick, latDecodeHTML(D, e[0]), "t:" + e[0], "Latincesi hangisi?");
+  }
+  if (mode === "kel") {
+    // aynı anlama gelen ya da çok yakın kelimeler aynı soruda şık olmasın
+    const SYN = [["fibularis", "peroneus"], ["pectoralis", "thoracicus", "pectus", "thorax"], ["frontalis", "coronalis"], ["ventralis", "anterior"], ["dorsalis", "posterior", "dorsum"],
+      ["cranialis", "superior"], ["caudalis", "inferior"], ["internus", "medialis"], ["externus", "lateralis"], ["magnus", "major", "maximus"], ["minor", "minimus"],
+      ["vastus", "latus", "latissimus"], ["teres", "rotundus"], ["medius", "medianus", "intermedius"], ["cavus", "cavitas", "cavum"], ["os", "ossa"], ["cervix", "collum", "cervicalis"],
+      ["venter", "abdomen", "abdominalis"], ["calx", "calcaneus", "malleolus"], ["tempus", "temporalis"], ["spina", "spinosus", "columna", "vertebra"], ["coxa", "gluteus"]];
+    const syn = l => new Set([].concat(...SYN.filter(g => g.includes(l))));
+    // "zigomatik", "deltoid" gibi Latinceden gelen ad soruyu ele verir: parantezin içi ya da dışından Latinceye benzemeyeni seç
+    const mean = w => {
+      const t = w.tr.replace(/:.*$/, "").trim(), m = t.match(/^(.*?)\s*\((.*)\)\s*$/), parts = m ? [m[1], m[2]] : [t];
+      const like = x => fold(x).replace(/[^a-z]/g, "").slice(0, 4) === fold(w.l).replace(/[^a-z]/g, "").slice(0, 4);
+      return (parts.find(x => !like(x)) || parts[0]).replace(/[;,].*$/, "").trim();
+    };
+    for (let k = 0; k < 20; k++) {
+      const w = rnd(D.w), bad = syn(w.l), same = shuf(D.w.filter(x => x !== w && x.c === w.c)), other = shuf(D.w.filter(x => x !== w && x.c !== w.c && x.k === w.k));
+      const right = mean(w), used = new Set([right, w.s]), wr = [];
+      same.concat(other).forEach(x => { const v = mean(x); if (wr.length < 4 && !used.has(v) && !used.has(x.s) && !bad.has(x.l) && x.tr.split(/[ (;,]/)[0] !== w.tr.split(/[ (;,]/)[0]) { used.add(v); used.add(x.s); wr.push(v); } });
+      if (wr.length === 4) return mk("<i>" + esc(w.l) + "</i>", right, wr, "<b>" + esc(w.l) + "</b> (" + esc(w.d) + "): " + esc(w.tr) + (w.n ? " · " + esc(w.n) : ""), "w:" + w.l, "Anlamı hangisi?");
+    }
+  }
+  // dilbilgisi: çoğul / -in hâli
+  const nouns = D.w.filter(w => w.k === "n" && w.c !== "hareket");
+  for (let k = 0; k < 30; k++) {
+    const w = rnd(nouns), ask = rnd(["gs", "np", "gp"]), right = w.f[ask];
+    if (ask !== "np" && right === w.l) continue;
+    const ns = w.l, gs = w.f.gs;
+    const nstem = ns.replace(/(us|um|on|a|is|en|ex|ix|er|or|as|es|u|os|ys)$/, ""), gstem = gs.replace(/(ae|is|i|us|ei)$/, "");
+    const END = { gs: ["ae", "i", "is", "us", "ei", "orum"], np: ["ae", "i", "a", "es", "us", "ina", "ia"], gp: ["arum", "orum", "um", "ium", "uum", "is"] }[ask];
+    const cand = new Set();
+    [nstem, gstem].forEach(st => END.forEach(e => cand.add(st + e)));
+    cand.delete(right);
+    const wr = shuf(Array.from(cand).filter(x => x.length >= 4 && x[0] === ns[0]));
+    if (wr.length < 4) continue;
+    const q = { gs: "-in hâli (tekil)", np: "çoğulu", gp: "çoğul -in hâli" }[ask];
+    return mk("<i>" + esc(ns) + "</i> (" + esc(w.s) + ")", right, wr,
+      "<b>" + esc(ns) + "</b>: tekil -in hâli <b>" + esc(w.f.gs) + "</b> (" + esc(w.tg) + "), çoğul <b>" + esc(w.f.np) + "</b>, çoğul -in hâli <b>" + esc(w.f.gp) + "</b> (" + esc(w.tgp) + ").", "w:" + w.l, "Bu ismin " + q + " hangisi?");
+  }
+}
+const LATMODES = [["lt", "Terimi çöz", "Latince terim → Türkçesi"], ["tl", "Terimi bul", "Türkçe → Latince terim"], ["kel", "Kelimeler", "Latince kelime → anlamı"], ["dil", "Çoğul ve -in hâli", "fossa → fossae, foramen → foramina"]];
+
+/* ---------- terimler sayfası ---------- */
 async function viewLexicon(q) {
-  if (!S.cat.lex) return notFound();
+  if (!S.cat.lex && !S.cat.lat) return notFound();
   setNav("sozluk");
-  const tab = q.get("t") || "terim";
-  main().innerHTML = bar({ title: "Tıbbi terimler", crumb: "Latince ve Yunanca kökler" }) + '<div class="page narrow" id="lx"><div class="loading"><div class="spin"></div></div></div>';
+  const OLD = ["dt", "kok", "kk"];
+  let tab = q.get("t") || (S.cat.lat ? "coz" : "dt");
+  if (tab === "terim") tab = "dt";
+  if (!S.cat.lat && !OLD.includes(tab)) tab = "dt";
+  main().innerHTML = bar({ title: "Anatomi Latincesi", crumb: "Terim çözücü, kelimeler, kökler" }) + '<div class="page narrow" id="lx"><div class="loading"><div class="spin"></div></div></div>';
+  const TABS = [["coz", "Çözücü"], ["kel", "Kelimeler"], ["dil", "Dilbilgisi"], ["alis", "Alıştır"], ["kart", "Kartlar"], ["sl", "Slaytlarda"], ["dt", "Kökler"]].filter(([k]) => S.cat.lat || k === "dt");
+  const cur = OLD.includes(tab) ? "dt" : tab;
+  const top = TABS.length > 1 ? '<div class="seg scroll">' + TABS.map(([k, l]) => '<a class="' + (cur === k ? "on" : "") + '" href="#/sozluk?t=' + k + '">' + l + "</a>").join("") + "</div>" : "";
+  if (OLD.includes(tab)) return viewRoots(q, tab, top);
+  const D = await loadLat();
+  if (parseHash().parts[0] !== "sozluk") return;
+  const box = $("#lx"), NOTE = '<p class="note">Bu bölüm ders kaynaklarından değil; standart anatomi Latincesinden (Terminologia Anatomica) Claude hazırladı. Anatomi slaytları geldikçe slaytlardaki terimler de eklenir.</p>';
+  if (tab === "coz") {
+    const v0 = q.get("q") || "";
+    const groups = [];
+    D.ex.forEach(e => { let g = groups.find(x => x[0] === e[2]); if (!g) groups.push(g = [e[2], []]); g[1].push(e); });
+    box.innerHTML = top + '<div class="sbox">' + icon("search") + '<input id="lq" type="search" placeholder="Örn. m. flexor digitorum profundus" autocomplete="off" autocapitalize="off" spellcheck="false" value="' + esc(v0) + '"></div><div id="lxo"></div>'
+      + '<h2 class="sec">Örnek terimler · ' + D.ex.length + "</h2>"
+      + groups.map(([g, es]) => '<details class="card lxgrp"><summary>' + esc(g) + ' <span class="muted">' + es.length + "</span></summary>" + es.map(e => '<a class="lxr lxa" href="#/sozluk?t=coz&q=' + encodeURIComponent(e[0]) + '"><b>' + esc(e[0]) + '</b><span class="muted">' + esc(e[1]) + "</span></a>").join("") + "</details>").join("") + NOTE;
+    const inp = $("#lq"), out = $("#lxo");
+    const run = () => {
+      const v = inp.value.trim();
+      history.replaceState(null, "", "#/sozluk?t=coz" + (v ? "&q=" + encodeURIComponent(v) : ""));
+      out.innerHTML = v ? latDecodeHTML(D, v) : '<p class="note">Bir terim yaz ya da aşağıdan bir örneğe dokun. Kısaltmalar da olur: m., n., a., v., lig.</p>';
+    };
+    inp.oninput = run; run();
+    if (v0) $("#lxo").scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (tab === "kel") {
+    const st = { q: q.get("q") || "", c: q.get("c") || "" };
+    const draw = () => {
+      const f = fold(st.q.trim());
+      const list = D.w.filter(w => (!st.c || w.c === st.c) && (!f || fold(w.l).includes(f) || fold(w.tr).includes(f) || Object.values(w.k === "n" ? w.f : w.f.m).some(x => fold(x).includes(f))));
+      box.innerHTML = top + '<div class="sbox">' + icon("search") + '<input id="lq" type="search" placeholder="Latince ya da Türkçe: fossa, delik, kısa" autocomplete="off" autocapitalize="off" value="' + esc(st.q) + '"></div>'
+        + '<div class="chips" style="margin-bottom:12px"><button class="chip' + (st.c ? "" : " on") + '" data-c="">Hepsi</button>' + D.cats.map(([k, l]) => '<button class="chip' + (st.c === k ? " on" : "") + '" data-c="' + k + '">' + esc(l) + "</button>").join("") + "</div>"
+        + (list.length ? '<div class="card">' + list.map(w => '<div class="lxr"><div class="lxt"><b>' + esc(w.l) + '</b><span class="muted small">' + esc(w.d) + '</span></div><div class="lxg">' + esc(w.tr) + "</div>" + (w.n ? '<div class="muted small">' + esc(w.n) + "</div>" : "") + "</div>").join("") + "</div>" : '<div class="card empty">Bu aramaya uyan kelime yok.</div>') + NOTE;
+      const lq = $("#lq");
+      lq.oninput = () => { st.q = lq.value; const pos = lq.selectionStart; draw(); const l2 = $("#lq"); l2.focus(); l2.setSelectionRange(pos, pos); };
+      $$(".chip", box).forEach(b => b.onclick = () => { st.c = b.dataset.c; draw(); });
+    };
+    draw(); return;
+  }
+  if (tab === "dil") {
+    box.innerHTML = top + D.ls.map(([t, h], i) => '<details class="card lxles"' + (i === 0 ? " open" : "") + "><summary>" + esc(t) + '</summary><div class="lxbody">' + h + "</div></details>").join("") + NOTE;
+    return;
+  }
+  if (tab === "sl") {
+    const refLink = r => { const it = S.byId[r[0]]; return it ? '<a href="#/d/' + r[0] + "/" + r[1] + "?h=" + r[1] + '">' + esc(it.t) + " · " + (it.k === "slayt" ? "slayt " : "s. ") + r[1] + "</a>" : ""; };
+    box.innerHTML = top + (D.sl.length ? '<p class="note">Slaytlarında ve notlarında geçen ' + D.sl.length + ' Latince terim. Terime dokununca çözülür.</p><div class="card">'
+      + D.sl.map(s => '<div class="lxr"><div class="lxt"><a href="#/sozluk?t=coz&q=' + encodeURIComponent(s[0]) + '"><b>' + esc(s[0]) + "</b></a>" + (s[1] > 1 ? '<span class="muted small">' + s[1] + " kez</span>" : "") + '</div><div class="lxref">' + s[2].slice(0, 4).map(refLink).join("") + "</div></div>").join("") + "</div>"
+      : '<div class="card empty"><b>Henüz yok</b><p>Anatomi ve Histoloji slaytları eklendikçe, slaytlarda geçen Latince terimler burada listelenir; her biri çözülür ve geçtiği slayta bağlanır. Slaytı açtığında da sayfadaki terimleri gösteren bir düğme çıkar.</p></div>');
+    return;
+  }
+  if (tab === "kart") {
+    const decks = [["kel", "Bütün kelimeler"]].concat(D.cats.map(([k, l]) => [k, l])).concat([["ter", "Örnek terimler"]]);
+    const st = { d: q.get("d") || "kel", i: 0, back: false };
+    const deck = () => st.d === "ter" ? D.ex.map(e => "t:" + e[0]) : D.w.filter(w => st.d === "kel" || w.c === st.d).map(w => "w:" + w.l);
+    let order = shuf(deck());
+    const draw = () => {
+      const k = order[st.i % order.length], c = latCard(D, k);
+      box.innerHTML = top + '<div class="chips" style="margin-bottom:12px">' + decks.map(([k2, l]) => '<button class="chip' + (st.d === k2 ? " on" : "") + '" data-d="' + k2 + '">' + esc(l) + "</button>").join("") + "</div>"
+        + '<div class="qprog"><span>' + (st.i % order.length + 1) + " / " + order.length + '</span><div class="prog"><i style="width:' + Math.round(100 * ((st.i % order.length) + 1) / order.length) + '%;background:var(--accent)"></i></div></div>'
+        + '<div class="card flash' + (st.back ? " back" : "") + '" id="fl"><div><div class="side-l">' + esc(c[0]) + '</div><div class="fx" style="margin-top:10px">' + (st.back ? c[2] : c[1]) + "</div>" + (st.back ? "" : '<div class="muted small" style="margin-top:14px">Anlamını görmek için dokun</div>') + "</div></div>"
+        + '<div class="qnav">' + (st.back ? '<button class="btn" id="no">Bilemedim</button><button class="btn primary" id="yes">Bildim</button>' : '<button class="btn primary" id="flip">Çevir</button>') + "</div>"
+        + '<p class="note">“Bilemedim” dediklerin Tekrar listesine düşer.</p>';
+      const nx = () => { st.i++; st.back = false; draw(); };
+      $("#fl").onclick = () => { st.back = !st.back; draw(); };
+      const fl = $("#flip"); if (fl) fl.onclick = () => { st.back = true; draw(); };
+      const y = $("#yes"); if (y) y.onclick = nx;
+      const n = $("#no"); if (n) n.onclick = () => { srsMarkWrong("lat|" + k); toast("Tekrar listesine eklendi"); nx(); };
+      $$(".chip", box).forEach(b => b.onclick = () => { st.d = b.dataset.d; st.i = 0; st.back = false; order = shuf(deck()); draw(); });
+    };
+    draw(); return;
+  }
+  // alıştır
+  const mode = q.get("m");
+  if (!mode) {
+    box.innerHTML = top + '<p class="note">10 soruluk kısa turlar, her soru 5 şıklı. Yanlış yaptığın kelime ve terimler Tekrar listesine düşer.</p>'
+      + LATMODES.map(([k, l, d]) => '<a class="card tile" href="#/sozluk?t=alis&m=' + k + '" style="margin-bottom:10px"><span class="txt"><b>' + l + '</b><span class="muted small">' + d + "</span></span>" + icon("chev", "chev") + "</a>").join("") + NOTE;
+    return;
+  }
+  const R = { n: 10, i: 0, ok: 0, qs: [] };
+  for (let k = 0; k < R.n; k++) { const qq = latQuestion(D, mode); if (qq) R.qs.push(qq); }
+  const L5 = ["A", "B", "C", "D", "E"], title = (LATMODES.find(m => m[0] === mode) || [])[1] || "";
+  const draw = () => {
+    if (R.i >= R.qs.length) {
+      box.innerHTML = top + '<div class="card empty"><div style="font:700 26px var(--f-cond);color:var(--ink)">' + R.ok + " / " + R.qs.length + "</div><p>" + esc(title) + '</p><div class="row-btns" style="justify-content:center"><a class="btn primary" href="#/sozluk?t=alis&m=' + mode + "&r=" + Date.now() + '">Yeni tur</a><a class="btn" href="#/sozluk?t=alis">Başka alıştırma</a></div></div>';
+      return;
+    }
+    const qq = R.qs[R.i];
+    box.innerHTML = top + '<div class="qprog"><span>' + (R.i + 1) + " / " + R.qs.length + '</span><div class="prog"><i style="width:' + Math.round(100 * R.i / R.qs.length) + '%;background:var(--accent)"></i></div></div>'
+      + '<div class="card qcard"><div class="crumb">' + esc(title) + " · " + esc(qq.sub) + '</div><p class="stem lxstem">' + qq.stem + '</p><ul class="opts">'
+      + qq.o.map((o, i) => '<li><button class="opt" data-i="' + i + '"><span class="bub">' + L5[i] + "</span><span>" + esc(o) + "</span></button></li>").join("") + '</ul><div id="fbx"></div></div>';
+    $$(".opt", box).forEach(b => b.onclick = () => {
+      const i = +b.dataset.i, ok = i === qq.a;
+      $$(".opt", box).forEach((x, j) => { x.disabled = true; x.classList.add(j === qq.a ? "ok" : j === i ? "bad" : "dim"); });
+      if (ok) R.ok++; else srsMarkWrong("lat|" + qq.key);
+      PS.set("days", addDayAnswers(Object.assign({}, PS.get("days", {})), 1));
+      $("#fbx").innerHTML = '<div class="fb ' + (ok ? "ok" : "bad") + '"><h4>' + (ok ? "Doğru." : "Yanlış. Doğru cevap: " + L5[qq.a]) + '</h4><div class="lxfb">' + qq.exp + '</div></div><div class="qnav"><button class="btn primary" id="nx">Devam →</button></div>';
+      $("#nx").onclick = () => { R.i++; draw(); window.scrollTo(0, 0); const m = main(); if (m) m.scrollTop = 0; };
+    });
+  };
+  draw();
+}
+function latSheet(title, html) {
+  const bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.innerHTML = '<div class="sheet" role="dialog" aria-label="' + esc(title) + '"><div class="sheet-h"><b>' + esc(title) + '</b><button class="ibtn" data-x title="Kapat">' + icon("close") + '</button></div><div class="sheet-b">' + html + '<p class="note">Terime dokunup ayrıntısını Anatomi Latincesi › Çözücü\'de görebilirsin.</p></div></div>';
+  const close = () => bg.remove();
+  bg.onclick = e => { if (e.target === bg || e.target.closest("[data-x]")) close(); };
+  document.body.appendChild(bg);
+  S.cleanup.push(close);
+}
+// Yalnız yerel denetimde (tools/check_site.sh, 127.0.0.1) testlerin erişebilmesi için
+if (location.hostname === "127.0.0.1") window.__ml = { loadLat: () => loadLat(), latQuestion: (D, m) => latQuestion(D, m), latDecodeHTML: (D, t) => latDecodeHTML(D, t), latSheet: (t, h) => latSheet(t, h), srs: () => srsLoad() };
+async function latPageTerms(itId, page) {
+  const D = await loadLat(), pg = (D.pg[itId] || {})[String(page)] || [];
+  return { D, terms: pg.map(i => D.sl[i][0]) };
+}
+
+async function viewRoots(q, tab, top) {
+  if (!S.cat.lex) { $("#lx").innerHTML = top + '<div class="card empty">Kök sözlüğü henüz yok.</div>'; return; }
   const L = await loadLex();
   if (parseHash().parts[0] !== "sozluk") return;
   const st = { q: q.get("q") || "", n: 60 };
@@ -1173,11 +1466,11 @@ async function viewLexicon(q) {
   const refLink = r => { const it = S.byId[r[0]]; return it ? '<a href="#/d/' + r[0] + "/" + r[1] + "?h=" + r[1] + '">' + esc(it.t) + " · " + (it.k === "slayt" ? "slayt " : "s. ") + r[1] + "</a>" : ""; };
   const draw = () => {
     const f = fold(st.q.trim());
-    const tabs = '<div class="seg">' + [["terim", "Terimler"], ["kok", "Kökler"], ["kart", "Kart çalış"]].map(([k, l]) => '<a class="' + (tab === k ? "on" : "") + '" href="#/sozluk?t=' + k + '">' + l + "</a>").join("") + "</div>";
+    const tabs = top + '<div class="seg sub">' + [["dt", "Ders terimleri"], ["kok", "Kökler"], ["kk", "Kök kartları"]].map(([k, l]) => '<a class="' + (tab === k ? "on" : "") + '" href="#/sozluk?t=' + k + '">' + l + "</a>").join("") + "</div>";
     let body = "";
-    if (tab === "terim") {
+    if (tab === "dt") {
       const list = L.terms.filter(t => !f || fold(t[0]).includes(f) || t[1].some(p => p[1] != null && fold(L.roots[p[1]][2]).includes(f)));
-      body = '<p class="note">Slaytlarında ve notlarında geçen ' + L.terms.length + ' terim, köklerine ayrılmış hâlde: <span class="mp mp-on">ön ek</span> <span class="mp mp-kok">kök</span> <span class="mp mp-son">son ek</span>. Ayrıştırma otomatik; nadiren yanlış olabilir.</p>'
+      body = '<p class="note">Biyokimya, Tıbbi Biyoloji gibi derslerin slaytlarında geçen ' + L.terms.length + ' terim, köklerine ayrılmış hâlde: <span class="mp mp-on">ön ek</span> <span class="mp mp-kok">kök</span> <span class="mp mp-son">son ek</span>. Ayrıştırma otomatik; nadiren yanlış olabilir.</p>'
         + (list.length ? '<div class="card">' + list.slice(0, st.n).map(t => '<div class="lxr"><div class="lxt"><b>' + esc(t[0]) + '</b><span class="lxs">' + seg(t) + '</span></div><div class="lxg">' + gloss(t) + '</div><div class="lxref">' + t[3].slice(0, 3).map(refLink).join("") + (t[2] > 1 ? '<span class="muted">' + t[2] + " kez geçiyor</span>" : "") + "</div></div>").join("") + "</div>"
           + (list.length > st.n ? '<div class="row-btns" style="justify-content:center;margin-top:12px"><button class="btn" id="more">Daha fazla (' + (list.length - st.n) + ")</button></div>" : "")
           : '<div class="card empty">Bu aramaya uyan terim yok.</div>');
@@ -1186,7 +1479,7 @@ async function viewLexicon(q) {
         const rows = L.roots.map((r, i) => [r, i]).filter(([r, i]) => r[0] === tp && (!f || fold(r[1]).includes(f) || fold(r[2]).includes(f) || L.ex[i].some(ti => fold(L.terms[ti][0]).includes(f))))
           .sort((a, b) => L.ex[b[1]].length - L.ex[a[1]].length || a[0][1].localeCompare(b[0][1], "tr"));
         return rows.length ? '<h2 class="sec">' + { on: "Ön ekler", kok: "Kökler", son: "Son ekler" }[tp] + " · " + rows.length + '</h2><div class="card">' + rows.map(([r, i]) => '<div class="lxr"><div class="lxt"><b class="mp mp-' + r[0] + '">' + esc(r[1]) + "</b><span>" + esc(r[2]) + '</span></div><div class="lxg muted">' + esc(r[3]) + "</div>"
-          + (L.ex[i].length ? '<div class="lxref">' + L.ex[i].slice(0, 4).map(ti => '<a href="#/sozluk?t=terim&q=' + encodeURIComponent(L.terms[ti][0]) + '">' + esc(L.terms[ti][0]) + "</a>").join("") + "</div>" : "") + "</div>").join("") + "</div>" : "";
+          + (L.ex[i].length ? '<div class="lxref">' + L.ex[i].slice(0, 4).map(ti => '<a href="#/sozluk?t=dt&q=' + encodeURIComponent(L.terms[ti][0]) + '">' + esc(L.terms[ti][0]) + "</a>").join("") + "</div>" : "") + "</div>").join("") + "</div>" : "";
       }).join("");
       body = groups || '<div class="card empty">Bu aramaya uyan kök yok.</div>';
     } else {
@@ -1198,11 +1491,11 @@ async function viewLexicon(q) {
         + '<div class="qnav">' + (s2.back ? '<button class="btn" id="no">Bilemedim</button><button class="btn primary" id="yes">Bildim</button>' : '<button class="btn primary" id="flip">Çevir</button>') + "</div>"
         + '<p class="note">Slaytlarında en sık geçen kökler önce gelir. “Bilemedim” dediklerin Tekrar listesine düşer.</p>';
     }
-    $("#lx").innerHTML = (tab !== "kart" ? '<div class="sbox">' + icon("search") + '<input id="lq" type="search" placeholder="Terim, kök ya da anlam: hepat, kan, emi" autocomplete="off" value="' + esc(st.q) + '"></div>' : "") + tabs + body;
+    $("#lx").innerHTML = (tab !== "kk" ? '<div class="sbox">' + icon("search") + '<input id="lq" type="search" placeholder="Terim, kök ya da anlam: hepat, kan, emi" autocomplete="off" value="' + esc(st.q) + '"></div>' : "") + tabs + body;
     const lq = $("#lq");
     if (lq) lq.oninput = () => { st.q = lq.value; st.n = 60; const pos = lq.selectionStart; draw(); const l2 = $("#lq"); l2.focus(); l2.setSelectionRange(pos, pos); };
     const mb = $("#more"); if (mb) mb.onclick = () => { st.n += 120; draw(); };
-    if (tab === "kart") {
+    if (tab === "kk") {
       const s2 = st.k, nx = () => { s2.i++; s2.back = false; draw(); };
       $("#fl").onclick = () => { s2.back = !s2.back; draw(); };
       const fl = $("#flip"); if (fl) fl.onclick = () => { s2.back = true; draw(); };
