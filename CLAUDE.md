@@ -58,7 +58,12 @@ Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama 
 `MEDLOCK_PASS=... bash tools/check_site.sh` bütün blobları çözer, siteyi yerelde sunar ve telefon/tablet boyutunda giriş, slayt, test ("Slayta git"), sonuç, tekrar ve arama akışını dener (Playwright gerekir). Çıktıdaki `fails` boş olmalı.
 
 ## Astronomican
-Eski merkez sayfa (claude.ai artifact) da güncel tutuluyor: yeni test ve notlar ikisine birden eklenir. Drive'dan gelen slaytlar sadece MedLock'a girer.
+Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor. Yeni test ve notlar sadece MedLock'a eklenir.
+
+## Profiller ve senkron
+- Her kullanıcının ilerlemesi (tekrar listesi, test sonuçları ve yarım kalan test durumları, işaretler, döndürülmüş sayfalar, ilerleme istatistikleri) cihazda `ml.p.<profil>` anahtarında durur.
+- Katalogda `sync.token` varsa (yalnız `gist` yetkili GitHub anahtarı, `sync-token` komutuyla şifreli yazılır) profiller "MedLock senkron" adlı gizli gist'te `p-<profil>.txt` olarak, uygulama anahtarıyla AES-GCM şifreli tutulur ve cihazlar arasında birleştirilir (kayıt bazında en yeni kazanır; deneme geçmişi ve günlük sayılar birleşir).
+- Denetim betiği api.github.com isteklerini engeller; gerçek senkron verisine dokunmaz.
 
 ## Boyut
 GitHub Pages sitesi 1 GB'ı geçmemeli. Yatay slaytlar 1100 px WebP q52 (~40 KB/sayfa); dikey A4 sayfalar (not, özet, çıkmış) küçük yazı yüzünden 1800 px q62 (~60–250 KB/sayfa). Ne kadar yer kaldığını izle (`du -sh d`). Yalnız görselleri yenilemek için `add_doc(..., keep_text=True)` eski OCR metnini korur.

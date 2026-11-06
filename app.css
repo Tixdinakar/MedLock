@@ -321,3 +321,12 @@ mark{background:color-mix(in srgb,var(--hl) 70%,transparent);color:inherit;borde
 .tl:first-of-type{border-top:0}
 .tl input{width:18px;height:18px;accent-color:var(--accent);flex:none}
 .tl .tn{flex:1;min-width:0}
+
+/* ---------- profiles ---------- */
+.plist{display:grid;gap:10px;margin:0 0 16px}
+.pbtn{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid #33416f;background:#0d1328;color:#fff;font:600 16px var(--f-ui);cursor:pointer;text-align:left}
+.pbtn:hover{border-color:#86a8ff}
+.av{flex:none;display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#86a8ff,#ff9a52);color:#0b1023;font:700 16px var(--f-ui)}
+.gate .pnew{display:flex;gap:8px}
+.gate .pnew input{flex:1;min-width:0}
+.gate .pnew .btn{padding:0 20px;flex:none}

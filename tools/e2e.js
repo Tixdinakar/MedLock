@@ -15,6 +15,7 @@ const ok = (cond, msg) => { if (!cond) fails.push(msg); };
   const b = await chromium.launch();
   for (const [name, vp] of [["tablet", { width: 1180, height: 820 }], ["telefon", { width: 390, height: 844 }]]) {
     const ctx = await b.newContext({ viewport: vp, serviceWorkers: "block" });
+    await ctx.route("https://api.github.com/**", r => r.abort());   // denetim gerçek senkron verisine dokunmasın
     const pg = await ctx.newPage();
     pg.on("pageerror", e => fails.push(name + " sayfa hatası: " + e.message));
     const shot = async n => { if (OUT) await pg.screenshot({ path: OUT + "/" + name + "-" + n + ".png" }); };
@@ -23,6 +24,8 @@ const ok = (cond, msg) => { if (!cond) fails.push(msg); };
       await pg.waitForSelector("#pw", { timeout: 20000 });
       await pg.fill("#pw", PASS);
       await pg.click("#lb");
+      await pg.waitForSelector(".hero, #pn", { timeout: 30000 });
+      if (await pg.$("#pn")) { await pg.fill("#pn", "Denetim"); await pg.click("#pf button"); }
       await pg.waitForSelector(".hero", { timeout: 30000 });
       await shot("1-ana");
       await pg.goto(BASE + "#/lib"); await pg.waitForSelector(".kurul");

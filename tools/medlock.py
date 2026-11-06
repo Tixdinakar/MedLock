@@ -17,6 +17,7 @@ MEDLOCK_PASS ortam değişkeninden alır; şifre hiçbir dosyaya yazılmaz.
   python3 tools/medlock.py refs      # test soruları -> slayt sayfaları (yeniden hesapla)
   python3 tools/medlock.py index     # arama dizinini yeniden kur
   python3 tools/medlock.py passwd    # MEDLOCK_NEWPASS ile şifreyi değiştir (içerik yeniden şifrelenmez)
+  python3 tools/medlock.py sync-token   # MEDLOCK_SYNC_TOKEN (yalnız "gist" yetkili GitHub anahtarı) ile profil senkronunu aç; boşsa kapatır
   python3 tools/medlock.py check     # bütün blobları çözüp doğrula
   python3 tools/medlock.py stamp     # sadece arayüz dosyaları değiştiyse v.json'u yenile (cihazlar güncellenir)
 
@@ -194,9 +195,11 @@ def date_from_name(name):
 
 
 # ---------- documents ----------
-def ocr_pages(pdf, idxs):
-    """Taranmış sayfalar için Türkçe OCR (arama ve soru-slayt eşleşmesi için). {sayfa: metin}"""
+def ocr_pages(pdf, idxs, do_ocr=True):
+    """Taranmış sayfalar: yön tespiti (tesseract OSD) ve Türkçe OCR. {sayfa: (metin|None, döndürme_açısı)}
+    Açı PIL'in im.rotate(açı, expand=True) çağrısına uygundur (saat yönünün tersine derece)."""
     from concurrent.futures import ThreadPoolExecutor
+    from PIL import Image
     env = dict(os.environ, OMP_THREAD_LIMIT="1")
 
     def one(i):
@@ -204,8 +207,34 @@ def ocr_pages(pdf, idxs):
         try:
             subprocess.run(["pdftoppm", "-r", "200", "-f", str(i), "-l", str(i), "-gray", "-png", pdf, os.path.join(tmp, "o")], check=True)
             f = glob.glob(os.path.join(tmp, "o*.png"))[0]
-            t = subprocess.run(["tesseract", f, "-", "-l", "tur+eng"], capture_output=True, text=True, env=env).stdout
-            return i, t
+            osd = subprocess.run(["tesseract", f, "-", "--psm", "0"], capture_output=True, text=True, env=env).stdout
+            m, c = re.search(r"Rotate:\s*(\d+)", osd), re.search(r"Orientation confidence:\s*([\d.]+)", osd)
+            hint = int(m.group(1)) if m and c and float(c.group(1)) >= 2 else 0
+            # OSD yönü (90/270) sık karıştırıyor; adayları OCR güveniyle karşılaştır
+            cands = [0] + ([90, 270] if hint in (90, 270) else [180] if hint == 180 else [])
+            res = {}
+            for a in cands:
+                g = f
+                if a:
+                    g = os.path.join(tmp, f"r{a}.png")
+                    Image.open(f).rotate(a, expand=True).save(g)
+                tsv = subprocess.run(["tesseract", g, "-", "-l", "tur+eng", "tsv"], capture_output=True, text=True, env=env).stdout
+                words, good = [], 0
+                for row in tsv.splitlines()[1:]:
+                    col = row.split("\t")
+                    if len(col) < 12 or not col[11].strip():
+                        continue
+                    words.append(col[11])
+                    try:
+                        if float(col[10]) >= 85 and len(col[11]) >= 4:
+                            good += 1
+                    except ValueError:
+                        pass
+                res[a] = (good, " ".join(words))
+            best = max(res, key=lambda a: res[a][0])
+            angle = best if best and res[best][0] >= max(40, 2 * res[0][0]) else 0
+            t = res[angle][1]
+            return i, (t if do_ocr else None, angle)
         finally:
             shutil.rmtree(tmp)
     with ThreadPoolExecutor(os.cpu_count() or 4) as ex:
@@ -229,16 +258,24 @@ def render_pdf(pdf, out, ocr=True):
     subprocess.run(["pdftoppm", "-scale-to-x", str(tw), "-scale-to-y", "-1", "-jpeg", "-jpegopt", "quality=92",
                     pdf, os.path.join(tmp, "p")], check=True)
     files = sorted(glob.glob(os.path.join(tmp, "p-*.jpg")), key=lambda p: int(p.rsplit("-", 1)[1][:-4]))
-    for i, p in enumerate(files, 1):
-        Image.open(p).convert("RGB").save(os.path.join(out, f"{i}.webp"), "WEBP", quality=quality, method=5)
-    shutil.rmtree(tmp)
     txt = subprocess.run(["pdftotext", "-enc", "UTF-8", pdf, "-"], capture_output=True, text=True).stdout
     pages = txt.split("\f")[: len(files)]
     pages += [""] * (len(files) - len(pages))
     empty = [i for i, t in enumerate(pages, 1) if len(t.strip()) < 30]
-    if ocr and empty and shutil.which("tesseract"):
-        for i, t in ocr_pages(pdf, empty).items():
-            pages[i - 1] = t
+    rot = {}
+    if empty and shutil.which("tesseract"):          # taranmış sayfalar: yönü düzelt, OCR yap
+        for i, (t, angle) in ocr_pages(pdf, empty, do_ocr=ocr).items():
+            if t is not None:
+                pages[i - 1] = t
+            rot[i] = angle
+    for i, p in enumerate(files, 1):
+        im = Image.open(p).convert("RGB")
+        if rot.get(i):
+            im = im.rotate(rot[i], expand=True)
+            if im.width > tw:
+                im = im.resize((tw, round(im.height * tw / im.width)), Image.LANCZOS)
+        im.save(os.path.join(out, f"{i}.webp"), "WEBP", quality=quality, method=5)
+    shutil.rmtree(tmp)
     json.dump(pages, open(os.path.join(out, "text.json"), "w"), ensure_ascii=False)
     open(os.path.join(out, "done"), "w").write(str(len(files)))
     return len(files)
@@ -604,6 +641,7 @@ def main():
     sk = sp.add_parser("skip")
     sk.add_argument("src")
     sp.add_parser("known")
+    sp.add_parser("sync-token")
     ad = sp.add_parser("add-drive")
     ad.add_argument("file")
     ad.add_argument("--folder", required=True, help="Drive klasörü, ör. K2/Biyokimya")
@@ -656,6 +694,14 @@ def main():
         build_index(V)
     elif a.cmd == "skip":
         V.cat.setdefault("skip", []).append(a.src.replace("drive:", ""))
+    elif a.cmd == "sync-token":
+        tok = os.environ.get("MEDLOCK_SYNC_TOKEN", "").strip()
+        if tok:
+            V.cat["sync"] = {"token": tok}
+            print("Senkron anahtarı kataloğa (şifreli) yazıldı.")
+        else:
+            V.cat.pop("sync", None)
+            print("Senkron kapatıldı.")
     elif a.cmd == "known":
         print("\n".join(known_sources(V)))
         return
