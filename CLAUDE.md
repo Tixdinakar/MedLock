@@ -11,7 +11,7 @@ Site: https://tixdinakar.github.io/MedLock/ (GitHub Pages, `main` dalının kök
 
 ## Yapı
 - `k.json`: veri anahtarı (DEK), şifreden türetilen anahtarla sarılı (PBKDF2-SHA256 600k + AES-GCM). Şifre değişince sadece bu dosya değişir (`passwd`).
-- `d/c`: katalog (gzip JSON, şifreli). Öğeler: id, k (slayt|not|ozet|cikmis|soru|ses|test|kart), g (k1..k4|ortak), c (ders), h (hoca), t (başlık), d (tarih), n (sayfa/soru), x (blob klasörü), v (sürüm), src (drive:<fileId>), dq (tarih tahmini).
+- `d/c`: katalog (gzip JSON, şifreli). Öğeler: id, k (slayt|not|ozet|cikmis|soru|test|kart), g (k1..k4|ortak), c (ders), h (hoca), t (başlık), d (tarih), n (sayfa/soru), x (blob klasörü), v (sürüm), src (drive:<fileId>), dq (tarih tahmini).
   `skip`: bilerek eklenmeyen Drive dosyaları. `todo`: eklenmesi bekleyen Drive dosyaları (çoğu 10 MB'tan büyük olduğu için connector indiremedi; sahibinden ek olarak istenir).
 - `d/<x>/<n>`: sayfa görselleri (WebP), `d/<x>/t`: sayfa metinleri; `d/<x>` (dosya): test ya da kart verisi; `d/s`: arama dizini.
 - Şifreleme deterministik (IV = HMAC(içerik)); aynı içerik aynı baytı üretir, git'te gereksiz fark oluşmaz.
@@ -30,7 +30,7 @@ Kurul tarihleri: k1 07.09–23.10.2026, k2 26.10–25.12.2026, k3 28.12.2026–1
 Drive klasörü "Ders Slaytları ve Notlar": Kurul › Ders düzeninde. Hoca sırası: 1) PDF'teki isim 2) bilinen ders–hoca eşleşmesi 3) Drive'daki slayttaki isim.
 
 ```
-# PDF (slayt, not, çıkmış, ses kaydı dökümü...)
+# PDF (slayt, not, çıkmış...)
 python3 tools/medlock.py add-doc dosya.pdf --kind slayt --kurul k2 --course Biyokimya --hoca "Hoca Adı" \
     --title "Lipitler" --src drive:<fileId>
 # Test (Astronomican motoru biçimindeki HTML)
@@ -46,6 +46,7 @@ Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tari
 ## Drive denetimi
 1. Drive'da "Ders Slaytları ve Notlar" klasörünü ve alt klasörlerini (K1/Biyokimya, K2/BiyokimyaSes...) dosya id'leri ve boyutlarıyla listele.
 2. `python3 tools/medlock.py known` çıktısında olmayan id'ler yenidir. "Diğer" klasörü ve Claude'un ürettiği özet kopyaları `skip`.
+   Ses kaydı dökümleri ("[Ders] Ses Kayıtları" / "...Ses" klasörleri) MedLock'a **eklenmez** (Buğra dersi kendisi dinliyor; dökümler sadece Claude'un not ve konu anlatımı hazırlarken Drive'dan okuduğu kaynaktır). `add-drive` ve `todo` bunları kendiliğinden `skip`'e yazar. Ses dosyalarının (mp3/m4a) kendisi de eklenmez.
 3. 10 MB altındaysa Drive connector'ının `download_file_content` aracıyla indir (sonuç JSON: `content` base64), çöz, PDF'e yaz:
    `python3 tools/medlock.py add-drive dosya.pdf --folder K2/Biyokimya --fid <id> --name "<Drive'daki ad>"`
    Tür (yatay = slayt, dikey A4 = not; ad "çıkmış/soru/özet/el" içeriyorsa ona göre), kurul (klasör ya da tarih), ders (klasör), hoca (PDF'teki isim, yoksa dersin bilinen hocası) ve başlık tahmin edilir. Emin değilsen önce `--dry`, gerekirse `--kind/--hoca/--title` ile düzelt.
@@ -53,6 +54,17 @@ Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tari
 5. `check`, commit, push. Ne eklendiğini ve tahmin edilen hocaları kısaca bildir.
 
 Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama ve soru–slayt eşleşmesi bunlarda da çalışır.
+
+## Müfredat
+`d/plan`: geçen yılın (2025–2026) Dönem I ders planı, kurul › ders › konu (her satır bir ders saati) ve kurul saatleri. `python3 tools/medlock.py plan [k2]` her konuyu katalogla karşılaştırır (✓ kaynağı var, · yok; eşleştirme kaba, adlar farklıysa elle bak, ör. Redoks = "Biyolojik Oksidasyon").
+- Karma deneme ve kurul denemesinde dersler arası soru dağılımı için ders saatleri yol gösterir; konu içindeki dağılım yine konunun soru çıkarma potansiyeline göredir.
+- Bu yıl sıra kayabiliyor (Biyoistatistik ve bazı Psikoloji konuları bu yıl Kurul 2'de). Kurul ataması için dosya tarihi esastır, plan değil.
+- Drive denetiminde biten bir kurulda `·` kalan konu varsa (ör. K1 Biyokimya "Vitaminler ve Koenzimler", "Mineraller ve Eser Elementler") Buğra'ya slaytı olup olmadığını sor.
+
+## Çıkmışlar (çözülebilir)
+`python3 tools/build_cx.py <bk|tb|bf> [--dry]`: çıkmış sorularını test öğesine (`cx=1`) çevirir; kurul sayfasında "Çıkmışlar" altında listelenir. Sorular şifreli `d/cx/<kod>` içinde; düzenlemek için `--dump x.json` (scratchpad'e, commit etme), düzeltip `--src x.json`.
+- İçeriği bu yılın kaynaklarında olmayan sorular `drop:1` ile teste girmez (Buğra'nın kuralı). Biyokimya çıkmışındaki enzim, lipit, karbonhidrat, membran ve protein yönlendirme soruları planda Kurul 2–3 konusu: o slaytlar gelince `drop`u kaldır, `sd`/`sp`/`quote` ekle; başka kurulun sorularıysa ayrı test olarak kur (ör. `bk-k2-cikmis`, SPEC'e ekle).
+- Her açıklama: doğru cevap, slayttan alıntı ("Slayta git" çalışsın diye `s` = "Deste adı, slayt N"), çıkmışın asıl sayfası. Cevap anahtarı yanlışsa doğrusunu yaz ve açıklamada belirt.
 
 ## Denetim
 `MEDLOCK_PASS=... bash tools/check_site.sh` bütün blobları çözer, siteyi yerelde sunar ve telefon/tablet boyutunda giriş, slayt, test ("Slayta git"), sonuç, tekrar ve arama akışını dener (Playwright gerekir). Çıktıdaki `fails` boş olmalı.
@@ -66,4 +78,5 @@ Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor.
 - Denetim betiği api.github.com isteklerini engeller; gerçek senkron verisine dokunmaz.
 
 ## Boyut
-GitHub Pages sitesi 1 GB'ı geçmemeli. Yatay slaytlar 1100 px WebP q52 (~40 KB/sayfa); dikey A4 sayfalar (not, özet, çıkmış) küçük yazı yüzünden 1800 px q62 (~60–250 KB/sayfa). Ne kadar yer kaldığını izle (`du -sh d`). Yalnız görselleri yenilemek için `add_doc(..., keep_text=True)` eski OCR metnini korur.
+GitHub Pages sitesi 1 GB'ı geçmemeli. Yatay slaytlar 1100 px WebP q52 (~40 KB/sayfa); dikey A4 sayfalar (not, özet, çıkmış) küçük yazı yüzünden 1800 px q62 (~60–250 KB/sayfa). Ne kadar yer kaldığını izle (`du -sh d`).
+Yer biterse (~800 MB): Buğra yeni boş bir depo açar (ör. `MedLock-2`) ve Pages'i açar. Bütün Pages siteleri aynı kökte (tixdinakar.github.io) olduğu için uygulama oradaki blobları doğrudan okuyabilir; aynı anahtarla şifrelenir, şifre tek kalır. O zaman katalog öğelerine depo alanı (`r`) eklenip uygulama ve `medlock.py` buna göre güncellenecek. Eski Astronomican depoları kullanılmaz. Video ve ses GitHub'a uygun değil (dosya başına 100 MB sınırı); gerekirse Drive'da durur, MedLock bağlantı verir. Yalnız görselleri yenilemek için `add_doc(..., keep_text=True)` eski OCR metnini korur.

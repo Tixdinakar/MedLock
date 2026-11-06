@@ -742,6 +742,29 @@ def guess_meta(V, folder, fname, texts=None, portrait=None):
     return {"kind": kind, "kurul": kur, "course": course, "hoca": hoca, "title": title, "date": date}
 
 
+def print_plan(V, only=None):
+    """d/plan (geçen yılın ders planı) ile katalogdaki slayt/notları karşılaştırır. ✓ = kaynağı var."""
+    plan = V.get_json("d/plan")
+    print(plan["kaynak"])
+    docs = [it for it in V.cat["items"] if it["k"] in ("slayt", "not", "ozet")]
+    for g, dersler in plan["kurullar"].items():
+        if only and g != only:
+            continue
+        h = plan["saat"].get(g, {})
+        print(f"\n== {g} · {h.get('toplam', '?')} saat, {h.get('hafta', '?')} hafta")
+        for c, konular in dersler.items():
+            mine = [it for it in docs if it["c"] == c]
+            print(f"  {c} ({len(konular)} ders saati)")
+            st = lambda t: {w[:5] for w in toks(t) if len(w) > 3}
+            for k in konular:
+                kt = st(k)
+                ov = lambda it: len(kt & st(it["t"]))
+                best = max(mine, key=lambda it: (ov(it), -len(st(it["t"]))), default=None)
+                # tek ortak kelime yalnız aynı kurulda ve genel olmayan bir kelimeyse sayılır (ör. "Proteinler I" ↔ k1 proteinler)
+                hit = best and (ov(best) >= 2 or (ov(best) == 1 and best["g"] == g and not (kt & st(best["t"])) <= {"hasta", "tibbi", "genel", "temel", "genet", "biyom"}))
+                print(f"    {'✓' if hit else '·'} {k}" + (f"  ← {best['t']} ({best['g']})" if hit else ""))
+
+
 def known_sources(V):
     c = V.cat
     return sorted({it["src"][6:] for it in c["items"] if it.get("src", "").startswith("drive:")}
@@ -778,6 +801,8 @@ def main():
     sk = sp.add_parser("skip")
     sk.add_argument("src")
     sp.add_parser("known")
+    pl = sp.add_parser("plan", help="müfredat: kurul › ders › konu, kaynağı olanlar işaretli")
+    pl.add_argument("kurul", nargs="?")
     ad = sp.add_parser("add-drive")
     ad.add_argument("file")
     ad.add_argument("--folder", required=True, help="Drive klasörü, ör. K2/Biyokimya")
@@ -825,6 +850,8 @@ def main():
     elif a.cmd == "rm":
         it = V.item(a.id) or sys.exit("yok: " + a.id)
         V.cat["items"].remove(it)
+        if it.get("src", "").startswith("drive:"):
+            V.cat.setdefault("skip", []).append(it["src"][6:])
         p = os.path.join(V.repo, "d", it["x"])
         shutil.rmtree(p) if os.path.isdir(p) else os.path.exists(p) and os.remove(p)
         build_index(V)
@@ -847,6 +874,13 @@ def main():
             if getattr(a, o):
                 m[o] = getattr(a, o)
         print("tahmin:", json.dumps(m, ensure_ascii=False))
+        if m["kind"] == "ses":
+            # Ses kaydı dökümleri yalnız Claude'un not hazırlarken kullandığı kaynaktır; MedLock'a eklenmez.
+            print("ses kaydı dökümü: MedLock'a eklenmez" + ("" if a.dry else ", skip listesine yazıldı"))
+            if not a.dry:
+                V.cat.setdefault("skip", []).append(a.fid)
+                V.save()
+            return
         if a.dry:
             return
         approx = not m["date"]
@@ -858,8 +892,16 @@ def main():
         print(compute_refs(V)); build_index(V)
     elif a.cmd == "todo":
         m = guess_meta(V, a.folder, a.name)
+        if m["kind"] == "ses":
+            V.cat.setdefault("skip", []).append(a.fid)
+            print("ses kaydı dökümü: todo yerine skip")
+            V.save()
+            return
         V.cat.setdefault("todo", []).append({"src": "drive:" + a.fid, "file": a.name, "kind": m["kind"], "g": m["kurul"],
                                              "c": m["course"], "h": m["hoca"], "t": m["title"], "kb": a.kb})
+    elif a.cmd == "plan":
+        print_plan(V, a.kurul)
+        return
     elif a.cmd == "refs":
         print(compute_refs(V))
     elif a.cmd == "index":
