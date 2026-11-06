@@ -268,11 +268,13 @@ function mergeP(a, b) {
 
 /* ---------- sync (GitHub Gist, şifreli) ---------- */
 const SY = { gist: null, t: 0, busy: false, again: false, last: 0, err: "" };
-const syncOn = () => !!(S.cat && S.cat.sync && S.cat.sync.token);
+// Anahtar repoya konmaz: her cihazda Ayarlar › Senkron'dan bir kez girilir ve yalnız o cihazda durur.
+const syncToken = () => LS.get("ml.st", "");
+const syncOn = () => !!syncToken();
 async function gh(method, path, body) {
   const r = await fetch("https://api.github.com" + path, {
     method, cache: "no-store", body: body ? JSON.stringify(body) : undefined,
-    headers: { Authorization: "Bearer " + S.cat.sync.token, Accept: "application/vnd.github+json" },
+    headers: { Authorization: "Bearer " + syncToken(), Accept: "application/vnd.github+json" },
   });
   if (!r.ok) throw new Error("GitHub " + r.status);
   return r.status === 204 ? null : r.json();
@@ -287,7 +289,7 @@ async function encJSON(o) {
 async function decJSON(b64) { return JSON.parse(new TextDecoder().decode(await decrypt(b64d(b64.trim()).buffer))); }
 async function findGist() {
   if (SY.gist) return SY.gist;
-  const fixed = S.cat.sync.gist || LS.get("ml.gist", null);
+  const fixed = LS.get("ml.gist", null);
   if (fixed) return (SY.gist = fixed);
   for (let page = 1; page <= 5; page++) {
     const L = await gh("GET", "/gists?per_page=100&page=" + page);
@@ -1205,7 +1207,11 @@ async function viewSettings() {
   const syncTxt = !syncOn() ? "Senkron kapalı: ilerleme yalnız bu cihazda." : SY.err ? "Senkron hatası: " + SY.err : SY.last ? "Senkron açık · son eşitleme " + new Date(SY.last).toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" }) : "Senkron açık";
   main().innerHTML = bar({ title: "Ayarlar" }) + '<div class="page narrow">'
     + '<h2 class="sec">Profil</h2><div class="card set"><div class="row"><span class="av">' + esc((P.name || "?").slice(0, 1).toLocaleUpperCase("tr")) + '</span><div class="txt"><b>' + esc(P.name) + "</b><span>" + esc(syncTxt) + "</span></div>"
-    + (syncOn() ? '<button class="btn" id="syn">Eşitle</button>' : "") + '<button class="btn" id="psw">Değiştir</button></div></div>'
+    + (syncOn() ? '<button class="btn" id="syn">Eşitle</button>' : "") + '<button class="btn" id="psw">Değiştir</button></div>'
+    + (syncOn() ? '<div class="row"><div class="txt"><b>Senkron anahtarı</b><span>Bu cihazda kayıtlı. Kaldırırsan ilerleme yalnız bu cihazda kalır.</span></div><button class="btn danger" id="stdel">Kaldır</button></div>'
+      : '<form class="row" id="stf"><div class="txt"><b>Cihazlar arası senkron</b><span>GitHub anahtarını (yalnız “gist” yetkili) bu cihazda bir kez gir; aynı profil adıyla her cihazda aynı ilerleme.</span>'
+        + '<input id="stin" type="password" autocomplete="off" placeholder="ghp_…" class="stin"></div><button class="btn primary">Kaydet</button></form>')
+    + "</div>"
     + '<h2 class="sec">Uygulama</h2><div class="card set">'
     + '<div class="row"><img src="icons/64.png" width="40" height="40" style="border-radius:10px" alt=""><div class="txt"><b>' + NAME + '</b><span>İçerik ' + fdate(stampIso(S.cat.v), true) + " tarihinde güncellendi · " + S.cat.items.length + " öğe</span></div>"
     + '<button class="btn" id="chk">Denetle</button></div>'
@@ -1225,6 +1231,22 @@ async function viewSettings() {
   const ib = $("#inst"); if (ib) ib.onclick = async () => { installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; viewSettings(); };
   $$("[data-off]").forEach(b => b.onclick = () => offline(b, b.dataset.off));
   $("#psw").onclick = () => { saveProfile(); LS.del("ml.prof"); location.hash = ""; location.reload(); };
+  const stf = $("#stf");
+  if (stf) stf.onsubmit = async e => {
+    e.preventDefault();
+    const tok = $("#stin").value.trim(), btn = stf.querySelector("button");
+    if (!tok) return;
+    btn.disabled = true; btn.textContent = "Deneniyor…";
+    try {
+      const r = await fetch("https://api.github.com/gists?per_page=1", { cache: "no-store", headers: { Authorization: "Bearer " + tok, Accept: "application/vnd.github+json" } });
+      if (!r.ok) throw new Error(r.status === 401 ? "Anahtar geçersiz." : "GitHub " + r.status);
+      LS.set("ml.st", tok); SY.gist = null;
+      await syncNow({ quiet: true });
+      toast(SY.err ? "Kaydedildi ama eşitlenemedi: " + SY.err : "Senkron açıldı");
+      shell(); viewSettings();
+    } catch (err) { btn.disabled = false; btn.textContent = "Kaydet"; toast(String(err.message || err)); }
+  };
+  const sd = $("#stdel"); if (sd) sd.onclick = () => { LS.del("ml.st"); LS.del("ml.gist"); SY.gist = null; viewSettings(); toast("Senkron bu cihazda kapatıldı"); };
   const sb = $("#syn"); if (sb) sb.onclick = async () => { sb.disabled = true; sb.textContent = "…"; await syncNow({ quiet: true }); viewSettings(); toast(SY.err ? "Eşitlenemedi: " + SY.err : "Eşitlendi"); };
   $("#bk").onclick = () => {
     saveProfile();

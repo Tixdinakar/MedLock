@@ -17,7 +17,6 @@ MEDLOCK_PASS ortam değişkeninden alır; şifre hiçbir dosyaya yazılmaz.
   python3 tools/medlock.py refs      # test soruları -> slayt sayfaları (yeniden hesapla)
   python3 tools/medlock.py index     # arama dizinini yeniden kur
   python3 tools/medlock.py passwd    # MEDLOCK_NEWPASS ile şifreyi değiştir (içerik yeniden şifrelenmez)
-  python3 tools/medlock.py sync-token   # MEDLOCK_SYNC_TOKEN (yalnız "gist" yetkili GitHub anahtarı) ile profil senkronunu aç; boşsa kapatır
   python3 tools/medlock.py check     # bütün blobları çözüp doğrula
   python3 tools/medlock.py stamp     # sadece arayüz dosyaları değiştiyse v.json'u yenile (cihazlar güncellenir)
 
@@ -641,7 +640,6 @@ def main():
     sk = sp.add_parser("skip")
     sk.add_argument("src")
     sp.add_parser("known")
-    sp.add_parser("sync-token")
     ad = sp.add_parser("add-drive")
     ad.add_argument("file")
     ad.add_argument("--folder", required=True, help="Drive klasörü, ör. K2/Biyokimya")
@@ -694,14 +692,6 @@ def main():
         build_index(V)
     elif a.cmd == "skip":
         V.cat.setdefault("skip", []).append(a.src.replace("drive:", ""))
-    elif a.cmd == "sync-token":
-        tok = os.environ.get("MEDLOCK_SYNC_TOKEN", "").strip()
-        if tok:
-            V.cat["sync"] = {"token": tok}
-            print("Senkron anahtarı kataloğa (şifreli) yazıldı.")
-        else:
-            V.cat.pop("sync", None)
-            print("Senkron kapatıldı.")
     elif a.cmd == "known":
         print("\n".join(known_sources(V)))
         return

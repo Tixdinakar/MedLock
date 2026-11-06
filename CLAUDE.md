@@ -62,7 +62,7 @@ Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor.
 
 ## Profiller ve senkron
 - Her kullanıcının ilerlemesi (tekrar listesi, test sonuçları ve yarım kalan test durumları, işaretler, döndürülmüş sayfalar, ilerleme istatistikleri) cihazda `ml.p.<profil>` anahtarında durur.
-- Katalogda `sync.token` varsa (yalnız `gist` yetkili GitHub anahtarı, `sync-token` komutuyla şifreli yazılır) profiller "MedLock senkron" adlı gizli gist'te `p-<profil>.txt` olarak, uygulama anahtarıyla AES-GCM şifreli tutulur ve cihazlar arasında birleştirilir (kayıt bazında en yeni kazanır; deneme geçmişi ve günlük sayılar birleşir).
+- Senkron anahtarı (yalnız `gist` yetkili GitHub anahtarı) **repoya ve kataloğa asla konmaz**; her cihazda Ayarlar › Profil › Cihazlar arası senkron'dan girilir ve yalnız o cihazda durur. Profiller "MedLock senkron" adlı gizli gist'te `p-<profil>.txt` olarak, uygulama anahtarıyla AES-GCM şifreli tutulur ve cihazlar arasında birleştirilir (kayıt bazında en yeni kazanır; deneme geçmişi ve günlük sayılar birleşir). Profil kimliği adın kendisidir: her cihazda aynı adı kullanmak gerekir.
 - Denetim betiği api.github.com isteklerini engeller; gerçek senkron verisine dokunmaz.
 
 ## Boyut

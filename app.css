@@ -330,3 +330,4 @@ mark{background:color-mix(in srgb,var(--hl) 70%,transparent);color:inherit;borde
 .gate .pnew{display:flex;gap:8px}
 .gate .pnew input{flex:1;min-width:0}
 .gate .pnew .btn{padding:0 20px;flex:none}
+.stin{display:block;width:100%;margin-top:8px;font:500 14px var(--f-mono);padding:9px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink)}
