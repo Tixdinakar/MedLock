@@ -503,7 +503,145 @@ def build_index(V):
             for i, c in enumerate(b["cards"]):
                 Q.append([it["id"], i, strip_html(c[1]) + " — " + strip_html(c[2])])
     V.put_json("d/s", {"d": D, "q": Q})
+    build_lexicon(V)
     return len(D), len(Q)
+
+
+# ---------- tıbbi terim sözlüğü ----------
+_TRMAP = str.maketrans({"ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ş": "s", "ü": "u", "â": "a", "î": "i", "û": "u"})
+END = sorted(set("""lerinin larinin lerinde larinda lerinden larindan lerine larina lerini larini lerin larin lerde larda
+lerden lardan lere lara leri lari ler lar nin nun den dan ten tan de da te ta in un ni nu yi yu ye ya si su sinin sunun
+sine suna sini sunu sinde sunda i u e a dir dur tir tur dir li lu siz suz yle le la ki""".split()), key=len, reverse=True)
+
+
+def _segmenter():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import importlib, kokler
+    importlib.reload(kokler)
+    ROOTS, STOP = kokler.ROOTS, kokler.STOP
+    forms = {}
+    for i, r in enumerate(ROOTS):
+        for f in r[2]:
+            forms.setdefault(f, i)
+    maxlen = max(map(len, forms))
+
+    def seg(w):
+        n = len(w)
+        best = [None] * (n + 1)
+        best[0] = (0, [])
+        for i in range(n):
+            if best[i] is None:
+                continue
+            sc, parts = best[i]
+            real = [p for p in parts if p[1] is not None]
+            only_prefix = all(ROOTS[p[1]][0] == "on" for p in real)
+            for j in range(i + 1, min(n, i + maxlen) + 1):
+                f = w[i:j]
+                if f not in forms:
+                    continue
+                ri = forms[f]
+                t = ROOTS[ri][0]
+                if t == "on" and not only_prefix:
+                    continue
+                if t == "son" and not real:
+                    continue
+                cand = (sc + len(f) ** 2, parts + [(f, ri)])
+                if best[j] is None or cand[0] > best[j][0]:
+                    best[j] = cand
+            if real and w[i] in "oiy" and i + 1 < n:
+                cand = (sc, parts + [(w[i], None)])
+                if best[i + 1] is None or cand[0] > best[i + 1][0]:
+                    best[i + 1] = cand
+        r = best[n]
+        if not r:
+            return None
+        parts = r[1]
+        real = [p for p in parts if p[1] is not None]
+        if len(real) < 2 or len(real) > 6 or parts[-1][1] is None:
+            return None
+        if ROOTS[real[-1][1]][0] == "on" or max(len(p[0]) for p in real) < 3:
+            return None
+        if sum(len(p[0]) for p in real if len(p[0]) <= 2) > 4:
+            return None
+        return parts
+
+    def ok_in(parts):
+        """'-in' ile biten iki parçalı çözümlemelerde ilk parça uzun bir kök olmalı (melanin evet, fazın hayır)."""
+        real = [p for p in parts if p[1] is not None]
+        if real[-1][0] != "in" or len(real) > 2:
+            return True
+        return ROOTS[real[0][1]][0] == "kok" and len(real[0][0]) >= 5
+
+    ENDSET = set(END)
+
+    def analyse(word_folded, vocab=()):
+        w = word_folded
+        if len(w) < 6 or w in STOP:
+            return None
+        # Türkçe çekim ekini (enzimin, enzimine, hepatitin) at: metinde tek başına geçen en kısa gövdeyi bul
+        for k in range(5, len(w)):
+            st, tail = w[:k], w[k:]
+            if len(tail) > 6 or st not in vocab:
+                continue
+            if tail in ENDSET or tail[:2] in ENDSET or tail[:3] in ENDSET:
+                if st in forms:
+                    return None                  # tek kökün çekimi (proteinin, sentezin)
+                if st in STOP:
+                    return None
+                p = seg(st)
+                if p and ok_in(p):
+                    return st, p
+        p = seg(w)
+        if p and ok_in(p):
+            return w, p
+        for e in END:
+            if w.endswith(e) and len(w) - len(e) >= 5:
+                st = w[: -len(e)]
+                if st in STOP:
+                    return None
+                p = seg(st)
+                if p and ok_in(p):
+                    return st, p
+        return None
+    return ROOTS, analyse
+
+
+def build_lexicon(V):
+    roots, analyse = _segmenter()
+    terms, docs, vocab = {}, [], set()
+    for it in V.cat["items"]:
+        if it["k"] not in ("slayt", "not", "ozet", "cikmis", "soru", "ses"):
+            continue
+        texts = V.get_json(f"d/{it['x']}/t")
+        docs.append((it, texts))
+        for t in texts:
+            vocab.update(tr_lower(w).translate(_TRMAP) for w in re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşüâîû]{5,}", t))
+    for it, texts in docs:
+        for pi, t in enumerate(texts, 1):
+            for tok in re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşüâîû]{6,}", t):
+                low = tr_lower(tok)
+                fo = low.translate(_TRMAP)
+                if len(fo) != len(low):
+                    continue
+                r = analyse(fo, vocab)
+                if not r:
+                    continue
+                st, parts = r
+                e = terms.get(st)
+                if not e:
+                    e = terms[st] = {"w": low[: len(st)], "p": parts, "n": 0, "r": []}
+                e["n"] += 1
+                ref = [it["id"], pi]
+                if len(e["r"]) < 6 and ref not in e["r"] and not any(x[0] == it["id"] for x in e["r"]):
+                    e["r"].append(ref)
+    T = [[e["w"], [[f, ri] for f, ri in e["p"]], e["n"], e["r"]] for e in terms.values()]
+    T.sort(key=lambda x: -x[2])
+    R = [[r[0], r[1], r[3], r[4]] for r in roots]
+    x = V.hid("lexicon")
+    V.put_json(f"d/{x}", {"roots": R, "terms": T})
+    blob = json.dumps(T, ensure_ascii=False, sort_keys=True) + json.dumps(R, ensure_ascii=False)
+    V.cat["lex"] = {"x": x, "v": hashlib.sha256(blob.encode()).hexdigest()[:8], "n": len(T)}
+    return len(R), len(T)
 
 
 def check(V):

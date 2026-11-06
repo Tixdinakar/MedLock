@@ -331,3 +331,21 @@ mark{background:color-mix(in srgb,var(--hl) 70%,transparent);color:inherit;borde
 .gate .pnew input{flex:1;min-width:0}
 .gate .pnew .btn{padding:0 20px;flex:none}
 .stin{display:block;width:100%;margin-top:8px;font:500 14px var(--f-mono);padding:9px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink)}
+
+/* ---------- lexicon ---------- */
+.seg{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px;margin:0 0 14px}
+.seg a{flex:1;text-align:center;padding:7px 8px;border-radius:8px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg a.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.lxr{padding:11px 14px;border-top:1px solid var(--line)}
+.lxr:first-child{border-top:0}
+.lxt{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.lxt b{font-size:15.5px}
+.lxs{display:inline-flex;gap:3px;flex-wrap:wrap}
+.lxg{font-size:13.5px;margin-top:3px}
+.lxref{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;font-size:12.5px}
+.lxref a{color:var(--accent)}
+.mp{display:inline-block;font:600 12.5px var(--f-mono);border-radius:6px;padding:1px 6px;border:1px solid transparent}
+.mp-on{background:color-mix(in srgb,#7a4fd0 14%,var(--surface));color:#7a4fd0;border-color:color-mix(in srgb,#7a4fd0 30%,transparent)}
+.mp-kok{background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.mp-son{background:color-mix(in srgb,var(--flame) 13%,var(--surface));color:var(--flame);border-color:color-mix(in srgb,var(--flame) 30%,transparent)}
+b.mp{font-size:14px;padding:2px 8px}

@@ -40,6 +40,7 @@ const ICONS = {
   chart: '<path d="M4 20h16"/><path d="M7 16v-5M12 16V7M17 16v-8"/>',
   mix: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6"/>',
   rot: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3L19.5 9"/><path d="M19.5 4v5h-5"/>',
+  lex: '<path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h10.5M9 8h6M9 11h4"/>',
   bm: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/>',
   bmf: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z" fill="currentColor"/>',
 };
@@ -163,7 +164,20 @@ async function loadCatalog() {
   S.ver = v; if (!S.appVer) S.appVer = v.app;
   setCatalog(await fetchJSON("d/c", v.c));
 }
-const loadTest = async it => S.tests[it.id] || (S.tests[it.id] = await fetchJSON("d/" + it.x, it.v));
+const LEXITEM = { id: "lex", k: "lex", c: "Tıbbi Terimler", t: "Kökler", g: "" };
+const RTYPE = { on: "Ön ek", kok: "Kök", son: "Son ek" };
+let lexP = null;
+function loadLex() {
+  if (!lexP) lexP = fetchJSON("d/" + S.cat.lex.x, S.cat.lex.v).then(L => {
+    const ex = L.roots.map(() => []);
+    L.terms.forEach((t, ti) => { new Set(t[1].map(p => p[1]).filter(x => x != null)).forEach(ri => { if (ex[ri].length < 6) ex[ri].push(ti); }); });
+    L.ex = ex;
+    L.cards = L.roots.map((r, i) => [RTYPE[r[0]] || "", "<b>" + esc(r[1]) + "</b>" + (ex[i].length ? '<div class="muted small" style="margin-top:8px">' + ex[i].slice(0, 3).map(ti => esc(L.terms[ti][0])).join(", ") + "</div>" : ""), esc(r[2]) + '<div class="muted small" style="margin-top:6px">' + esc(r[3]) + "</div>"]);
+    return L;
+  });
+  return lexP;
+}
+const loadTest = async it => it.k === "lex" ? loadLex() : S.tests[it.id] || (S.tests[it.id] = await fetchJSON("d/" + it.x, it.v));
 const loadTexts = async it => S.texts[it.id] || (S.texts[it.id] = await fetchJSON("d/" + it.x + "/t", it.v));
 let engineP = null;
 const engineTpl = () => engineP || (engineP = fetch("engine.html").then(r => { if (!r.ok) throw new Error("engine"); return r.text(); }));
@@ -191,7 +205,7 @@ function srsDue(all) {
   const s = srsLoad(), t = today();
   return Object.keys(s).filter(k => !s[k].m && (all || s[k].due <= t));
 }
-function srsKeyItem(k) { return S.byId[k.split("|")[0]]; }
+function srsKeyItem(k) { const id = k.split("|")[0]; return id === "lex" ? (S.cat.lex ? LEXITEM : null) : S.byId[id]; }
 const testRes = () => Object.assign({}, PS.get("tres", {}));
 const bmLoad = () => Object.values(PS.get("bm", {})).filter(b => !b.x).sort((a, b) => b.at - a.at);
 const bmHas = (id, p) => { const b = PS.get("bm", {})[id + "|" + p]; return !!b && !b.x; };
@@ -361,6 +375,7 @@ function shell() {
     + '<a data-nav="tekrar" href="#/tekrar">' + icon("rep") + 'Tekrar<span class="badge" data-badge hidden></span></a>'
     + '<a data-nav="ilerleme" href="#/ilerleme">' + icon("chart") + 'İlerleme</a>'
     + '<a data-nav="karma" href="#/karma">' + icon("mix") + 'Karma deneme</a>'
+    + (S.cat.lex ? '<a data-nav="sozluk" href="#/sozluk">' + icon("lex") + 'Tıbbi terimler</a>' : "")
     + '<a data-nav="ara" href="#/ara">' + icon("search") + 'Ara</a>'
     + '<div class="sep"></div><a data-nav="ayarlar" href="#/ayarlar">' + icon("set") + 'Ayarlar</a></nav>'
     + '<div class="foot" id="side-foot"></div></aside>'
@@ -428,6 +443,7 @@ async function route() {
     if (a === "isaretler") return viewBookmarks();
     if (a === "ilerleme") return viewProgress();
     if (a === "karma") return viewMix(q);
+    if (a === "sozluk") return viewLexicon(q);
     if (a === "kurulum") return viewInstall(true);
     viewHome();
   } catch (err) { showError(err); }
@@ -494,6 +510,7 @@ function viewHome() {
     + '<a class="card tile" href="#/ilerleme"><span class="big">' + streak + '</span><span class="txt"><b>günlük seri</b><span class="muted small">Bugün ' + dayN(days, t) + " soru çözdün</span></span>" + icon("chev", "chev") + "</a>"
     + '<a class="card tile" href="#/karma"><span class="big">' + icon("mix") + '</span><span class="txt"><b>Karma deneme</b><span class="muted small">Seçtiğin derslerden karışık sorular</span></span>' + icon("chev", "chev") + "</a>"
     + '<a class="card tile" href="#/ara"><span class="big">' + icon("search") + '</span><span class="txt"><b>Her yerde ara</b><span class="muted small">Slaytlar, notlar ve sorular</span></span>' + icon("chev", "chev") + "</a>"
+    + (S.cat.lex ? '<a class="card tile" href="#/sozluk"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Tıbbi terimler</b><span class="muted small">Latince ve Yunanca kökler, ' + S.cat.lex.n + " terim</span></span>" + icon("chev", "chev") + "</a>" : "")
     + "</div>"
     + installCard()
     + (cont.length ? '<h2 class="sec">Kaldığın yer</h2><div class="card list">' + cont.map(c => c.html).join("") + "</div>" : "")
@@ -531,7 +548,9 @@ function viewLib() {
       + (now ? '<span class="st now">Şu an</span>' : k.end && t > k.end ? '<span class="st">Bitti</span>' : k.start && t < k.start ? '<span class="st">Yaklaşıyor</span>' : "") + "</a>";
   };
   const hasOrtak = S.cat.items.some(i => i.g === "ortak");
-  main().innerHTML = bar({ title: "Kütüphane", crumb: "Tıp · Dönem I" }) + '<div class="page"><div class="grid">'
+  main().innerHTML = bar({ title: "Kütüphane", crumb: "Tıp · Dönem I" }) + '<div class="page">'
+    + (S.cat.lex ? '<a class="card tile" href="#/sozluk" style="margin-bottom:12px"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Tıbbi terim sözlüğü</b><span class="muted small">Slaytlarındaki terimler Latince ve Yunanca köklerine ayrılmış hâlde</span></span>' + icon("chev", "chev") + "</a>" : "")
+    + '<div class="grid">'
     + started.map(k => card(k)).join("") + (hasOrtak ? card(kurulById("ortak")) : "") + future.map(k => card(k, "future")).join("")
     + "</div></div>";
 }
@@ -957,8 +976,9 @@ async function viewSession(q) {
   keys.sort(() => Math.random() - .5);
   main().innerHTML = '<div class="fill">' + bar({ title: "Tekrar", solid: 1, back: "#/tekrar", crumb: cf ? esc(cf) : all ? "Bütün liste" : "Bugünün soruları" })
     + '<div class="doc" style="padding:16px 12px 60px"><div class="page narrow" id="rv" style="padding:0"><div class="loading"><div class="spin"></div></div></div></div></div>';
-  const items = Array.from(new Set(keys.map(k => k.split("|")[0]))).map(id => S.byId[id]);
+  const items = Array.from(new Set(keys.map(k => k.split("|")[0]))).map(id => id === "lex" ? LEXITEM : S.byId[id]);
   await Promise.all(items.map(loadTest));
+  if (items.some(i => i.k === "lex")) S.lex = await loadLex();
   const queue = keys.map(k => ({ k, again: false }));
   let pos = 0, nOk = 0, nBad = 0;
   const draw = () => {
@@ -968,9 +988,9 @@ async function viewSession(q) {
       box.innerHTML = '<div class="card empty"><div style="font:700 26px var(--f-cond);color:var(--ink)">Bitti</div><p>' + nOk + " doğru · " + nBad + ' yanlış</p><div class="row-btns" style="justify-content:center"><a class="btn primary" href="#/tekrar">Tekrar sayfası</a><a class="btn" href="#/">Ana sayfa</a></div></div>';
       updateBadge(); return;
     }
-    const cur = queue[pos], [tid, qid] = cur.k.split("|"), it = S.byId[tid], blob = S.tests[tid];
+    const cur = queue[pos], [tid, qid] = cur.k.split("|"), it = srsKeyItem(cur.k), blob = tid === "lex" ? S.lex : S.tests[tid];
     const head = '<div class="qprog"><span>' + (pos + 1) + " / " + queue.length + '</span><div class="prog"><i style="width:' + Math.round(100 * pos / queue.length) + '%;background:var(--flame)"></i></div></div>';
-    if (it.k === "kart") {
+    if (it.k === "kart" || it.k === "lex") {
       const c = blob.cards[+qid];
       let back = false;
       const dc = () => {
@@ -1132,6 +1152,65 @@ async function viewMix(q) {
         d: (st.f === "new" ? "Hiç çözmediğin" : st.f === "wrong" ? "Yanlış yaptığın" : "Seçtiğin konulardan") + " sorular, karışık sırayla." });
       location.hash = "#/t/mix";
     };
+  };
+  draw();
+}
+
+/* ---------- lexicon ---------- */
+async function viewLexicon(q) {
+  if (!S.cat.lex) return notFound();
+  setNav("sozluk");
+  const tab = q.get("t") || "terim";
+  main().innerHTML = bar({ title: "Tıbbi terimler", crumb: "Latince ve Yunanca kökler" }) + '<div class="page narrow" id="lx"><div class="loading"><div class="spin"></div></div></div>';
+  const L = await loadLex();
+  if (parseHash().parts[0] !== "sozluk") return;
+  const st = { q: q.get("q") || "", n: 60 };
+  const seg = t => t[1].filter(p => p[1] != null).map(p => '<span class="mp mp-' + L.roots[p[1]][0] + '" title="' + esc(L.roots[p[1]][2]) + '">' + esc(p[0]) + "</span>").join("");
+  const gloss = t => t[1].filter(p => p[1] != null).map(p => esc(L.roots[p[1]][2].split(/[;(]/)[0].trim())).join(" + ");
+  const refLink = r => { const it = S.byId[r[0]]; return it ? '<a href="#/d/' + r[0] + "/" + r[1] + "?h=" + r[1] + '">' + esc(it.t) + " · " + (it.k === "slayt" ? "slayt " : "s. ") + r[1] + "</a>" : ""; };
+  const draw = () => {
+    const f = fold(st.q.trim());
+    const tabs = '<div class="seg">' + [["terim", "Terimler"], ["kok", "Kökler"], ["kart", "Kart çalış"]].map(([k, l]) => '<a class="' + (tab === k ? "on" : "") + '" href="#/sozluk?t=' + k + '">' + l + "</a>").join("") + "</div>";
+    let body = "";
+    if (tab === "terim") {
+      const list = L.terms.filter(t => !f || fold(t[0]).includes(f) || t[1].some(p => p[1] != null && fold(L.roots[p[1]][2]).includes(f)));
+      body = '<p class="note">Slaytlarında ve notlarında geçen ' + L.terms.length + ' terim, köklerine ayrılmış hâlde: <span class="mp mp-on">ön ek</span> <span class="mp mp-kok">kök</span> <span class="mp mp-son">son ek</span>. Ayrıştırma otomatik; nadiren yanlış olabilir.</p>'
+        + (list.length ? '<div class="card">' + list.slice(0, st.n).map(t => '<div class="lxr"><div class="lxt"><b>' + esc(t[0]) + '</b><span class="lxs">' + seg(t) + '</span></div><div class="lxg">' + gloss(t) + '</div><div class="lxref">' + t[3].slice(0, 3).map(refLink).join("") + (t[2] > 1 ? '<span class="muted">' + t[2] + " kez geçiyor</span>" : "") + "</div></div>").join("") + "</div>"
+          + (list.length > st.n ? '<div class="row-btns" style="justify-content:center;margin-top:12px"><button class="btn" id="more">Daha fazla (' + (list.length - st.n) + ")</button></div>" : "")
+          : '<div class="card empty">Bu aramaya uyan terim yok.</div>');
+    } else if (tab === "kok") {
+      const groups = ["on", "kok", "son"].map(tp => {
+        const rows = L.roots.map((r, i) => [r, i]).filter(([r, i]) => r[0] === tp && (!f || fold(r[1]).includes(f) || fold(r[2]).includes(f) || L.ex[i].some(ti => fold(L.terms[ti][0]).includes(f))))
+          .sort((a, b) => L.ex[b[1]].length - L.ex[a[1]].length || a[0][1].localeCompare(b[0][1], "tr"));
+        return rows.length ? '<h2 class="sec">' + { on: "Ön ekler", kok: "Kökler", son: "Son ekler" }[tp] + " · " + rows.length + '</h2><div class="card">' + rows.map(([r, i]) => '<div class="lxr"><div class="lxt"><b class="mp mp-' + r[0] + '">' + esc(r[1]) + "</b><span>" + esc(r[2]) + '</span></div><div class="lxg muted">' + esc(r[3]) + "</div>"
+          + (L.ex[i].length ? '<div class="lxref">' + L.ex[i].slice(0, 4).map(ti => '<a href="#/sozluk?t=terim&q=' + encodeURIComponent(L.terms[ti][0]) + '">' + esc(L.terms[ti][0]) + "</a>").join("") + "</div>" : "") + "</div>").join("") + "</div>" : "";
+      }).join("");
+      body = groups || '<div class="card empty">Bu aramaya uyan kök yok.</div>';
+    } else {
+      const used = L.roots.map((r, i) => i).filter(i => L.ex[i].length).sort((a, b) => L.ex[b].length - L.ex[a].length);
+      const s2 = st.k || (st.k = { order: used, i: 0, back: false });
+      const ri = s2.order[s2.i % s2.order.length], c = L.cards[ri];
+      body = '<div class="qprog"><span>' + (s2.i % s2.order.length + 1) + " / " + s2.order.length + '</span><div class="prog"><i style="width:' + Math.round(100 * ((s2.i % s2.order.length) + 1) / s2.order.length) + '%;background:var(--accent)"></i></div><button class="ibtn" id="shf" title="Karıştır">' + icon("shuffle") + "</button></div>"
+        + '<div class="card flash' + (s2.back ? " back" : "") + '" id="fl"><div><div class="side-l">' + esc(c[0]) + (s2.back ? " · anlamı" : "") + '</div><div class="fx" style="margin-top:10px">' + (s2.back ? c[2] : c[1]) + "</div>" + (s2.back ? "" : '<div class="muted small" style="margin-top:14px">Anlamını görmek için dokun</div>') + "</div></div>"
+        + '<div class="qnav">' + (s2.back ? '<button class="btn" id="no">Bilemedim</button><button class="btn primary" id="yes">Bildim</button>' : '<button class="btn primary" id="flip">Çevir</button>') + "</div>"
+        + '<p class="note">Slaytlarında en sık geçen kökler önce gelir. “Bilemedim” dediklerin Tekrar listesine düşer.</p>';
+    }
+    $("#lx").innerHTML = (tab !== "kart" ? '<div class="sbox">' + icon("search") + '<input id="lq" type="search" placeholder="Terim, kök ya da anlam: hepat, kan, emi" autocomplete="off" value="' + esc(st.q) + '"></div>' : "") + tabs + body;
+    const lq = $("#lq");
+    if (lq) lq.oninput = () => { st.q = lq.value; st.n = 60; const pos = lq.selectionStart; draw(); const l2 = $("#lq"); l2.focus(); l2.setSelectionRange(pos, pos); };
+    const mb = $("#more"); if (mb) mb.onclick = () => { st.n += 120; draw(); };
+    if (tab === "kart") {
+      const s2 = st.k, nx = () => { s2.i++; s2.back = false; draw(); };
+      $("#fl").onclick = () => { s2.back = !s2.back; draw(); };
+      const fl = $("#flip"); if (fl) fl.onclick = () => { s2.back = true; draw(); };
+      const y = $("#yes"); if (y) y.onclick = nx;
+      const n = $("#no"); if (n) n.onclick = () => {
+        const S2 = srsLoad(), key = "lex|" + s2.order[s2.i % s2.order.length], e = S2[key];
+        S2[key] = { b: 0, due: addDays(today(), 1), w: (e ? e.w : 0) + 1, t: Date.now(), u: Date.now() }; srsSave(S2); updateBadge();
+        toast("Tekrar listesine eklendi"); nx();
+      };
+      $("#shf").onclick = () => { s2.order = s2.order.slice().sort(() => Math.random() - .5); s2.i = 0; s2.back = false; draw(); };
+    }
   };
   draw();
 }
