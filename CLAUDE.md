@@ -44,7 +44,21 @@ python3 tools/medlock.py check && git add -A && git commit && git push
 Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tarihi", "Biyoistatistik", "Psikoloji", "ATA 151 · Türk Dili I". Yeni ders gelirse Drive klasör adını kullan.
 
 ## Drive denetimi
-Drive klasöründeki dosya id'lerini katalogdaki `src` + `skip` + `todo` ile karşılaştır; yeni olanları ekle. Connector 10 MB üstünü indiremez: onları `todo`'ya yaz ve sahibinden iste.
+1. Drive'da "Ders Slaytları ve Notlar" klasörünü ve alt klasörlerini (K1/Biyokimya, K2/BiyokimyaSes...) dosya id'leri ve boyutlarıyla listele.
+2. `python3 tools/medlock.py known` çıktısında olmayan id'ler yenidir. "Diğer" klasörü ve Claude'un ürettiği özet kopyaları `skip`.
+3. 10 MB altındaysa Drive connector'ının `download_file_content` aracıyla indir (sonuç JSON: `content` base64), çöz, PDF'e yaz:
+   `python3 tools/medlock.py add-drive dosya.pdf --folder K2/Biyokimya --fid <id> --name "<Drive'daki ad>"`
+   Tür (yatay = slayt, dikey A4 = not; ad "çıkmış/soru/özet/el" içeriyorsa ona göre), kurul (klasör ya da tarih), ders (klasör), hoca (PDF'teki isim, yoksa dersin bilinen hocası) ve başlık tahmin edilir. Emin değilsen önce `--dry`, gerekirse `--kind/--hoca/--title` ile düzelt.
+4. 10 MB üstündeyse `todo <id> --folder ... --name ... --kb ...` ile kaydet ve sahibinden ek olarak iste.
+5. `check`, commit, push. Ne eklendiğini ve tahmin edilen hocaları kısaca bildir.
+
+Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama ve soru–slayt eşleşmesi bunlarda da çalışır.
+
+## Denetim
+`MEDLOCK_PASS=... bash tools/check_site.sh` bütün blobları çözer, siteyi yerelde sunar ve telefon/tablet boyutunda giriş, slayt, test ("Slayta git"), sonuç, tekrar ve arama akışını dener (Playwright gerekir). Çıktıdaki `fails` boş olmalı.
+
+## Astronomican
+Eski merkez sayfa (claude.ai artifact) da güncel tutuluyor: yeni test ve notlar ikisine birden eklenir. Drive'dan gelen slaytlar sadece MedLock'a girer.
 
 ## Boyut
 GitHub Pages sitesi 1 GB'ı geçmemeli. Sayfalar ~40 KB (WebP q52). Ne kadar yer kaldığını izle (`du -sh d`).

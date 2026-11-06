@@ -37,6 +37,10 @@ const P = {
   expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
   shuffle: '<path d="M4 7h3.5c4 0 5 10 9 10H20M4 17h3.5c1.4 0 2.4-1.2 3.3-2.8M13.2 9.8C14.1 8.2 15.1 7 16.5 7H20"/><path d="m17.5 4.5 2.5 2.5-2.5 2.5M17.5 14.5l2.5 2.5-2.5 2.5"/>',
   out: '<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>',
+  chart: '<path d="M4 20h16"/><path d="M7 16v-5M12 16V7M17 16v-8"/>',
+  mix: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6"/>',
+  bm: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/>',
+  bmf: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z" fill="currentColor"/>',
 };
 const icon = (n, cls) => '<svg class="ic' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" aria-hidden="true">' + (P[n] || "") + "</svg>";
 
@@ -188,6 +192,19 @@ function srsDue(all) {
 }
 function srsKeyItem(k) { return S.byId[k.split("|")[0]]; }
 const testRes = () => LS.get("ml.tres", {});
+const bmLoad = () => LS.get("ml.bm", []);
+const bmHas = (id, p) => bmLoad().some(b => b.id === id && b.p === p);
+function bmToggle(id, p) {
+  let L = bmLoad();
+  const had = L.some(b => b.id === id && b.p === p);
+  L = had ? L.filter(b => !(b.id === id && b.p === p)) : [{ id, p, at: Date.now() }].concat(L);
+  LS.set("ml.bm", L);
+  return !had;
+}
+function bmRow(b) {
+  const it = S.byId[b.id];
+  return '<a class="it" href="#/d/' + it.id + "/" + b.p + "?h=" + b.p + '">' + kindBox(it.k) + '<div class="txt"><div class="t">' + esc(it.t) + '</div><div class="m"><span><i class="cdot" style="background:' + ccol(it.c) + '"></i>' + esc(it.c) + "</span><span>" + (it.k === "slayt" ? "Slayt " : "Sayfa ") + b.p + "</span></div></div>" + icon("chev", "chev") + "</a>";
+}
 
 /* ---------- toast ---------- */
 let toastT = 0;
@@ -212,6 +229,8 @@ function shell() {
     + kl.map(k => '<a class="sub" data-nav="k:' + k.id + '" href="#/lib/' + k.id + '">Kurul ' + k.no + '</a>').join("")
     + (S.cat.items.some(i => i.g === "ortak") ? '<a class="sub" data-nav="k:ortak" href="#/lib/ortak">Ortak dersler</a>' : "")
     + '<a data-nav="tekrar" href="#/tekrar">' + icon("rep") + 'Tekrar<span class="badge" data-badge hidden></span></a>'
+    + '<a data-nav="ilerleme" href="#/ilerleme">' + icon("chart") + 'İlerleme</a>'
+    + '<a data-nav="karma" href="#/karma">' + icon("mix") + 'Karma deneme</a>'
     + '<a data-nav="ara" href="#/ara">' + icon("search") + 'Ara</a>'
     + '<div class="sep"></div><a data-nav="ayarlar" href="#/ayarlar">' + icon("set") + 'Ayarlar</a></nav>'
     + '<div class="foot" id="side-foot"></div></aside>'
@@ -220,8 +239,8 @@ function shell() {
     + '<a data-nav="home" href="#/">' + icon("home") + 'Ana sayfa</a>'
     + '<a data-nav="lib" href="#/lib">' + icon("lib") + 'Kütüphane</a>'
     + '<a data-nav="tekrar" href="#/tekrar">' + icon("rep") + 'Tekrar<span class="badge" data-badge hidden></span></a>'
+    + '<a data-nav="ilerleme" href="#/ilerleme">' + icon("chart") + 'İlerleme</a>'
     + '<a data-nav="ara" href="#/ara">' + icon("search") + 'Ara</a>'
-    + '<a data-nav="ayarlar" href="#/ayarlar">' + icon("set") + 'Ayarlar</a>'
     + '</nav></div>';
   updateBadge();
   footNote();
@@ -238,7 +257,7 @@ function updateBadge() {
 function setNav(key, immersive) {
   $$("[data-nav]").forEach(a => {
     const k = a.dataset.nav;
-    a.classList.toggle("on", k === key || (key.startsWith("k:") && k === "lib" && !a.classList.contains("sub")) || k === key);
+    a.classList.toggle("on", k === key || (key.startsWith("k:") && k === "lib" && !a.classList.contains("sub")) || (key === "karma" && k === "ilerleme" && a.closest(".tabs")));
   });
   $("#shell").classList.toggle("immersive", !!immersive);
 }
@@ -276,6 +295,9 @@ async function route() {
     if (a === "tekrar") return q.get("s") ? viewSession(q) : viewReview();
     if (a === "ara") return viewSearch(q.get("q") || "");
     if (a === "ayarlar") return viewSettings();
+    if (a === "isaretler") return viewBookmarks();
+    if (a === "ilerleme") return viewProgress();
+    if (a === "karma") return viewMix(q);
     if (a === "kurulum") return viewInstall(true);
     viewHome();
   } catch (err) { showError(err); }
@@ -323,21 +345,44 @@ function viewHome() {
   if (lastDoc && S.byId[lastDoc.id]) { const it = S.byId[lastDoc.id]; cont.push({ at: lastDoc.at, html: '<a class="it" href="#/d/' + it.id + "/" + lastDoc.p + '">' + kindBox(it.k) + '<div class="txt"><div class="t">' + esc(it.t) + '</div><div class="m"><span><i class="cdot" style="background:' + ccol(it.c) + '"></i>' + esc(it.c) + "</span><span>Sayfa " + lastDoc.p + " / " + it.n + "</span></div></div>" + icon("chev", "chev") + "</a>" }); }
   if (lastTest && S.byId[lastTest.id]) { const it = S.byId[lastTest.id]; cont.push({ at: lastTest.at, html: itemRow(it, { course: 1, noHoca: 1 }) }); }
   cont.sort((a, b) => b.at - a.at);
+  const bms = bmLoad().filter(b => S.byId[b.id]);
   const started = t >= k.start;
-  main().innerHTML = bar({ title: NAME, crumb: fdate(t, true) })
+  const lastWeek = started && left >= 0 && left <= 7;
+  const days = LS.get("ml.days", {});
+  let streak = 0, dd = days[t] ? t : addDays(t, -1); while (days[dd]) { streak++; dd = addDays(dd, -1); }
+  main().innerHTML = bar({ title: NAME, crumb: fdate(t, true), actions: '<a class="ibtn" href="#/ayarlar" aria-label="Ayarlar">' + icon("set") + "</a>" })
     + '<div class="page">'
-    + '<a class="card hero" href="#/lib/' + k.id + '"><div class="k">Kurul ' + k.no + (started ? " · " + week + ". hafta / " + weeks : " · yakında") + '</div><h3>' + esc(k.name) + "</h3>"
+    + '<div class="card hero"><div class="k">Kurul ' + k.no + (started ? " · " + week + ". hafta / " + weeks : " · yakında") + (lastWeek ? ' <span class="lw">Son hafta</span>' : "") + '</div><h3>' + esc(k.name) + "</h3>"
     + '<div class="prog"><i style="width:' + Math.round(100 * gone / total) + '%"></i></div>'
     + '<div class="meta"><span>' + fdate(k.start) + " – " + fdate(k.end) + "</span>" + (left >= 0 ? "<span>Kurul sonuna <b>" + left + " gün</b></span>" : "") + "<span><b>" + kItems.length + "</b> öğe</span></div>"
-    + '<span class="btn">Kurula git ' + icon("chev") + "</span></a>"
-    + '<div class="grid" style="margin-top:12px">'
+    + '<div class="row-btns"><a class="btn" href="#/lib/' + k.id + '">Kurula git ' + icon("chev") + "</a>"
+    + (lastWeek ? '<a class="btn" href="#/karma?w=1&g=' + k.id + '">' + icon("mix") + 'Zayıf konulardan deneme</a>' + (kItems.some(i => i.k === "cikmis") ? '<a class="btn" href="#/lib/' + k.id + '?s=cikmis">' + icon("star") + "Çıkmışlar</a>" : "") : "")
+    + "</div></div>"
+    + '<div class="grid tiles4" style="margin-top:12px">'
     + '<a class="card tile' + (due ? " due" : "") + '" href="#/tekrar"><span class="big">' + due + '</span><span class="txt"><b>' + (due ? "soru tekrar bekliyor" : "Bugün tekrar yok") + '</b><span class="muted small">'
     + (tracked ? "Listede " + tracked + " soru var" : "Yanlış yaptığın sorular buraya düşer") + "</span></span>" + icon("chev", "chev") + "</a>"
+    + '<a class="card tile" href="#/ilerleme"><span class="big">' + streak + '</span><span class="txt"><b>günlük seri</b><span class="muted small">Bugün ' + (days[t] || 0) + " soru çözdün</span></span>" + icon("chev", "chev") + "</a>"
+    + '<a class="card tile" href="#/karma"><span class="big">' + icon("mix") + '</span><span class="txt"><b>Karma deneme</b><span class="muted small">Seçtiğin derslerden karışık sorular</span></span>' + icon("chev", "chev") + "</a>"
     + '<a class="card tile" href="#/ara"><span class="big">' + icon("search") + '</span><span class="txt"><b>Her yerde ara</b><span class="muted small">Slaytlar, notlar ve sorular</span></span>' + icon("chev", "chev") + "</a>"
     + "</div>"
+    + installCard()
     + (cont.length ? '<h2 class="sec">Kaldığın yer</h2><div class="card list">' + cont.map(c => c.html).join("") + "</div>" : "")
+    + (bms.length ? '<h2 class="sec">İşaretli sayfalar' + (bms.length > 4 ? ' · <a href="#/isaretler" style="color:var(--accent)">tümü (' + bms.length + ")</a>" : "") + '</h2><div class="card list">' + bms.slice(0, 4).map(bmRow).join("") + "</div>" : "")
     + '<h2 class="sec">Son eklenenler</h2><div class="card list">' + S.cat.items.slice(0, 8).map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>"
     + "</div>";
+}
+
+function installCard() {
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (standalone || LS.get("ml.noinst")) return "";
+  return '<div class="card tile" style="margin-top:12px" id="instc"><img src="icons/64.png" width="40" height="40" style="border-radius:10px" alt=""><span class="txt"><b>Ana ekrana ekle</b><span class="muted small">Uygulama gibi açılır, çevrimdışı da çalışır.</span></span>'
+    + '<a class="btn" href="#/kurulum">Nasıl?</a><button class="ibtn" onclick="localStorage.setItem(\'ml.noinst\',\'1\');this.parentNode.remove()" aria-label="Kapat">' + icon("close") + "</button></div>";
+}
+function viewBookmarks() {
+  setNav("home");
+  const bms = bmLoad().filter(b => S.byId[b.id]);
+  main().innerHTML = bar({ title: "İşaretli sayfalar", back: "#/" }) + '<div class="page narrow">'
+    + (bms.length ? '<div class="card list">' + bms.map(bmRow).join("") + "</div>" : '<div class="card empty">Henüz işaretli sayfa yok. Slayt açıkken üstteki işaret düğmesine dokun.</div>') + "</div>";
 }
 
 /* ---------- views: library ---------- */
@@ -372,7 +417,14 @@ function viewKurul(g) {
       return '<a class="card course" href="#/lib/' + g + "/" + slug(o.c) + '"><span class="bar-c" style="background:' + ccol(o.c) + '"></span><span class="txt"><h3>' + esc(o.c) + "</h3>"
         + '<span class="h">' + (Array.from(o.hocas).map(esc).join(", ") || "Hoca belirtilmedi") + '</span><span class="cnt">' + cnt + "</span></span>" + icon("chev", "chev") + "</a>";
     }).join("") + "</div>" : '<div class="card empty">Bu kurula henüz içerik eklenmedi. Ders dosyaları Drive’a yüklendikçe burada görünecek.</div>')
+    + kurulSection(g, "test", "Bu kuruldaki testler", "test") + kurulSection(g, "cikmis", "Çıkmışlar", "cikmis")
     + "</div>";
+  const sec = parseHash().q.get("s");
+  if (sec) { const el = document.getElementById("sec-" + sec); if (el) el.scrollIntoView(); }
+}
+function kurulSection(g, kind, title, id) {
+  const its = S.cat.items.filter(i => i.g === g && i.k === kind);
+  return its.length ? '<h2 class="sec" id="sec-' + id + '">' + title + '</h2><div class="card list">' + its.map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>" : "";
 }
 function viewCourse(g, cs) {
   const k = kurulById(g);
@@ -453,8 +505,8 @@ function viewDoc(id, page, q) {
   const back = "#/lib/" + it.g + "/" + slug(it.c);
   main().innerHTML = '<div class="fill">' + bar({
     title: it.t, solid: 1, back, crumb: esc(it.c) + (it.h ? " · " + esc(it.h) : ""),
-    actions: '<button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
-  }) + '<div class="doc" id="doc"></div></div>';
+    actions: '<button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
+  }) + '<div class="doc" id="doc" tabindex="-1"></div></div>';
   const rel = S.cat.items.filter(t => t.k === "test" && (t.dk || []).some(d => d[0] === it.id));
   const foot = rel.length ? '<div class="doc-foot"><b>Bu ' + (it.k === "slayt" ? "slayttan" : "dosyadan") + " soru olan testler</b><div class=\"row-btns\">"
     + rel.map(t => '<a class="btn" href="#/t/' + t.id + '">' + icon("test") + esc(t.c === it.c ? t.t : t.c + " · " + t.t) + ' <span class="muted">' + (t.dk.find(d => d[0] === it.id)[1]) + " soru</span></a>").join("") + "</div></div>" : "";
@@ -464,12 +516,19 @@ function viewDoc(id, page, q) {
     highlight: hl, est: q && q.get("e") === "1", foot,
     onPage: p => {
       $("#pgc").textContent = p + " / " + it.n;
+      $("#bmb").innerHTML = icon(bmHas(it.id, p) ? "bmf" : "bm");
       clearTimeout(saveT);
       saveT = setTimeout(() => { history.replaceState(null, "", "#/d/" + it.id + "/" + p + (hl.length ? "?" + q.toString() : "")); LS.set("ml.lastDoc", { id: it.id, p, at: Date.now() }); }, 400);
     },
   });
   LS.set("ml.lastDoc", { id: it.id, p: page, at: Date.now() });
   S.cleanup.push(() => V.destroy());
+  $("#doc").focus({ preventScroll: true });
+  $("#bmb").onclick = () => {
+    const on = bmToggle(it.id, V.page);
+    $("#bmb").innerHTML = icon(on ? "bmf" : "bm");
+    toast(on ? (it.k === "slayt" ? "Slayt " : "Sayfa ") + V.page + " işaretlendi" : "İşaret kaldırıldı");
+  };
   $("#pgc").onclick = () => {
     const b = $("#pgc");
     const inp = document.createElement("input");
@@ -544,47 +603,88 @@ function onEngineSave(C, st) {
   const r = st && st.run;
   if (!r) return;
   if (!r.mlid) r.mlid = Date.now();
-  const res = testRes();
-  let ok = 0, done = 0;
-  r.ids.forEach(id => { const a = r.ans[id]; if (a !== undefined) { done++; if (C.byQ[id] && a === C.byQ[id].a) ok++; } });
-  res[C.it.id] = { ok, done, n: r.ids.length, fin: !!r.finished, at: Date.now() };
-  LS.set("ml.tres", res);
-  LS.set("ml.lastTest", { id: C.it.id, at: Date.now() });
-  const srs = srsLoad();
-  let ch = false;
+  let ok = 0, done = 0, bad = 0;
+  r.ids.forEach(id => { const a = r.ans[id]; if (a !== undefined) { done++; if (C.byQ[id] && a === C.byQ[id].a) ok++; else bad++; } });
+  if (!C.mix) {
+    const res = testRes();
+    res[C.it.id] = { ok, done, n: r.ids.length, fin: !!r.finished, at: Date.now() };
+    LS.set("ml.tres", res);
+    LS.set("ml.lastTest", { id: C.it.id, at: Date.now() });
+  }
+  if (r.finished) {
+    const H = LS.get("ml.hist", []);
+    if (!H.some(h => h.r === r.mlid)) {
+      H.push({ id: C.it.id, g: C.it.g, t: C.it.t, c: C.it.c, at: Date.now(), ok, bad, n: r.ids.length, r: r.mlid });
+      LS.set("ml.hist", H.slice(-400));
+    }
+  }
+  const srs = srsLoad(), qh = LS.get("ml.qh", {}), days = LS.get("ml.days", {}), td = today();
+  let ch = false, chq = false;
   r.ids.forEach(id => {
     const q = C.byQ[id], a = r.ans[id];
-    if (!q) return;
-    const revealed = r.finished || (r.mode === "study" && a !== undefined);
-    if (!revealed || a === undefined || a === q.a) return;   // boşlar listeye girmez, sadece yanlışlar
-    const key = C.it.id + "|" + id, e = srs[key];
+    if (!q || a === undefined || !(r.finished || r.mode === "study")) return;
+    const key = C.src ? C.src[id] : C.it.id + "|" + id;
+    const h = qh[key] || (qh[key] = { n: 0, k: 0 });
+    if (h.r !== r.mlid) {
+      h.r = r.mlid; h.n++; if (a === q.a) h.k++; h.l = a === q.a ? 1 : 0; h.t = q.t; h.c = C.srcC ? C.srcC[id] : C.it.c; h.at = Date.now();
+      days[td] = (days[td] || 0) + 1; chq = true;
+    }
+    if (a === q.a) return;                       // boşlar ve doğrular tekrar listesine girmez
+    const e = srs[key];
     if (e && e.r === r.mlid) return;
-    srs[key] = { b: 0, due: addDays(today(), 1), w: (e ? e.w : 0) + 1, r: r.mlid, t: Date.now() };
+    srs[key] = { b: 0, due: addDays(td, 1), w: (e ? e.w : 0) + 1, r: r.mlid, t: Date.now() };
     ch = true;
   });
+  if (chq) { LS.set("ml.qh", qh); LS.set("ml.days", days); }
   if (ch) { srsSave(srs); updateBadge(); }
 }
 const jsLit = o => JSON.stringify(o).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+async function mixBlob(M) {
+  const tests = {};
+  for (const [tid] of M.ids) if (!tests[tid] && S.byId[tid]) tests[tid] = await loadTest(S.byId[tid]);
+  const data = [], refs = {}, src = {}, srcC = {}, courses = new Map();
+  M.ids.forEach(([tid, qid]) => {
+    const b = tests[tid]; if (!b) return;
+    const q = b.data.find(x => x.id === qid); if (!q) return;
+    const nid = tid + "~" + qid;
+    data.push(Object.assign({}, q, { id: nid }));
+    if (b.refs && b.refs[qid]) refs[nid] = b.refs[qid];
+    src[nid] = tid + "|" + qid; srcC[nid] = S.byId[tid].c;
+    b.cfg.courses.forEach(c => { if (!courses.has(c.code)) courses.set(c.code, c); });
+  });
+  const cfg = { key: M.k, title: M.t, sub: data.length + " soru", eyebrow: NAME + " · karma deneme", lede: M.d || "", courses: Array.from(courses.values()), perQuestion: 1.2 };
+  return { blob: { cfg, data, refs }, src, srcC };
+}
 async function viewTest(id) {
-  const it = S.byId[id];
-  if (!it || it.k !== "test") return notFound();
+  let it, blob, extra = {}, back;
+  if (id === "mix") {
+    const M = LS.get("ml.mix");
+    if (!M) return notFound();
+    it = { id: "mix", k: "test", t: M.t, c: M.c || "Karma", g: M.g || "", n: M.ids.length, h: "" };
+    back = "#/karma";
+  } else {
+    it = S.byId[id];
+    if (!it || it.k !== "test") return notFound();
+    back = "#/lib/" + it.g + "/" + slug(it.c);
+  }
   setNav("lib", true);
-  const back = "#/lib/" + it.g + "/" + slug(it.c);
   main().innerHTML = '<div class="fill">' + bar({
     title: it.t, solid: 1, back, crumb: esc(it.c) + (it.h ? " · " + esc(it.h) : ""),
-    actions: '<button class="ibtn" id="tinfo" title="Testin kaynakları">' + icon("info") + "</button>",
+    actions: id === "mix" ? "" : '<button class="ibtn" id="tinfo" title="Testin kaynakları">' + icon("info") + "</button>",
   }) + '<div class="tsplit"><div class="tpane"><div class="loading"><div><div class="spin"></div>Test açılıyor…</div></div></div><aside class="spane" id="spane" hidden></aside></div></div>';
-  const [tpl, blob] = await Promise.all([engineTpl(), loadTest(it)]);
+  if (id === "mix") { const m = await mixBlob(LS.get("ml.mix")); blob = m.blob; extra = { mix: 1, src: m.src, srcC: m.srcC }; }
+  else blob = await loadTest(it);
+  const tpl = await engineTpl();
   if (parseHash().parts[1] !== id) return;
   const byQ = {}; blob.data.forEach(q => { byQ[q.id] = q; });
-  S.cur = { it, blob, byQ };
+  S.cur = Object.assign({ it, blob, byQ }, extra);
   S.cleanup.push(() => { S.cur = null; });
   const fr = document.createElement("iframe");
   fr.title = it.t;
   fr.srcdoc = tpl.replace("/*ML_DATA*/", () => "const CFG = " + jsLit(blob.cfg) + ";\nconst DATA = " + jsLit(blob.data));
   $(".tpane").replaceChildren(fr);
-  $("#tinfo").onclick = () => testInfo(it);
-  LS.set("ml.lastTest", { id: it.id, at: Date.now() });
+  const ti = $("#tinfo"); if (ti) ti.onclick = () => testInfo(it);
+  if (id !== "mix") LS.set("ml.lastTest", { id: it.id, at: Date.now() });
 }
 function sheet(html) {
   const bg = document.createElement("div");
@@ -660,10 +760,21 @@ function viewReview() {
     + (active.length ? '<a class="btn' + (due.length ? "" : " primary") + '" href="#/tekrar?s=1&all=1">Hepsini çalış (' + active.length + ")</a>" : "") + "</div>"
     + (byC.size ? '<h2 class="sec">Derslere göre</h2><div class="card">' + Array.from(byC.entries()).sort((a, b) => b[1].due - a[1].due || b[1].all - a[1].all).map(([c, o]) =>
       '<div class="crow"><i class="cdot" style="background:' + ccol(c) + '"></i><div class="txt"><b>' + esc(c) + '</b></div><span class="n">' + o.due + " / " + o.all + '</span><a class="btn" href="#/tekrar?s=1&c=' + encodeURIComponent(c) + (o.due ? "" : "&all=1") + '">Çalış</a></div>').join("") + "</div>" : "")
+    + resultsHTML()
     + '<h2 class="sec">Nasıl çalışır</h2><p class="note">Testte yanlış yaptığın her soru buraya düşer ve ertesi gün sorulur. Doğru bildikçe aralık uzar: 1, 3, 7, 14, 30 gün. 30 günlük aralıktan sonra da doğru bilirsen soru öğrenildi sayılır'
     + (learned ? " (şimdiye kadar " + learned + ")" : "") + ". Yanlış yaparsan baştan başlar. Kartlarda “Bilemedim” dediklerin de buraya gelir.</p>"
     + (active.length ? "" : '<div class="card empty" style="margin-top:14px">Listen boş. Bir test çöz; yanlışların burada birikir.</div>')
     + "</div>";
+}
+function resultsHTML() {
+  const R = testRes();
+  const rows = Object.entries(R).filter(([id]) => S.byId[id]).sort((a, b) => b[1].at - a[1].at);
+  if (!rows.length) return "";
+  return '<h2 class="sec">Test sonuçların</h2><div class="card">' + rows.map(([id, r]) => {
+    const it = S.byId[id], pc = r.n ? Math.round(100 * r.ok / r.n) : 0;
+    return '<a class="crow" href="#/t/' + id + '"><i class="cdot" style="background:' + ccol(it.c) + '"></i><div class="txt"><b>' + esc(it.c) + " · " + esc(it.t) + '</b><div class="muted small">'
+      + (r.fin ? "Bitti" : "Devam ediyor") + " · " + fdate(isoDay(new Date(r.at))) + '</div></div><span class="n">' + (r.fin ? r.ok + "/" + r.n + " · %" + pc : r.done + "/" + r.n) + "</span></a>";
+  }).join("") + "</div>";
 }
 function qHTML(q) {
   return (q.p ? '<div class="passage">' + q.p + "</div>" : "") + '<p class="stem">' + q.q + "</p>"
@@ -721,18 +832,146 @@ async function viewSession(q) {
       $$(".opt", box).forEach((x, j) => { x.disabled = true; if (j === qq.a) x.classList.add("ok"); else if (j === i) x.classList.add("bad"); else x.classList.add("dim"); });
       $("#fbx").innerHTML = '<div class="fb ' + (ok ? "ok" : "bad") + '"><h4>' + (ok ? "Doğru." : "Yanlış. Doğru cevap: " + L[qq.a]) + "</h4><p>" + qq.e + '</p><div class="src">Kaynak: ' + esc(qq.s) + "</div></div>"
         + slideBtn(blob, qid) + '<div class="qnav"><button class="btn primary" id="nx">Devam →</button></div>';
-      gradeOnly(ok);
+      gradeOnly(ok, { t: qq.t, c: it.c });
       $("#nx").onclick = () => { pos++; draw(); $("#rv").parentNode.scrollTop = 0; };
     });
   };
-  const gradeOnly = ok => {
+  const gradeOnly = (ok, meta) => {
     const cur = queue[pos], st = srsLoad(), e = st[cur.k] || { b: 0, w: 0 };
+    if (meta) {
+      const qh = LS.get("ml.qh", {}), days = LS.get("ml.days", {}), h = qh[cur.k] || (qh[cur.k] = { n: 0, k: 0 });
+      h.n++; if (ok) h.k++; h.l = ok ? 1 : 0; h.t = meta.t; h.c = meta.c; h.at = Date.now(); h.r = 0;
+      days[today()] = (days[today()] || 0) + 1; LS.set("ml.qh", qh); LS.set("ml.days", days);
+    }
     if (ok) { nOk++; if (!cur.again) { e.b = (e.b || 0) + 1; if (e.b >= INT.length) e.m = 1; e.due = addDays(today(), INT[Math.min(e.b, INT.length - 1)]); } }
     else { nBad++; e.b = 0; e.w = (e.w || 0) + 1; e.due = addDays(today(), 1); if (!cur.again) queue.push({ k: cur.k, again: true }); }
     st[cur.k] = e; srsSave(st);
   };
   const grade = ok => { gradeOnly(ok); pos++; draw(); };
   if (!queue.length) { $("#rv").innerHTML = '<div class="card empty">Şu an tekrar edilecek soru yok.</div>'; return; }
+  draw();
+}
+
+/* ---------- progress ---------- */
+function topicTotals() {
+  const T = new Map();
+  S.cat.items.filter(i => i.k === "test").forEach(it => {
+    if (!T.has(it.c)) T.set(it.c, new Map());
+    const m = T.get(it.c);
+    (it.tp || []).forEach(([t, n]) => m.set(t, (m.get(t) || 0) + n));
+  });
+  return T;
+}
+function mastery() {
+  const M = new Map();
+  Object.values(LS.get("ml.qh", {})).forEach(h => {
+    if (!h.c || !h.t) return;
+    if (!M.has(h.c)) M.set(h.c, new Map());
+    const m = M.get(h.c), o = m.get(h.t) || { seen: 0, ok: 0, n: 0, k: 0 };
+    o.seen++; o.ok += h.l ? 1 : 0; o.n += h.n; o.k += h.k; m.set(h.t, o);
+  });
+  return M;
+}
+const weakTopics = () => { const W = []; mastery().forEach((m, c) => m.forEach((o, t) => { if (o.seen >= 3 && o.ok / o.seen < 0.6) W.push([c, t]); })); return W; };
+function viewProgress() {
+  setNav("ilerleme");
+  const days = LS.get("ml.days", {}), t = today();
+  let streak = 0, d = days[t] ? t : addDays(t, -1); while (days[d]) { streak++; d = addDays(d, -1); }
+  const qh = Object.values(LS.get("ml.qh", {})), total = Object.values(days).reduce((a, b) => a + b, 0);
+  const seen = qh.length, okNow = qh.filter(h => h.l).length;
+  const arr = []; for (let i = 13; i >= 0; i--) { const x = addDays(t, -i); arr.push([x, days[x] || 0]); }
+  const max = Math.max(10, ...arr.map(x => x[1]));
+  const T = topicTotals(), M = mastery();
+  const courseBlocks = Array.from(T.entries()).sort((a, b) => (M.get(b[0]) || new Map()).size - (M.get(a[0]) || new Map()).size).map(([c, tm]) => {
+    const mm = M.get(c) || new Map();
+    const rows = Array.from(tm.entries()).map(([tp, n]) => ({ tp, n, o: mm.get(tp) })).sort((a, b) => {
+      const pa = a.o && a.o.seen >= 3 ? a.o.ok / a.o.seen : 2, pb = b.o && b.o.seen >= 3 ? b.o.ok / b.o.seen : 2; return pa - pb || b.n - a.n; });
+    const seenC = rows.reduce((x, r) => x + (r.o ? r.o.seen : 0), 0), totC = rows.reduce((x, r) => x + r.n, 0);
+    return '<details class="card mcard"' + (mm.size ? " open" : "") + '><summary><i class="cdot" style="background:' + ccol(c) + '"></i><b>' + esc(c) + '</b><span class="muted small">' + seenC + " / " + totC + " soru görüldü</span></summary>"
+      + rows.map(r => {
+        const pc = r.o && r.o.seen ? Math.round(100 * r.o.ok / r.o.seen) : null, weak = r.o && r.o.seen >= 3 && pc < 60;
+        return '<div class="mrow' + (weak ? " weak" : "") + '"><span class="tn">' + esc(r.tp) + (weak ? ' <span class="wtag">zayıf</span>' : "") + '</span><span class="mb"><i style="width:' + (pc || 0) + '%"></i></span><span class="pc">' + (pc == null ? "–" : "%" + pc) + '</span><span class="cv">' + (r.o ? r.o.seen : 0) + "/" + r.n + "</span></div>";
+      }).join("") + "</details>";
+  }).join("");
+  const H = LS.get("ml.hist", []).slice().reverse();
+  const real = LS.get("ml.real", {});
+  const ks = S.cat.kurullar.filter(k => S.cat.items.some(i => i.g === k.id && i.k === "test"));
+  const W = weakTopics();
+  main().innerHTML = bar({ title: "İlerleme", crumb: "Bu cihazdaki çalışman" }) + '<div class="page narrow">'
+    + '<div class="stat4"><div class="card"><b>' + streak + '</b><span>günlük seri</span></div><div class="card"><b>' + (days[t] || 0) + '</b><span>bugün</span></div><div class="card"><b>' + total + '</b><span>toplam cevap</span></div><div class="card"><b>' + (seen ? "%" + Math.round(100 * okNow / seen) : "–") + '</b><span>son cevaplarda başarı</span></div></div>'
+    + '<h2 class="sec">Son 14 gün</h2><div class="card bars">' + arr.map(([x, n]) => '<div class="bcol" title="' + fdate(x) + ": " + n + ' soru"><span class="bn">' + (n || "") + '</span><i style="height:' + Math.round(100 * n / max) + '%"></i><span class="bd">' + (+x.slice(8)) + "</span></div>").join("") + "</div>"
+    + '<h2 class="sec">Konu hakimiyeti</h2><p class="note" style="margin-top:-4px">Her konuda çözdüğün soruların son cevabına göre. En az 3 soru çözülen ve %60’ın altında kalan konular zayıf sayılır.</p>'
+    + (W.length ? '<div class="row-btns" style="margin-bottom:10px"><a class="btn flame" href="#/karma?w=1">' + icon("mix") + "Zayıf " + W.length + " konudan karma deneme</a></div>" : "")
+    + (courseBlocks || '<div class="card empty">Henüz test yok.</div>')
+    + '<h2 class="sec">Deneme geçmişi</h2>' + (H.length ? '<div class="card">' + H.slice(0, 40).map(h => {
+      const net = h.ok - h.bad / 4;
+      return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(h.c) + " · " + esc(h.t) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">net ' + (Math.round(net * 100) / 100) + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
+    }).join("") + "</div>" : '<div class="card empty">Bitirdiğin denemeler burada listelenir.</div>')
+    + (ks.length ? '<h2 class="sec">Kurul sınavı ile karşılaştır</h2><p class="note" style="margin-top:-4px">Kurul sınavından sonra gerçek netini ve soru sayısını gir; denemelerdeki başarınla yan yana görürsün.</p><div class="card">'
+      + ks.map(k => {
+        const hs = H.filter(h => h.g === k.id), avg = hs.length ? Math.round(100 * hs.reduce((a, h) => a + h.ok / h.n, 0) / hs.length) : null, r = real[k.id] || {};
+        const rp = r.net && r.n ? Math.round(100 * r.net / r.n) : null;
+        return '<div class="crow realrow"><div class="txt"><b>Kurul ' + k.no + '</b><div class="muted small">Denemelerde ' + (avg == null ? "henüz sonuç yok" : "%" + avg + " (" + hs.length + " deneme)") + (rp != null ? " · kurulda %" + rp : "") + "</div></div>"
+          + '<input class="realin" type="number" step="0.25" inputmode="decimal" placeholder="Net" data-rk="' + k.id + '" data-rf="net" value="' + (r.net ?? "") + '"><input class="realin" type="number" inputmode="numeric" placeholder="Soru" data-rk="' + k.id + '" data-rf="n" value="' + (r.n ?? "") + '"></div>';
+      }).join("") + "</div>" : "")
+    + "</div>";
+  $$("[data-rk]").forEach(inp => inp.onchange = () => {
+    const R = LS.get("ml.real", {}), o = R[inp.dataset.rk] || {};
+    const v = parseFloat(inp.value); if (isNaN(v)) delete o[inp.dataset.rf]; else o[inp.dataset.rf] = v;
+    R[inp.dataset.rk] = o; LS.set("ml.real", R); viewProgress();
+  });
+}
+async function viewMix(q) {
+  setNav("karma");
+  const tests = S.cat.items.filter(i => i.k === "test");
+  const courses = Array.from(new Set(tests.map(i => i.c)));
+  const T = topicTotals(), M = mastery(), W = weakTopics(), qh = LS.get("ml.qh", {});
+  const g = q.get("g");
+  const st = { c: new Set(), t: new Set(), n: 20, f: "all" };
+  if (q.get("w") === "1" && W.length) { W.forEach(([c, t]) => { if (!g || tests.some(i => i.c === c && i.g === g)) { st.c.add(c); st.t.add(c + "|" + t); } }); }
+  if (!st.c.size) { const k = g || currentKurul().id; tests.filter(i => i.g === k).forEach(i => st.c.add(i.c)); if (!st.c.size) courses.forEach(c => st.c.add(c)); Array.from(st.c).forEach(c => (T.get(c) || new Map()).forEach((n, t) => st.t.add(c + "|" + t))); }
+  const draw = () => {
+    const avail = Array.from(st.t).filter(k => st.c.has(k.split("|")[0])).reduce((a, k) => { const [c, t] = k.split("|"); return a + ((T.get(c) || new Map()).get(t) || 0); }, 0);
+    main().innerHTML = bar({ title: "Karma deneme", crumb: "Testlerdeki sorulardan yeni bir deneme" }) + '<div class="page narrow">'
+      + '<div class="flabel">Dersler</div><div class="chips" style="flex-wrap:wrap">' + courses.map(c => '<button class="chip' + (st.c.has(c) ? " on" : "") + '" data-c="' + esc(c) + '"><i class="cdot" style="background:' + ccol(c) + '"></i>' + esc(c) + "</button>").join("") + "</div>"
+      + '<div class="flabel" style="margin-top:14px">Konular</div>'
+      + Array.from(st.c).map(c => { const tm = T.get(c) || new Map(), mm = M.get(c) || new Map();
+        return '<div class="card tlist"><div class="th"><b>' + esc(c) + '</b><button class="btn ghost" data-all="' + esc(c) + '">Hepsi</button><button class="btn ghost" data-none="' + esc(c) + '">Hiçbiri</button></div>'
+          + Array.from(tm.entries()).map(([t, n]) => { const o = mm.get(t), pc = o && o.seen ? Math.round(100 * o.ok / o.seen) : null, key = c + "|" + t;
+            return '<label class="tl"><input type="checkbox" data-t="' + esc(key) + '"' + (st.t.has(key) ? " checked" : "") + '><span class="tn">' + esc(t) + (o && o.seen >= 3 && pc < 60 ? ' <span class="wtag">zayıf</span>' : "") + '</span><span class="muted small">' + n + " soru" + (pc != null ? " · %" + pc : "") + "</span></label>"; }).join("") + "</div>"; }).join("")
+      + '<div class="flabel" style="margin-top:14px">Hangi sorular</div><div class="chips" style="flex-wrap:wrap">'
+      + [["all", "Hepsi"], ["new", "Hiç çözmediklerim"], ["wrong", "Yanlış yaptıklarım"]].map(([v, l]) => '<button class="chip' + (st.f === v ? " on" : "") + '" data-f="' + v + '">' + l + "</button>").join("") + "</div>"
+      + '<div class="flabel" style="margin-top:14px">Soru sayısı</div><div class="chips">' + [10, 20, 40, 80, 0].map(n => '<button class="chip' + (st.n === n ? " on" : "") + '" data-n="' + n + '">' + (n || "Hepsi") + "</button>").join("") + "</div>"
+      + '<div class="row-btns" style="margin-top:18px"><button class="btn primary" id="mk"' + (avail ? "" : " disabled") + ">" + icon("mix") + "Denemeyi oluştur</button><span class='muted small' style='align-self:center'>Seçili konularda " + avail + " soru var</span></div>"
+      + '<p class="note">Sorular mevcut testlerden gelir; kaynak, “Slayta git” ve tekrar listesi aynen çalışır. Çalışma, sınav ve zamana karşı modları deneme açılınca seçilir.</p></div>';
+    $$("[data-c]").forEach(b => b.onclick = () => { const c = b.dataset.c; if (st.c.has(c)) st.c.delete(c); else { st.c.add(c); (T.get(c) || new Map()).forEach((n, t) => st.t.add(c + "|" + t)); } draw(); });
+    $$("[data-t]").forEach(i => i.onchange = () => { if (i.checked) st.t.add(i.dataset.t); else st.t.delete(i.dataset.t); draw(); });
+    $$("[data-all]").forEach(b => b.onclick = () => { const c = b.dataset.all; (T.get(c) || new Map()).forEach((n, t) => st.t.add(c + "|" + t)); draw(); });
+    $$("[data-none]").forEach(b => b.onclick = () => { const c = b.dataset.none; Array.from(st.t).forEach(k => { if (k.split("|")[0] === c) st.t.delete(k); }); draw(); });
+    $$("[data-f]").forEach(b => b.onclick = () => { st.f = b.dataset.f; draw(); });
+    $$("[data-n]").forEach(b => b.onclick = () => { st.n = +b.dataset.n; draw(); });
+    $("#mk").onclick = async () => {
+      const btn = $("#mk"); btn.disabled = true; btn.textContent = "Hazırlanıyor…";
+      const its = tests.filter(i => st.c.has(i.c));
+      await Promise.all(its.map(loadTest));
+      let pool = [];
+      its.forEach(it => S.tests[it.id].data.forEach(qq => {
+        if (!st.t.has(it.c + "|" + qq.t)) return;
+        const h = qh[it.id + "|" + qq.id];
+        if (st.f === "new" && h) return;
+        if (st.f === "wrong" && !(h && !h.l)) return;
+        pool.push([it.id, qq.id]);
+      }));
+      if (!pool.length) { toast("Bu seçimde soru kalmadı."); btn.disabled = false; btn.textContent = "Denemeyi oluştur"; return; }
+      pool = pool.map(x => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+      if (st.n) pool = pool.slice(0, st.n);
+      const old = LS.get("ml.mix"); if (old) LS.del(old.k);
+      const cs = Array.from(st.c);
+      LS.set("ml.mix", { k: "ml:mix:" + Date.now(), t: "Karma deneme · " + pool.length + " soru", c: cs.length > 2 ? cs.length + " ders" : cs.join(" + "), ids: pool,
+        d: (st.f === "new" ? "Hiç çözmediğin" : st.f === "wrong" ? "Yanlış yaptığın" : "Seçtiğin konulardan") + " sorular, karışık sırayla." });
+      location.hash = "#/t/mix";
+    };
+  };
   draw();
 }
 

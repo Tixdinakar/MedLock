@@ -8,6 +8,10 @@ MEDLOCK_PASS ortam değişkeninden alır; şifre hiçbir dosyaya yazılmaz.
   python3 tools/medlock.py cat       # kataloğu göster
   python3 tools/medlock.py add-doc dosya.pdf --kind slayt --kurul k2 --course Biyokimya --hoca "Hoca Adı" --title "..."
   python3 tools/medlock.py add-test test.html --kurul k2 --course Biyokimya --hoca "Hoca Adı" --title "..."
+  python3 tools/medlock.py add-drive dosya.pdf --folder K2/Biyokimya --fid <driveId>   # tür/kurul/ders/hoca/başlığı kendisi tahmin eder
+  python3 tools/medlock.py known     # kataloğun bildiği Drive id'leri (eklenmiş + atlanan + bekleyen)
+  python3 tools/medlock.py todo <driveId> --folder K2/Biyokimya --name "dosya.pdf" --kb 19000   # indirilemeyen büyük dosya
+  python3 tools/medlock.py skip <driveId>                                                     # bilerek eklenmeyecek dosya
   python3 tools/medlock.py set <id> t="Yeni başlık" h="Hoca"
   python3 tools/medlock.py rm <id>
   python3 tools/medlock.py refs      # test soruları -> slayt sayfaları (yeniden hesapla)
@@ -190,6 +194,24 @@ def date_from_name(name):
 
 
 # ---------- documents ----------
+def ocr_pages(pdf, idxs):
+    """Taranmış sayfalar için Türkçe OCR (arama ve soru-slayt eşleşmesi için). {sayfa: metin}"""
+    from concurrent.futures import ThreadPoolExecutor
+    env = dict(os.environ, OMP_THREAD_LIMIT="1")
+
+    def one(i):
+        tmp = tempfile.mkdtemp()
+        try:
+            subprocess.run(["pdftoppm", "-r", "200", "-f", str(i), "-l", str(i), "-gray", "-png", pdf, os.path.join(tmp, "o")], check=True)
+            f = glob.glob(os.path.join(tmp, "o*.png"))[0]
+            t = subprocess.run(["tesseract", f, "-", "-l", "tur+eng"], capture_output=True, text=True, env=env).stdout
+            return i, t
+        finally:
+            shutil.rmtree(tmp)
+    with ThreadPoolExecutor(os.cpu_count() or 4) as ex:
+        return dict(ex.map(one, idxs))
+
+
 def render_pdf(pdf, out):
     """pdf -> out/1.webp, 2.webp ... + out/text.json ; returns (n, ratio)"""
     from PIL import Image
@@ -208,6 +230,10 @@ def render_pdf(pdf, out):
     txt = subprocess.run(["pdftotext", "-enc", "UTF-8", pdf, "-"], capture_output=True, text=True).stdout
     pages = txt.split("\f")[: len(files)]
     pages += [""] * (len(files) - len(pages))
+    empty = [i for i, t in enumerate(pages, 1) if len(t.strip()) < 30]
+    if empty and shutil.which("tesseract"):
+        for i, t in ocr_pages(pdf, empty).items():
+            pages[i - 1] = t
     json.dump(pages, open(os.path.join(out, "text.json"), "w"), ensure_ascii=False)
     open(os.path.join(out, "done"), "w").write(str(len(files)))
     return len(files)
@@ -251,6 +277,9 @@ def add_doc(V, pdf=None, rendered=None, **meta):
         it["src"] = meta["src"]
     if meta.get("sub"):
         it["m"] = meta["sub"]
+    for k in ("dq", "al", "src", "m"):          # yeniden eklemede eski alanları koru
+        if k not in it and k in old:
+            it[k] = old[k]
     V.upsert(it)
     if tmp:
         shutil.rmtree(tmp)
@@ -448,6 +477,95 @@ def check(V):
     return n
 
 
+# ---------- Drive'dan gelen dosyalar ----------
+FOLDER_COURSE = {"TıbbiBiyoloji": "Tıbbi Biyoloji ve Genetik", "TıpTarihi": "Tıp Tarihi", "Biyokimya": "Biyokimya",
+                 "Biyofizik": "Biyofizik", "Biyoistatistik": "Biyoistatistik", "Psikoloji": "Psikoloji",
+                 "DavranışBilimleri": "Psikoloji", "Anatomi": "Anatomi", "Histoloji": "Histoloji ve Embriyoloji",
+                 "Fizyoloji": "Fizyoloji"}
+SMALL = {"ve", "ile", "de", "da", "için", "veya", "ya", "ki", "mi"}
+
+
+def tr_lower(s):
+    return s.replace("I", "ı").replace("İ", "i").lower()
+
+
+def tr_title(s):
+    out = []
+    for i, w in enumerate(s.split()):
+        lw = tr_lower(w)
+        if i and lw in SMALL:
+            out.append(lw)
+        else:
+            out.append((lw[:1].replace("i", "İ").replace("ı", "I").upper() + lw[1:]) if lw else lw)
+    return " ".join(out)
+
+
+def clean_title(fname):
+    t = re.sub(r"\.pdf$", "", fname, flags=re.I)
+    t = re.sub(r"_\d{6}_\d{6}(_\d+)?$", "", t)
+    t = re.sub(r"[_]+", " ", t)
+    t = re.sub(r"\s+", " ", t).strip(" -")
+    letters = [c for c in t if c.isalpha()]
+    if letters and sum(c.isupper() for c in letters) > 0.7 * len(letters):
+        t = tr_title(t)
+    return t
+
+
+def kurul_for_date(iso):
+    d = iso[:10]
+    for k in KURULLAR:
+        if k["start"] <= d <= k["end"]:
+            return k["id"]
+    nxt = [k for k in KURULLAR if d < k["start"]]
+    return nxt[0]["id"] if nxt else KURULLAR[-1]["id"]
+
+
+def guess_meta(V, folder, fname, texts=None, portrait=None):
+    """Drive klasörü + dosya adından kurul/ders/tür/hoca/başlık tahmini."""
+    parts = [p for p in folder.split("/") if p]
+    kur = next((p.lower() for p in parts if re.fullmatch(r"[Kk][1-4]", p)), None)
+    leaf = parts[-1] if parts else ""
+    kind = "slayt"
+    if leaf.endswith("Ses") or re.search(r"ses kayd", leaf, re.I):
+        kind, leaf = "ses", re.sub(r"\s*Ses(\s*Kayıtları)?$", "", leaf)
+    course = FOLDER_COURSE.get(leaf) or re.sub(r"(?<=[a-zçğıöşü])(?=[A-ZÇĞİÖŞÜ])", " ", leaf) or "Diğer"
+    low = tr_lower(fname)
+    if re.search(r"çıkmış|cikmis|çıkm", low):
+        kind = "cikmis"
+    elif kind != "ses" and re.search(r"soru", low):
+        kind = "soru"
+    elif kind != "ses" and (re.search(r"(^|[ _(])(el|not\w*|özet\w*|ozet\w*|rehber\w*|anlat[ıi]m\w*|ai|son)([ _.)]|$)", low)
+                            or portrait):
+        kind = "not"          # Samsung Notes çıktıları dikey A4; slaytlar yatay
+    date = date_from_name(fname)
+    kur = kur or (kurul_for_date(date) if date else kurul_for_date(datetime.date.today().isoformat()))
+    # hoca: 1) PDF'in ilk sayfalarında geçen bilinen bir isim 2) aynı kurul+dersin en yeni hocası 3) aynı dersin herhangi bir hocası
+    hocas = [it["h"] for it in V.cat["items"] if it.get("h")]
+    hoca = ""
+    if texts:
+        head = norm(" ".join(texts[:2]))
+        for h in sorted(set(hocas), key=len, reverse=True):
+            ws = [w for w in re.findall(r"[a-z]+", norm(h)) if len(w) > 1]
+            if len(ws) >= 2 and re.search(r"\b" + ws[0] + r"\W+(?:\w+\W+){0,2}" + ws[-1] + r"\b", head):
+                hoca = h
+                break
+    if not hoca:
+        same = [it for it in V.cat["items"] if it.get("h") and it["c"] == course and it["g"] == kur]
+        same = same or [it for it in V.cat["items"] if it.get("h") and it["c"] == course]
+        if same:
+            hoca = max(same, key=lambda it: it.get("d") or "")["h"]
+    title = clean_title(fname)
+    if kind == "ses":
+        title = re.sub(r"^(.*?)\s*(\d+)$", r"\1 Ses Kaydı \2", title)
+    return {"kind": kind, "kurul": kur, "course": course, "hoca": hoca, "title": title, "date": date}
+
+
+def known_sources(V):
+    c = V.cat
+    return sorted({it["src"][6:] for it in c["items"] if it.get("src", "").startswith("drive:")}
+                  | set(c.get("skip", [])) | {t["src"][6:] for t in c.get("todo", [])})
+
+
 def main():
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest="cmd", required=True)
@@ -477,6 +595,20 @@ def main():
     r.add_argument("id")
     sk = sp.add_parser("skip")
     sk.add_argument("src")
+    sp.add_parser("known")
+    ad = sp.add_parser("add-drive")
+    ad.add_argument("file")
+    ad.add_argument("--folder", required=True, help="Drive klasörü, ör. K2/Biyokimya")
+    ad.add_argument("--fid", required=True, help="Drive dosya id'si")
+    ad.add_argument("--name", help="Drive'daki dosya adı (yerel ad farklıysa)")
+    for o in ("kind", "kurul", "course", "hoca", "title", "date"):
+        ad.add_argument("--" + o)
+    ad.add_argument("--dry", action="store_true", help="sadece tahmini göster")
+    tdp = sp.add_parser("todo")
+    tdp.add_argument("fid")
+    tdp.add_argument("--folder", required=True)
+    tdp.add_argument("--name", required=True)
+    tdp.add_argument("--kb", type=int, default=0)
     a = ap.parse_args()
 
     V = Vault(create=a.cmd == "init")
@@ -515,7 +647,37 @@ def main():
         shutil.rmtree(p) if os.path.isdir(p) else os.path.exists(p) and os.remove(p)
         build_index(V)
     elif a.cmd == "skip":
-        V.cat.setdefault("skip", []).append(a.src)
+        V.cat.setdefault("skip", []).append(a.src.replace("drive:", ""))
+    elif a.cmd == "known":
+        print("\n".join(known_sources(V)))
+        return
+    elif a.cmd == "add-drive":
+        name = a.name or os.path.basename(a.file)
+        txt = subprocess.run(["pdftotext", "-l", "2", "-enc", "UTF-8", a.file, "-"], capture_output=True, text=True).stdout.split("\f")
+        info = subprocess.run(["pdfinfo", a.file], capture_output=True, text=True).stdout
+        sz = [l for l in info.splitlines() if l.startswith("Page size:")]
+        portrait = None
+        if sz:
+            pw, ph = (float(x) for x in sz[0].split(":", 1)[1].split("pts")[0].split("x"))
+            portrait = pw < ph
+        m = guess_meta(V, a.folder, name, txt, portrait)
+        for o in ("kind", "kurul", "course", "hoca", "title", "date"):
+            if getattr(a, o):
+                m[o] = getattr(a, o)
+        print("tahmin:", json.dumps(m, ensure_ascii=False))
+        if a.dry:
+            return
+        approx = not m["date"]
+        if approx:
+            m["date"] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M")
+        it = add_doc(V, a.file, src="drive:" + a.fid, approx=False, **m)
+        V.cat["todo"] = [t for t in V.cat.get("todo", []) if t["src"] != "drive:" + a.fid]
+        print("eklendi", it["id"], it["n"], "sayfa")
+        print(compute_refs(V)); build_index(V)
+    elif a.cmd == "todo":
+        m = guess_meta(V, a.folder, a.name)
+        V.cat.setdefault("todo", []).append({"src": "drive:" + a.fid, "file": a.name, "kind": m["kind"], "g": m["kurul"],
+                                             "c": m["course"], "h": m["hoca"], "t": m["title"], "kb": a.kb})
     elif a.cmd == "refs":
         print(compute_refs(V))
     elif a.cmd == "index":
