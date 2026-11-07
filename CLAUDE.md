@@ -53,6 +53,8 @@ python3 tools/medlock.py check && git add -A && git commit && git push
 
 `--by`: dosyayı yükleyen (Drive'da sahibi). Buğra'nın ve arkadaşının kendi notları, özetleri ve videolarında her zaman; hoca slaytlarında yalnız Buğra dışında biri yüklediyse. Uygulamada "Yükleyen: …" olarak görünür.
 
+Seçmeli dersler (ör. TIP253 "Kanser ve Kök Hücre") ortak derstir: `--kurul ortak` (Buğra için "seçmeli" = "ortak ders"; ayrı grup açma).
+
 Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tarihi", "Biyoistatistik", "Davranış Bilimleri", "ATA 151 · Türk Dili I". Drive'daki "Psikoloji" ve "DavranışBilimleri" klasörleri "Davranış Bilimleri"ne gider (`COURSE_RENAME`, `FOLDER_COURSE`). Yeni ders gelirse Drive klasör adını kullan.
 
 ## Drive denetimi

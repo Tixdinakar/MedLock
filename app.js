@@ -7,7 +7,7 @@ const NAME = "MedLock";
 const VERSION = "1.1.5";
 const CHANGES = [
   { v: "1.1.5", d: "2026-11-07", l: [
-    "Kütüphane’de yeni bölüm: Seçmeli Dersler (ilk ders: Kanser ve Kök Hücre, not ve 100 soruluk vize denemesi)",
+    "Ortak Dersler’e Kanser ve Kök Hücre eklendi: vize özeti ve 100 soruluk vize denemesi",
   ] },
   { v: "1.1.4", d: "2026-11-07", l: [
     "Telefonun geri tuşu önce açık pencereyi ya da testteki slayt panelini kapatıyor, testten çıkmıyor",
@@ -37,7 +37,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "8cacbf0e5c";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "a10e77f699";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -231,8 +231,8 @@ const loadTexts = async it => S.texts[it.id] || (S.texts[it.id] = await fetchJSO
 let engineP = null;
 const engineTpl = () => engineP || (engineP = fetch("engine.html").then(r => { if (!r.ok) throw new Error("engine"); return r.text(); }));
 
-// Kurul dışı gruplar: ortak dersler ve seçmeli dersler (tarihsiz, kurul numarası yok)
-const SPECIAL = { ortak: "Ortak Dersler", secmeli: "Seçmeli Dersler" };
+// Kurul dışı grup: ortak dersler (seçmeliler dahil; tarihsiz, kurul numarası yok)
+const SPECIAL = { ortak: "Ortak Dersler" };
 const kurulById = id => SPECIAL[id] ? Object.assign({ no: "", start: "", end: "" }, { id, name: SPECIAL[id], dn: "d1" }, S.cat[id]) : S.cat.kurullar.find(k => k.id === id);
 const specialGs = () => Object.keys(SPECIAL).filter(g => S.cat.items.some(i => i.g === g));
 const DEFDN = { id: "d1", no: "I", name: "Dönem I" };
@@ -446,7 +446,7 @@ function shell() {
     + '<a data-nav="lib" href="#/lib">' + icon("lib") + 'Kütüphane</a>'
     + (cxAny() ? '<a class="sub" data-nav="cikmis" href="#/cikmis">Çıkmışlar</a>' : "")
     + kl.map(k => '<a class="sub" data-nav="k:' + k.id + '" href="#/lib/' + k.id + '">Kurul ' + k.no + '</a>').join("")
-    + specialGs().map(g => '<a class="sub" data-nav="k:' + g + '" href="#/lib/' + g + '">' + (g === "ortak" ? "Ortak dersler" : "Seçmeli dersler") + "</a>").join("")
+    + specialGs().map(g => '<a class="sub" data-nav="k:' + g + '" href="#/lib/' + g + '">' + "Ortak dersler" + "</a>").join("")
     + '<a data-nav="tekrar" href="#/tekrar">' + icon("rep") + 'Tekrar<span class="badge" data-badge hidden></span></a>'
     + '<a data-nav="ilerleme" href="#/ilerleme">' + icon("chart") + 'İlerleme</a>'
     + '<a data-nav="karma" href="#/karma">' + icon("mix") + 'Karma deneme</a>'

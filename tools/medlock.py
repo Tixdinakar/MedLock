@@ -51,7 +51,6 @@ KURULLAR = [
     {"id": "k4", "no": "IV", "name": "Temel Bilimler IV", "start": "2027-03-16", "end": "2027-05-14", "dn": "d1"},
 ]
 ORTAK = {"id": "ortak", "name": "Ortak Dersler", "dn": "d1"}
-SECMELI = {"id": "secmeli", "name": "Seçmeli Dersler", "dn": "d1"}   # --kurul secmeli
 
 
 def ensure_schema(c):
@@ -61,7 +60,7 @@ def ensure_schema(c):
         k.setdefault("dn", "d1")
     if c.get("ortak"):
         c["ortak"].setdefault("dn", "d1")
-    c.setdefault("secmeli", dict(SECMELI))
+    c.pop("secmeli", None)   # seçmeli dersler "ortak" altında
     return c
 
 
