@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.1.5";
+const VERSION = "1.1.6";
 const CHANGES = [
+  { v: "1.1.6", d: "2026-11-08", l: [
+    "Ana sayfada yaklaşan sınav uyarısı: kaç gün kaldığı, özete, denemeye ve derse tek dokunuş (ilki Kanser ve Kök Hücre vizesi, 13 Kasım Cuma)",
+    "Kanser ve Kök Hücre denemesinde açıklamalardaki kaynak satırı iki kez yazıyordu; düzeldi",
+  ] },
   { v: "1.1.5", d: "2026-11-07", l: [
     "Ortak Dersler’e Kanser ve Kök Hücre eklendi: vize özeti ve 100 soruluk vize denemesi",
   ] },
@@ -37,7 +41,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "a10e77f699";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "599d63da47";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -700,6 +704,21 @@ function viewCikmis(q) {
 }
 
 /* ---------- views: home ---------- */
+// Yaklaşan sınav uyarısı (katalogda "sinavlar": [{d, c, t}]; medlock.py sinav ile eklenir), 3 hafta önceden
+function examCard() {
+  const t = today(), L = (S.cat.sinavlar || []).filter(x => x.d >= t && dayDiff(t, x.d) <= 21);
+  if (!L.length) return "";
+  return L.map(x => {
+    const n = dayDiff(t, x.d), its = S.cat.items.filter(i => i.c === x.c), g = its[0] && its[0].g;
+    const wd = new Date(x.d + "T12:00").toLocaleDateString("tr", { weekday: "long" });
+    const pick = k => its.filter(i => i.k === k && !i.cx).sort((a, b) => (b.d || "").localeCompare(a.d || ""))[0];
+    const oz = pick("ozet"), ts = pick("test");
+    return '<div class="card exam' + (n <= 2 ? " soon" : "") + '"><div class="ex-l"><span class="ex-n">' + (n === 0 ? "Bugün" : n === 1 ? "Yarın" : n + " gün") + '</span><span class="ex-k">Yaklaşan sınav</span></div>'
+      + '<div class="ex-t"><b>' + esc(x.c) + " · " + esc(x.t || "Sınav") + '</b><span class="muted small">' + fdate(x.d) + " " + wd + "</span>"
+      + '<div class="row-btns">' + (oz ? '<a class="btn" href="#/d/' + oz.id + '/1">Özet</a>' : "") + (ts ? '<a class="btn" href="#/t/' + ts.id + '">Deneme</a>' : "")
+      + (g ? '<a class="btn" href="#/lib/' + g + "/" + slug(x.c) + '">Ders</a>' : "") + "</div></div></div>";
+  }).join("");
+}
 function viewHome() {
   setNav("home");
   const k = currentKurul(), t = today(), F = finalInfo();
@@ -729,7 +748,7 @@ function viewHome() {
       + (lastWeek ? '<a class="btn" href="#/karma?w=1&g=' + k.id + '">' + icon("mix") + 'Zayıf konulardan deneme</a>' : "")
       + "</div></div>";
   main().innerHTML = bar({ title: NAME, crumb: fdate(t, true) + (P && P.name ? " · " + esc(P.name) : ""), actions: '<a class="ibtn" href="#/ayarlar" aria-label="Ayarlar">' + icon("set") + "</a>" })
-    + '<div class="page">' + updCard() + hero
+    + '<div class="page">' + updCard() + examCard() + hero
     + '<div class="duo">'
     + '<a class="card tile mini' + (due ? " due" : "") + '" href="#/tekrar"><span class="big">' + due + '</span><b>' + (due ? "soru tekrar bekliyor" : "Bugün tekrar yok") + '</b><span class="muted small">'
     + (tracked ? "Listede " + tracked + " soru" : "Yanlışların buraya düşer") + "</span></a>"

@@ -484,3 +484,12 @@ b.mp{font-size:14px;padding:2px 8px}
 .chg .ch .muted{margin-left:auto}
 .set a.row:hover{background:var(--surface-2)}
 .set a.row .chev{color:var(--faint)}
+
+.exam{display:flex;gap:14px;align-items:center;padding:14px 16px;margin-bottom:12px;border-left:4px solid var(--flame)}
+.exam.soon{border-left-color:var(--bad);background:var(--bad-soft)}
+.exam .ex-l{display:grid;justify-items:center;min-width:64px}
+.exam .ex-n{font:700 22px/1.1 var(--f-cond);color:var(--flame)}
+.exam.soon .ex-n{color:var(--bad)}
+.exam .ex-k{font:600 10.5px var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
+.exam .ex-t{display:grid;gap:3px;min-width:0}
+.exam .row-btns{margin-top:6px}

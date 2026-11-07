@@ -47,6 +47,7 @@ python3 tools/medlock.py rm <id>
 python3 tools/medlock.py test-dump <id> x.json        # testi düzelt (x.json scratchpad'de; commit etme) …
 python3 tools/medlock.py test-load <id> x.json        # … ve geri yaz (refs + arama dizini yenilenir)
 python3 tools/medlock.py final 2027-05-24 2027-06-18  # final sınavı tarihleri belli olunca (şimdilik tahmini 15.05–15.07.2027)
+python3 tools/medlock.py sinav 2026-11-13 "Kanser ve Kök Hücre" --t Vize   # ana sayfada 3 hafta önceden sınav uyarısı (--rm siler)
 python3 tools/medlock.py check && git add -A && git commit && git push
 ```
 `add-doc`/`add-test` soru→slayt bağlantılarını (`refs`) ve arama dizinini kendisi yeniler. Testteki `s` alanı "Ders adı, slayt 12, 14" biçimindeyse sayfa doğrudan alınır; numara yoksa metin benzerliğiyle tahmin edilir ("tahmini" diye gösterilir). Testteki ders adı slayt başlığından farklıysa slayt öğesine `al` (takma ad listesi) ekle: `set <id> al='["Testteki ad"]'`, sonra `refs`.
@@ -71,7 +72,7 @@ Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tari
 Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama ve soru–slayt eşleşmesi bunlarda da çalışır.
 
 ## Soru yazarken kaynak gösterme
-Her açıklamanın sonunda tek satır kaynak: slayt (ve sayfası), gerekiyorsa ses kaydı ve çıkmış. Ses kaydı dökümünü kullandıysan dosya ve dakika:saniye yaz (dökümlerde "Konuşmacı 1 (mm:ss)" damgası var), hangi slaytla karşılaştırdığını ve varsa çıkmışı ekle. Uzatma:
+Motor `s` alanını açıklamanın altında "Kaynak: …" olarak zaten gösterir; `e` içine aynı slaytı tekrar yazma. `e`nin sonuna yalnız `s`de olmayan ek kaynağı ekle: slayt (ve sayfası), gerekiyorsa ses kaydı ve çıkmış. Ses kaydı dökümünü kullandıysan dosya ve dakika:saniye yaz (dökümlerde "Konuşmacı 1 (mm:ss)" damgası var), hangi slaytla karşılaştırdığını ve varsa çıkmışı ekle. Uzatma:
 `Kaynak: Redoks slayt 14 · Ses: Redoks 1, 37:21 · Çıkmış: Biyokimya K1, s. 4`
 Hoca derste "sınavda çıktı / soru olarak gelir" dediyse açıklamaya "Hoca derste sınavda geldiğini söyledi" ekle. `s` alanı yine "Deste adı, slayt N" biçiminde kalır ("Slayta git" bununla çalışır).
 
