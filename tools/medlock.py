@@ -757,6 +757,11 @@ def check(V):
     vj = json.load(open(os.path.join(V.repo, "v.json")))
     if vj.get("app") != app_version(V.repo) or not appv or appv.group(0) != b'const APPV = "' + vj["app"].encode() + b'";':
         sys.exit("arayüz sürümü eski: python3 tools/medlock.py stamp")
+    js = open(os.path.join(V.repo, "app.js"), encoding="utf8").read()
+    ver = re.search(r'const VERSION = "([\d.]+)";', js)
+    first = re.search(r'const CHANGES = \[\s*\{ v: "([\d.]+)"', js)
+    if not ver or not first or ver.group(1) != first.group(1):
+        sys.exit("app.js: VERSION ile CHANGES'in ilk notu aynı sürüm olmalı (küçük düzeltme +0.0.1, büyük güncelleme +0.1)")
     return n
 
 

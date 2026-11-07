@@ -40,6 +40,9 @@ async function openTest(pg, href) {
     try {
       await login(pg);
       ok(await pg.$(".duo .tile.mini"), name + ": ana sayfada Tekrar/seri yan yana değil");
+      ok(await pg.$("#updc"), name + ": ana sayfada yeni sürüm notu yok");
+      await shot("0-surum-notu");
+      if (await pg.$("#updok")) { await pg.click("#updok"); await sleep(200); ok(!(await pg.$("#updc")), name + ": sürüm notu kapanmadı"); }
       ok(!(await pg.$('a.tile[href="#/ara"]')), name + ": ana sayfada hâlâ 'Her yerde ara' var");
       ok(await pg.$('a.tile[href="#/cikmis"]'), name + ": ana sayfada Çıkmışlar yok");
       ok((await pg.$$eval(".sec-a + .card .it", x => x.length)) <= 5, name + ": son eklenenler 5'ten fazla");
@@ -62,6 +65,8 @@ async function openTest(pg, href) {
         const inside = await pg.$eval(".pg", f => !!f.querySelector(".pgi .pn"));
         ok(!inside && await pg.$(".pg > figcaption.pn"), name + ": sayfa numarası slaytın dışında değil");
         const cr = await pg.$$eval(".bar .crumb a", as => as.map(a => a.getAttribute("href")));
+        const fs = await pg.$eval(".bar .crumb a:last-of-type", a => { const r = a.getBoundingClientRect(); return { f: parseFloat(getComputedStyle(a).fontSize), h: r.height }; });
+        ok(fs.f >= 14 && fs.h >= 28, name + ": yol düğmeleri küçük: " + JSON.stringify(fs));
         ok(cr.length >= 4, name + ": slaytta yol (Tıp › Dönem › Kurul › Ders) eksik: " + cr.join(" "));
         // uzun başlık dikey ekranda kesilmemeli
         await pg.goto(BASE + "#/d/biyoistatistige-giris-tanimlar-ve-kullan/1"); await pg.waitForSelector(".bar h1");

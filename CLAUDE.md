@@ -8,6 +8,7 @@ Site: https://tixdinakar.github.io/MedLock/ (GitHub Pages, `main` dalının kök
 - Şifre sadece `MEDLOCK_PASS` ortam değişkeniyle verilir; hiçbir dosyaya, commit mesajına ya da loga yazılmaz.
 - Commit'ten önce `python3 tools/medlock.py check` çalıştır. `check` (ve şifre istemeyen `scan`) izin listesi dışındaki dosyayı, `d/` altında şifresiz görünen ya da bu anahtarla çözülmeyen dosyayı, GitHub anahtarı ve şifre sızıntısını reddeder. Bir şey bulursa: içerik ise `add-doc`/`add-test` ile şifreli ekle, şifresiz kopyayı ve geçici dosyaları sil, sonra yeniden `check`. Kurulumda `git config core.hooksPath tools/hooks` (pre-commit kancası `scan` çalıştırır).
 - Arayüz dosyalarını (index.html, app.js, app.css, engine.html, sw.js, manifest) değiştirdikten sonra `python3 tools/medlock.py stamp` çalıştır. Kabuk cihazda önbellekten açılır; uygulama `v.json`'daki `app` ile app.js'teki `APPV`'yi karşılaştırıp kabuğu topluca yeniler. `stamp` ikisini birlikte yazar; `check` uyuşmazlığı yakalar.
+- Kullanıcıya görünen sürüm `app.js`'te `VERSION` (1.0 ilk sürüm, 1.1 = 7 Kasım genel güncellemesi). Her arayüz değişikliğinde artır: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.2 → 1.1.3); `CHANGES`'in başına kısa Türkçe not ekle (Buğra'nın anlayacağı dille, kod terimi yok). Ana sayfada her cihazda bir kez "Yeni sürüm" notu çıkar; Ayarlar › Yenilikler'de hepsi durur. `check` VERSION ile ilk notun aynı olduğuna bakar.
 
 ## Yapı
 - `k.json`: veri anahtarı (DEK), şifreden türetilen anahtarla sarılı (PBKDF2-SHA256 600k + AES-GCM). Şifre değişince sadece bu dosya değişir (`passwd`).
@@ -101,7 +102,7 @@ Sorularda "Hata bildir" düğmesi var; bildirimler profilde (`rep`) birikir, Bu�
 Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor. Yeni test ve notlar sadece MedLock'a eklenir.
 
 ## Arayüz notları
-- Üst çubukta yol (Tıp › Dönem I › Kurul II › Ders) her parçası dokunulabilir; dikey ekranda yol üst satırda, başlık altta üç satıra kadar.
+- Üst çubukta yol (Tıp › Dönem I › Kurul II › Ders) her parçası düğme gibi, büyük (Buğra küçük bulmuştu); dikey ekranda yol üst satırda ("Tıp" gizli, Dönem ile aynı yere gider), başlık altta üç satıra kadar.
 - Alttaki sekme çubuğu (telefon/dikey tablet) slayt, test ve tekrarda da hep görünür; gizleme (Buğra istemiyor). Yatay tablette slayt/testte yalnız yan menü gizlenir.
 - Çıkmışlar ayrı sayfa (#/cikmis): kurul › ders, her derste çözülebilir test (ilerleme, net) ve orijinal PDF yan yana. Ana sayfada ve Kütüphane'nin başında girişi var.
 - Test motorunda (engine.html) MedLock içindeyken büyük başlık gizli, araç satırı ince; "Başla · N soru" altta sabit. Optik formda başka sorunun satırına dokunmak önce o soruya götürür, işaret yalnız açık sorunun satırında değişir; formun açılıp kapanmasına dokunma (Buğra'nın isteği). Motor değişiklikleri `tools/make_engine.py` içindeki `PATCHES`'te; `--apply` mevcut motora uygular.

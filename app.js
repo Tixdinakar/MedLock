@@ -3,7 +3,25 @@
 "use strict";
 
 const NAME = "MedLock";
-const APPV = "aaa359d74e";                            // arayüz sürümü; tools/medlock.py stamp yazar
+// Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
+const VERSION = "1.1.2";
+const CHANGES = [
+  { v: "1.1.2", d: "2026-11-07", l: ["Üstteki yol (Tıp › Kurul › Ders) düğmeleri büyüdü, dokunması kolay", "Slaytı kaydırdıktan hemen sonra yol düğmesine basınca slayta geri dönme hatası düzeldi", "Sürüm numarası ve bu yenilik notu"] },
+  { v: "1.1.1", d: "2026-11-07", l: ["Alttaki çubuk slayt, test ve tekrarda da görünüyor"] },
+  { v: "1.1", d: "2026-11-07", l: [
+    "Çıkmışlar sayfası: her derste çözülebilir test ve orijinal PDF yan yana, ilerleme ve netinle",
+    "Üstteki yol dokunulabilir; testten ya da slayttan tek dokunuşla kurula veya derse dönersin",
+    "Testte tek başlık, altta sabit “Başla · N soru”; karma denemede de",
+    "Optik formda başka sorunun satırına dokunmak önce o soruya götürür",
+    "Sorularda “Hata bildir”; Ayarlar › Hata bildirimleri’nden kopyalanır",
+    "İnternet yokken anında açılış",
+    "Tırnaklı arama: \"sodyum pompası\" yalnız yan yana geçenleri bulur",
+    "Ana sayfa sadeleşti; Psikoloji artık Davranış Bilimleri; Drive videoları; final döneminde öğrenilmiş sorular yeniden gelir",
+  ] },
+  { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
+];
+const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+const APPV = "c2f7ad35ac";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -204,7 +222,7 @@ const donemById = id => donemler().find(d => d.id === id) || donemler()[0];
 const donemOf = g => { const k = g && kurulById(g); return donemById(k && k.dn || "d1"); };
 const kurulLabel = k => k.no ? "Kurul " + k.no : k.name;
 // Üstteki yol: Tıp › Dönem I › Kurul II › Biyokimya (her parça dokunulabilir)
-function crumbs(P) { return P.map(([l, h]) => h ? '<a href="' + h + '">' + esc(l) + "</a>" : "<span>" + esc(l) + "</span>").join('<i class="sep">›</i>'); }
+function crumbs(P) { return P.map(([l, h], i) => h ? '<a href="' + h + '"' + (i === 0 && l === "Tıp" ? ' class="root"' : "") + ">" + esc(l) + "</a>" : "<span>" + esc(l) + "</span>").join('<i class="sep">›</i>'); }
 function crumbFor(g, c, upTo) {
   const P = [["Tıp", "#/lib"]];
   if (donemler().length > 1 || g !== undefined) { const d = donemOf(g); P.push([d.name, "#/lib?dn=" + d.id]); }
@@ -404,7 +422,7 @@ const main = () => $("#main");
 function shell() {
   const kl = S.cat.kurullar.filter(k => k.start <= today() || S.cat.items.some(i => i.g === k.id)).slice().reverse();
   app().innerHTML = '<div class="shell" id="shell">'
-    + '<aside class="side"><a class="brand" href="#/"><img src="icons/64.png" alt=""><span>' + NAME + '</span></a><nav>'
+    + '<aside class="side"><a class="brand" href="#/"><img src="icons/64.png" alt=""><span>' + NAME + '</span><small class="ver">' + VERSION + '</small></a><nav>'
     + '<a data-nav="home" href="#/">' + icon("home") + 'Ana sayfa</a>'
     + '<a data-nav="lib" href="#/lib">' + icon("lib") + 'Kütüphane</a>'
     + (cxAny() ? '<a class="sub" data-nav="cikmis" href="#/cikmis">Çıkmışlar</a>' : "")
@@ -483,6 +501,7 @@ async function route() {
     if (a === "v") return viewVideo(b);
     if (a === "cikmis") return viewCikmis(q);
     if (a === "yeni") return viewRecent();
+    if (a === "yenilikler") return viewChanges();
     if (a === "tekrar") return q.get("s") ? viewSession(q) : viewReview();
     if (a === "ara") return viewSearch(q.get("q") || "");
     if (a === "ayarlar") return viewSettings();
@@ -602,7 +621,7 @@ function viewHome() {
       + (lastWeek ? '<a class="btn" href="#/karma?w=1&g=' + k.id + '">' + icon("mix") + 'Zayıf konulardan deneme</a>' : "")
       + "</div></div>";
   main().innerHTML = bar({ title: NAME, crumb: fdate(t, true) + (P && P.name ? " · " + esc(P.name) : ""), actions: '<a class="ibtn" href="#/ayarlar" aria-label="Ayarlar">' + icon("set") + "</a>" })
-    + '<div class="page">' + hero
+    + '<div class="page">' + updCard() + hero
     + '<div class="duo">'
     + '<a class="card tile mini' + (due ? " due" : "") + '" href="#/tekrar"><span class="big">' + due + '</span><b>' + (due ? "soru tekrar bekliyor" : "Bugün tekrar yok") + '</b><span class="muted small">'
     + (tracked ? "Listede " + tracked + " soru" : "Yanlışların buraya düşer") + "</span></a>"
@@ -617,7 +636,26 @@ function viewHome() {
     + (cont.length ? '<h2 class="sec">Kaldığın yer</h2><div class="card list">' + cont.map(c => c.html).join("") + "</div>" : "")
     + (bms.length ? '<h2 class="sec">İşaretli sayfalar' + (bms.length > 4 ? ' · <a href="#/isaretler" style="color:var(--accent)">tümü (' + bms.length + ")</a>" : "") + '</h2><div class="card list">' + bms.slice(0, 4).map(bmRow).join("") + "</div>" : "")
     + '<h2 class="sec sec-a">Son eklenenler<a href="#/yeni">Tümü ' + icon("chev") + '</a></h2><div class="card list">' + S.cat.items.slice(0, 5).map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>"
-    + "</div>";
+    + "</div>";  bindUpd();
+}
+// Güncellemeden sonra ana sayfada bir kez görünen kısa not (cihaz başına)
+function updCard() {
+  const news = CHANGES.filter(c => vcmp(c.v, LS.get("ml.seenv", "1.0")) > 0);
+  if (!news.length) return "";
+  return '<div class="card upd" id="updc"><div class="uh"><span class="k">Yeni sürüm</span><b>MedLock ' + VERSION + '</b><button class="ibtn" id="updx" aria-label="Kapat">' + icon("close") + "</button></div>"
+    + news.map(c => '<div class="uv">' + (news.length > 1 ? "<small>" + c.v + "</small>" : "") + "<ul>" + c.l.map(x => "<li>" + esc(x) + "</li>").join("") + "</ul></div>").join("")
+    + '<div class="row-btns"><button class="btn primary" id="updok">Tamam</button><a class="btn ghost" href="#/yenilikler">Bütün sürümler</a></div></div>';
+}
+function bindUpd() {
+  const done = () => { LS.set("ml.seenv", VERSION); const c = $("#updc"); if (c) c.remove(); };
+  ["#updx", "#updok"].forEach(s => { const b = $(s); if (b) b.onclick = done; });
+}
+function viewChanges() {
+  setNav("ayarlar");
+  LS.set("ml.seenv", VERSION);
+  main().innerHTML = bar({ title: "Yenilikler", back: "#/ayarlar", crumb: "Şu an " + VERSION + " · büyük güncelleme 0.1, küçük düzeltme 0.0.1 artar" })
+    + '<div class="page narrow">' + CHANGES.map(c => '<div class="card chg"><div class="ch"><b>' + c.v + "</b>" + (c.v === VERSION ? '<span class="now">Şu an</span>' : "") + (c.d ? '<span class="muted small">' + fdate(c.d, true) + "</span>" : "") + "</div><ul>"
+      + c.l.map(x => "<li>" + esc(x) + "</li>").join("") + "</ul></div>").join("") + "</div>";
 }
 function viewRecent() {
   setNav("yeni");
@@ -819,11 +857,12 @@ function viewDoc(id, page, q) {
       $("#pgc").textContent = p + " / " + it.n;
       $("#bmb").innerHTML = icon(bmHas(it.id, p) ? "bmf" : "bm");
       clearTimeout(saveT);
-      saveT = setTimeout(() => { history.replaceState(null, "", "#/d/" + it.id + "/" + p + (hl.length ? "?" + q.toString() : "")); setLast("doc", { id: it.id, p }); }, 400);
+      // sayfa adresi yazılmadan başka yere geçildiyse yazma (yoksa yol düğmesine basınca slayta geri döner)
+      saveT = setTimeout(() => { if (!location.hash.startsWith("#/d/" + it.id + "/")) return; history.replaceState(null, "", "#/d/" + it.id + "/" + p + (hl.length ? "?" + q.toString() : "")); setLast("doc", { id: it.id, p }); }, 400);
     },
   });
   setLast("doc", { id: it.id, p: page });
-  S.cleanup.push(() => V.destroy());
+  S.cleanup.push(() => { clearTimeout(saveT); V.destroy(); });
   $("#doc").focus({ preventScroll: true });
   const lb = $("#latb");
   if (lb) lb.onclick = async () => {
@@ -1811,8 +1850,9 @@ async function viewSettings() {
         + '<input id="stin" type="password" autocomplete="off" placeholder="ghp_…" class="stin"></div><button class="btn primary">Kaydet</button></form>')
     + "</div>"
     + '<h2 class="sec">Uygulama</h2><div class="card set">'
-    + '<div class="row"><img src="icons/64.png" width="40" height="40" style="border-radius:10px" alt=""><div class="txt"><b>' + NAME + '</b><span>İçerik ' + fdate(stampIso(S.cat.v), true) + " tarihinde güncellendi · " + S.cat.items.length + " öğe</span></div>"
+    + '<div class="row"><img src="icons/64.png" width="40" height="40" style="border-radius:10px" alt=""><div class="txt"><b>' + NAME + " " + VERSION + '</b><span>İçerik ' + fdate(stampIso(S.cat.v), true) + " tarihinde güncellendi · " + S.cat.items.length + " öğe</span></div>"
     + '<button class="btn" id="chk">Denetle</button></div>'
+    + '<a class="row" href="#/yenilikler"><div class="txt"><b>Yenilikler</b><span>Sürüm ' + VERSION + " · neler değişti</span></div>" + icon("chev", "chev") + "</a>"
     + (standalone ? "" : '<div class="row"><div class="txt"><b>Ana ekrana yükle</b><span>Uygulama gibi açılır, çevrimdışı da çalışır.</span></div>' + (installEvt ? '<button class="btn primary" id="inst">Yükle</button>' : '<a class="btn" href="#/kurulum">Nasıl?</a>') + "</div>")
     + "</div>"
     + '<h2 class="sec">Çevrimdışı</h2><div class="card set">'
@@ -1954,7 +1994,7 @@ function viewLogin(msg) {
 }
 
 /* ---------- updates ---------- */
-const passive = () => { const a = parseHash().parts[0]; return !a || a === "lib" || a === "ayarlar" || a === "kurulum" || a === "cikmis" || a === "yeni" || (a === "tekrar" && !parseHash().q.get("s")); };
+const passive = () => { const a = parseHash().parts[0]; return !a || a === "lib" || a === "ayarlar" || a === "kurulum" || a === "cikmis" || a === "yeni" || a === "yenilikler" || (a === "tekrar" && !parseHash().q.get("s")); };
 // Kabuk (index, app.js, css, motor) önbellekten açılır; yeni sürüm çıkınca hepsi birlikte yenilenir.
 async function updateShell(target) {
   if (!("caches" in window)) return true;
