@@ -101,7 +101,8 @@ Sorularda "Hata bildir" düğmesi var; bildirimler profilde (`rep`) birikir, Bu�
 Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor. Yeni test ve notlar sadece MedLock'a eklenir.
 
 ## Arayüz notları
-- Üst çubukta yol (Tıp › Dönem I › Kurul II › Ders) her parçası dokunulabilir; dikey ekranda yol üst satırda, başlık altta iki satıra kadar.
+- Üst çubukta yol (Tıp › Dönem I › Kurul II › Ders) her parçası dokunulabilir; dikey ekranda yol üst satırda, başlık altta üç satıra kadar.
+- Alttaki sekme çubuğu (telefon/dikey tablet) slayt, test ve tekrarda da hep görünür; gizleme (Buğra istemiyor). Yatay tablette slayt/testte yalnız yan menü gizlenir.
 - Çıkmışlar ayrı sayfa (#/cikmis): kurul › ders, her derste çözülebilir test (ilerleme, net) ve orijinal PDF yan yana. Ana sayfada ve Kütüphane'nin başında girişi var.
 - Test motorunda (engine.html) MedLock içindeyken büyük başlık gizli, araç satırı ince; "Başla · N soru" altta sabit. Optik formda başka sorunun satırına dokunmak önce o soruya götürür, işaret yalnız açık sorunun satırında değişir; formun açılıp kapanmasına dokunma (Buğra'nın isteği). Motor değişiklikleri `tools/make_engine.py` içindeki `PATCHES`'te; `--apply` mevcut motora uygular.
 - Arama: tırnak içi ("sodyum pompası") yalnız yan yana geçenleri bulur (ekler serbest); tırnaksız aramada kelimelerin yan yana geçtiği sayfalar öne çıkar.

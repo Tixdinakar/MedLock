@@ -68,6 +68,7 @@ async function openTest(pg, href) {
         const h1 = await pg.$eval(".bar h1", h => ({ cut: h.scrollWidth > h.clientWidth + 2 || h.scrollHeight > h.clientHeight + 2, t: h.textContent }));
         ok(!h1.cut, name + ": uzun başlık kesiliyor: " + h1.t);
         await pg.goto(BASE + doc); await pg.waitForSelector(".pg img", { timeout: 20000 });
+        if (name === "telefon") ok(await pg.$eval(".tabs", t => t.offsetHeight > 0), name + ": slaytta alttaki sekme çubuğu gizlenmiş");
         await shot("3-slayt");
         const kHref = cr.find(h => /^#\/lib\/[^/]+$/.test(h));
         await pg.click('.bar .crumb a[href="' + kHref + '"]'); await pg.waitForSelector(".course", { timeout: 10000 });
@@ -85,12 +86,17 @@ async function openTest(pg, href) {
         ok(/Başla · \d+ soru/.test(gb.txt) && gb.vh - gb.bottom < 40, name + ": Başla çubuğu altta sabit değil: " + JSON.stringify(gb));
         await shot("4-test-kapak");
         await fr.click("button.go"); await sleep(400);
+        if (name === "telefon") ok(await pg.$eval(".tabs", t => t.offsetHeight > 0), name + ": testte alttaki sekme çubuğu gizlenmiş");
         const top = await fr.$eval(".top", t => ({ h: t.getBoundingClientRect().height, brand: getComputedStyle(t.querySelector(".brand")).display }));
         ok(top.brand === "none" && top.h < 70, name + ": test araç satırı ince değil: " + JSON.stringify(top));
         await fr.click('[data-act="choose"][data-i="0"]'); await sleep(400);
         const go = await fr.$(".ml-go");
         notes.push(name + ": " + testHref + " ilk soruda Slayta git " + (go ? "var" : "yok"));
-        if (go) { await go.click(); await sleep(1200); ok(await pg.$(".spane:not([hidden]) .pg"), name + ": slayt paneli açılmadı"); await shot("5-test-slayt"); }
+        if (go) {
+          await go.click(); await sleep(1200); ok(await pg.$(".spane:not([hidden]) .pg"), name + ": slayt paneli açılmadı");
+          if (name === "telefon") { const ov = await pg.evaluate(() => document.querySelector("#spane").getBoundingClientRect().bottom - document.querySelector(".tabs").getBoundingClientRect().top); ok(ov <= 1, name + ": slayt paneli alttaki çubuğun üstünü kapatıyor (" + ov + ")"); }
+          await shot("5-test-slayt");
+        }
         await pg.evaluate(() => { const c = document.querySelector("#spane [data-sclose]"); if (c) c.click(); });
         // hata bildir
         const rb = await fr.$(".ml-rep");

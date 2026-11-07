@@ -3,7 +3,7 @@
 "use strict";
 
 const NAME = "MedLock";
-const APPV = "e24db38ce4";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "aaa359d74e";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -442,8 +442,12 @@ function setNav(key, immersive) {
     const k = a.dataset.nav;
     a.classList.toggle("on", k === key || ((key.startsWith("k:") || key === "cikmis" || key === "yeni") && k === "lib" && !a.classList.contains("sub")) || (key === "karma" && k === "ilerleme" && a.closest(".tabs")));
   });
-  $("#shell").classList.toggle("immersive", !!immersive);
+  $("#shell").classList.toggle("immersive", !!immersive);   // alttaki sekme çubuğu hiç gizlenmez; yatay tablette yalnız yan menü gizlenir
+  tabH();
 }
+// testten açılan slayt paneli telefonda alttaki çubuğun üstünde biter
+function tabH() { const t = $(".tabs"); document.documentElement.style.setProperty("--tabh", (t ? t.offsetHeight : 0) + "px"); }
+addEventListener("resize", () => tabH());
 function bar(o) {
   const back = o.back ? '<a class="ibtn bk" href="' + o.back + '" data-back aria-label="Geri">' + icon("back") + "</a>" : "";
   return '<header class="bar' + (o.solid ? " solid" : "") + (o.crumb ? " has-crumb" : "") + '">' + back + '<div class="ttl">' + (o.crumb ? '<nav class="crumb">' + o.crumb + "</nav>" : "")
