@@ -97,7 +97,7 @@ Sorularda "Hata bildir" düğmesi var; bildirimler profilde (`rep`) birikir, Bu�
 - Eski kök sözlüğü (`kokler.py`, `lex`) "Kökler" sekmesinde durur. Tekrar anahtarları: `lex|<kök>`, `lat|w:<kelime>`, `lat|t:<terim>`.
 
 ## Denetim
-`MEDLOCK_PASS=... bash tools/check_site.sh` bütün blobları çözer, siteyi yerelde sunar ve telefon/tablet boyutunda giriş, slayt, test ("Slayta git"), sonuç, tekrar ve arama akışını dener (Playwright gerekir). Çıktıdaki `fails` boş olmalı.
+`MEDLOCK_PASS=... bash tools/check_site.sh` bütün blobları çözer, siteyi yerelde sunar ve telefon/tablet boyutunda giriş, slayt, test ("Slayta git"), sonuç, tekrar ve arama akışını (`tools/e2e.js`) ve geri tuşunu (`tools/back.js`) dener (Playwright gerekir). Çıktılardaki `fails` boş olmalı.
 
 ## Astronomican
 Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor. Yeni test ve notlar sadece MedLock'a eklenir.
@@ -108,7 +108,7 @@ Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor.
 - Çıkmışlar ayrı sayfa (#/cikmis): kurul › ders, her derste çözülebilir test (ilerleme, net) ve orijinal PDF yan yana. Ana sayfada ve Kütüphane'nin başında girişi var.
 - Test motorunda (engine.html) MedLock içindeyken büyük başlık gizli, araç satırı ince; "Başla · N soru" altta sabit. Optik formda başka sorunun satırına dokunmak önce o soruya götürür, işaret yalnız açık sorunun satırında değişir; formun açılıp kapanmasına dokunma (Buğra'nın isteği). Motor değişiklikleri `tools/make_engine.py` içindeki `PATCHES`'te; `--apply` mevcut motora uygular.
 - Slayt görünümünde "açık sayfa" ekranın üst kısmındaki sayfadır (sayaç, işaret, döndürme, adres); en alta inilince son sayfa.
-- Geri düğmesi geçmiş derinliğini `history.state.d`'den okur; `replaceState` yaparken `keepState()` ver, yoksa derinlik kaybolur.
+- Geri tuşu (Buğra'nın en çok şikâyet ettiği yer): geçmiş bir yığın (`history.state.d` + sessionStorage `ml.navstack`). Uygulama içi bağlantılar `navTo`'dan geçer: yığında zaten olan ekrana (alt sekmeler, yol) yeni kayıt açmadan geri dönülür; sol üstteki ok geldiğin yer üstteyse geri gider, değilse üst ekrana çıkar (slayta geri inmez). Alt pencereler (`sheet`, `latSheet`) ve testteki slayt paneli `ovOpen`/`ovDone` ile geçmişe kayıt ekler; telefonun geri tuşu önce onları kapatır. Adres değiştirirken `replaceHash` kullan (`history.replaceState`'i doğrudan çağırma). `tools/back.js` bunları dener.
 - Cihaz önbelleğinde (`ml-data-1`) güncel olmayan `?v=` blobları `pruneCache` siler; yeni blob yolu eklersen oraya da ekle.
 - Arama: tırnak içi ("sodyum pompası") yalnız yan yana geçenleri bulur (ekler serbest); tırnaksız aramada kelimelerin yan yana geçtiği sayfalar öne çıkar.
 

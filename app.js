@@ -4,8 +4,13 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.1.3";
+const VERSION = "1.1.4";
 const CHANGES = [
+  { v: "1.1.4", d: "2026-11-07", l: [
+    "Telefonun geri tuşu önce açık pencereyi ya da testteki slayt panelini kapatıyor, testten çıkmıyor",
+    "Alt sekmelere ya da yoldaki Kurul/Ders düğmesine basınca geçmiş uzamıyor; geri tuşu geldiğin yolu yukarı doğru izliyor",
+    "Sol üstteki ok, yoldan yukarı çıktıktan sonra seni slayta geri indirmiyor; bir üst ekrana çıkıyor",
+  ] },
   { v: "1.1.3", d: "2026-11-07", l: [
     "Telefonda sayfa sayacı, işaret ve döndürme artık ekranın üstündeki slayta uygulanıyor (önceden bir iki sonrakine gidiyordu)",
     "Sayfa numarasına dokunup sayfaya giderken çıkan hata düzeldi",
@@ -29,7 +34,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "c4b41eaf38";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "14e697c7c9";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -479,19 +484,100 @@ function bar(o) {
   return '<header class="bar' + (o.solid ? " solid" : "") + (o.crumb ? " has-crumb" : "") + '">' + back + '<div class="ttl">' + (o.crumb ? '<nav class="crumb">' + o.crumb + "</nav>" : "")
     + "<h1>" + esc(o.title) + "</h1></div>" + (o.actions ? '<div class="acts">' + o.actions + "</div>" : "") + "</header>";
 }
-document.addEventListener("click", e => {
-  const b = e.target.closest("[data-back]");
-  if (b && S.nav > 1) { e.preventDefault(); history.back(); }
-});
-// Her geçmiş kaydına uygulama içindeki derinliği yazılır. Geri düğmesi yalnız uygulama içinde geri gidilecek yer varsa
-// history.back() yapar; yoksa kendi bağlantısına gider (uygulamadan çıkmaz). Ekranı yeniden çizmek derinliği değiştirmez.
+/* ---------- geçmiş ve geri tuşu ----------
+   Geçmiş bir yığın gibi tutulur: her kayıtta derinlik (history.state.d), sessionStorage'da o derinlikteki adres.
+   - Yığında zaten olan bir ekrana (alt sekmeler, yoldaki Kurul II, Çıkmışlar…) giderken yeni kayıt açılmaz, o kayda dönülür.
+     Böylece geçmiş şişmez; telefonun geri tuşu geldiğin yolu yukarı doğru izler.
+   - Sol üstteki ok: geldiğin ekran üst ya da aynı seviyedeyse oraya döner; değilse (ör. slayttan yolla kurula çıktıysan)
+     üst ekrana çıkar, slayta geri inmez. İlk ekransa uygulamadan çıkmaz.
+   - Alt pencere ya da testteki slayt paneli açıkken telefonun geri tuşu önce onu kapatır. */
+const NAVK = "ml.navstack";
+const navStack = () => { try { return JSON.parse(sessionStorage.getItem(NAVK)) || []; } catch (e) { return []; } };
+const navSave = A => { try { sessionStorage.setItem(NAVK, JSON.stringify(A)); } catch (e) {} };
+const curHash = () => location.hash || "#/";
 function navDepth() {
-  const st = history.state;
-  if (st && st.d) { S.nav = st.d; return; }
-  S.nav = (S.nav || 0) + 1;
-  try { history.replaceState(Object.assign({}, st, { d: S.nav }), ""); } catch (e) {}
+  const st = history.state, A = navStack();
+  if (st && st.d) S.nav = st.d;
+  else {
+    S.nav = (S.nav || 0) + 1;
+    A.length = S.nav;                                            // ileri kayıtlar artık geçersiz
+    try { history.replaceState(Object.assign({}, st, { d: S.nav }), ""); } catch (e) {}
+  }
+  A[S.nav] = curHash(); navSave(A);
 }
 const keepState = () => history.state;
+function replaceHash(h) {                                        // adresi değiştir, geçmişe kayıt ekleme
+  history.replaceState(keepState(), "", h);
+  const A = navStack(); A[S.nav] = h; navSave(A);
+}
+function navLevel(h) {
+  const [p, q] = String(h || "#/").replace(/^#/, "").split("?"), a = p.split("/").filter(Boolean);
+  if (!a.length) return 0;
+  if (a[0] === "lib") return a.length;
+  if (["d", "t", "c", "v"].includes(a[0])) return 4;
+  if (a[0] === "tekrar") return /(^|&)s=/.test(q || "") ? 2 : 1;
+  if (["cikmis", "yenilikler", "kurulum"].includes(a[0])) return 2;
+  return 1;
+}
+function navKey(h) {
+  const [p, q] = String(h || "#/").replace(/^#/, "").split("?"), a = p.split("/").filter(Boolean);
+  if (a[0] === "d") return "/d/" + a[1];
+  if (a[0] === "tekrar" && /(^|&)s=/.test(q || "")) return h;
+  return "/" + a.join("/");
+}
+function findUp(href) {                                          // geride, yığında aynı ekran var mı
+  const A = navStack(), exact = /[?&](h|final|s|w|e)=/.test(href) || /^#\/karma/.test(href);
+  for (let k = S.nav - 1; k >= 1; k--) {
+    const h = A[k];
+    if (h && (h === href || (!exact && navKey(h) === navKey(href)))) return k;
+  }
+  return -1;
+}
+const OV = [];                                                   // açık katmanlar (alt pencere, slayt paneli)
+let ovSkip = 0, afterPop = null;
+function ovOpen(close) { OV.push(close); try { history.pushState(Object.assign({}, history.state, { ov: OV.length }), ""); } catch (e) {} return close; }
+function ovDone(tok) {                                           // katman düğmeyle kapandı: eklediği geçmiş kaydını geri al
+  const i = OV.indexOf(tok); if (i < 0) return;
+  OV.splice(i, 1);
+  if (((history.state && history.state.ov) || 0) > OV.length) { ovSkip++; history.back(); }
+}
+addEventListener("popstate", () => {
+  const st = history.state || {};
+  if (ovSkip) { ovSkip--; }
+  else {
+    const want = st.ov || 0;
+    while (OV.length > want) { const f = OV.pop(); try { f(true); } catch (e) {} }
+    if (want > OV.length) { history.back(); return; }          // artık açık olmayan bir katmanın eski kaydı: atla
+  }
+  if (afterPop) { const f = afterPop; afterPop = null; setTimeout(f, 0); }
+});
+function navTo(href, isBack) {
+  if (!S.cat) { location.hash = href; return; }
+  if ((history.state && history.state.ov) || ovSkip) {           // önce açık katmanın geçmiş kaydını kapat
+    while (OV.length) { const f = OV.pop(); try { f(true); } catch (e) {} }
+    afterPop = () => navTo(href, isBack);
+    if (!ovSkip) { ovSkip = 1; history.go(-history.state.ov); }  // zaten geri gidiliyorsa ikinci kez gitme
+    return;
+  }
+  const cur = curHash();
+  if (href === cur) return;
+  const A = navStack();
+  if (isBack) {
+    const from = A[S.nav - 1];
+    if (S.nav > 1 && from && navLevel(from) <= navLevel(cur)) { history.back(); return; }
+  }
+  const k = findUp(href);
+  if (k > 0) { history.go(k - S.nav); return; }
+  if (isBack) { replaceHash(href); route(); return; }           // üst ekrana çık, geçmiş uzamasın
+  location.hash = href;
+}
+document.addEventListener("click", e => {
+  if (e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest && e.target.closest('a[href^="#/"], a[href="#"]');
+  if (!a || a.target || !S.cat) return;
+  e.preventDefault();
+  navTo(a.getAttribute("href") === "#" ? "#/" : a.getAttribute("href"), a.hasAttribute("data-back"));
+});
 
 /* ---------- router ---------- */
 function parseHash() {
@@ -882,7 +968,7 @@ function viewDoc(id, page, q) {
       $("#bmb").innerHTML = icon(bmHas(it.id, p) ? "bmf" : "bm");
       clearTimeout(saveT);
       // sayfa adresi yazılmadan başka yere geçildiyse yazma (yoksa yol düğmesine basınca slayta geri döner)
-      saveT = setTimeout(() => { if (!location.hash.startsWith("#/d/" + it.id + "/")) return; history.replaceState(keepState(), "", "#/d/" + it.id + "/" + p + (hl.length ? "?" + q.toString() : "")); setLast("doc", { id: it.id, p }); }, 400);
+      saveT = setTimeout(() => { if (!location.hash.startsWith("#/d/" + it.id + "/")) return; replaceHash("#/d/" + it.id + "/" + p + (hl.length ? "?" + q.toString() : "")); setLast("doc", { id: it.id, p }); }, 400);
     },
   });
   setLast("doc", { id: it.id, p: page });
@@ -918,24 +1004,29 @@ function viewDoc(id, page, q) {
 }
 
 /* ---------- slide panel (from tests & review) ---------- */
+let slideTok = null;
 function openSlide(docId, pages, est) {
   const it = S.byId[docId];
   if (!it) return toast("Bu kaynak henüz kütüphanede yok.");
-  closeSlide();
+  const wasOpen = $("#spane") && !$("#spane").hidden;
+  closeSlide(true);
   let pane = $("#spane");
   if (!pane) { pane = document.createElement("aside"); pane.className = "spane"; pane.id = "spane"; pane.dataset.float = "1"; document.body.appendChild(pane); }
   pane.hidden = false;
   pane.innerHTML = '<div class="shead"><button class="ibtn" data-sclose aria-label="Kapat">' + icon(innerWidth < 900 ? "back" : "close") + '</button><div class="t">' + esc(it.t)
     + "<small>" + (est ? "Tahmini " : "") + (it.k === "slayt" ? "slayt " : "sayfa ") + esc(pages.join(", ")) + " · " + esc(it.c) + '</small></div><a class="ibtn" href="#/d/' + it.id + "/" + pages[0] + "?h=" + pages.join(",") + (est ? "&e=1" : "") + '" title="Tam ekran aç">' + icon("expand") + '</a></div><div class="doc"></div>';
   pane._v = mountDoc($(".doc", pane), it, pages[0], { highlight: pages, est });
-  $("[data-sclose]", pane).onclick = closeSlide;
-  S.cleanup.push(closeSlide);
+  $("[data-sclose]", pane).onclick = () => closeSlide(false);
+  if (!wasOpen || !slideTok) slideTok = ovOpen(() => closeSlide(true));   // telefonun geri tuşu paneli kapatsın
+  S.cleanup.push(() => { slideTok = null; closeSlide(true); });
 }
-function closeSlide() {
+// fromPop: geri tuşuyla ya da başka bir slayt açılırken kapandı; false: kapat düğmesi (geçmiş kaydı da geri alınır)
+function closeSlide(fromPop) {
   const p = $("#spane");
   if (!p || p.hidden) return;
   if (p._v) { p._v.destroy(); p._v = null; }
   if (p.dataset.float) p.remove(); else { p.hidden = true; p.innerHTML = ""; }
+  if (fromPop !== true && slideTok) { const t = slideTok; slideTok = null; ovDone(t); }
 }
 const pagesLabel = (it, pages) => (it && it.k === "slayt" ? "slayt " : "sayfa ") + pages.join(", ");
 
@@ -1077,9 +1168,14 @@ function sheet(html) {
   const bg = document.createElement("div");
   bg.className = "sheet-bg";
   bg.innerHTML = '<div class="sheet" role="dialog">' + html + "</div>";
-  bg.addEventListener("click", e => { if (e.target === bg || e.target.closest("[data-close]")) bg.remove(); });
+  let tok = null;
+  // fromPop: telefonun geri tuşu kapattı (geçmiş zaten geri gitti)
+  const close = fromPop => { if (!bg.isConnected) return; bg.remove(); if (!fromPop) ovDone(tok); };
+  bg.addEventListener("click", e => { if (e.target === bg || e.target.closest("[data-close]")) close(false); });
   document.body.appendChild(bg);
+  tok = ovOpen(() => close(true));
   S.cleanup.push(() => bg.remove());
+  bg.close = () => close(false);
   return bg;
 }
 function testInfo(it) {
@@ -1113,7 +1209,7 @@ function reportSheet(R) {
   $("#rsend", bg).onclick = () => {
     const M = Object.assign({}, PS.get("rep", {}));
     M[key] = { tid: R.tid, qid: R.qid, t: R.t, c: R.c, no: R.no, q: (R.q || "").slice(0, 220), r: ($("input[name=rr]:checked", bg) || {}).value || "x", n: $("#rnote", bg).value.trim(), at: Date.now(), x: 0 };
-    PS.set("rep", M); bg.remove(); toast("Kaydedildi · Ayarlar › Hata bildirimleri");
+    PS.set("rep", M); bg.close(); toast("Kaydedildi · Ayarlar › Hata bildirimleri");
   };
 }
 const openReps = () => Object.values(PS.get("rep", {})).filter(r => r && !r.x).sort((a, b) => b.at - a.at);
@@ -1622,7 +1718,7 @@ async function viewLexicon(q) {
     const inp = $("#lq"), out = $("#lxo");
     const run = () => {
       const v = inp.value.trim();
-      history.replaceState(keepState(), "", "#/sozluk?t=coz" + (v ? "&q=" + encodeURIComponent(v) : ""));
+      replaceHash("#/sozluk?t=coz" + (v ? "&q=" + encodeURIComponent(v) : ""));
       out.innerHTML = v ? latDecodeHTML(D, v) : '<p class="note">Bir terim yaz ya da aşağıdan bir örneğe dokun. Kısaltmalar da olur: m., n., a., v., lig.</p>';
     };
     inp.oninput = run; run();
@@ -1709,10 +1805,12 @@ function latSheet(title, html) {
   const bg = document.createElement("div");
   bg.className = "sheet-bg";
   bg.innerHTML = '<div class="sheet" role="dialog" aria-label="' + esc(title) + '"><div class="sheet-h"><b>' + esc(title) + '</b><button class="ibtn" data-x title="Kapat">' + icon("close") + '</button></div><div class="sheet-b">' + html + '<p class="note">Terime dokunup ayrıntısını Anatomi Latincesi › Çözücü\'de görebilirsin.</p></div></div>';
-  const close = () => bg.remove();
-  bg.onclick = e => { if (e.target === bg || e.target.closest("[data-x]")) close(); };
+  let tok = null;
+  const close = fromPop => { if (!bg.isConnected) return; bg.remove(); if (!fromPop) ovDone(tok); };
+  bg.onclick = e => { if (e.target === bg || e.target.closest("[data-x]")) close(false); };
   document.body.appendChild(bg);
-  S.cleanup.push(close);
+  tok = ovOpen(() => close(true));
+  S.cleanup.push(() => bg.remove());
 }
 // Yalnız yerel denetimde (tools/check_site.sh, 127.0.0.1) testlerin erişebilmesi için
 if (location.hostname === "127.0.0.1") window.__ml = { loadLat: () => loadLat(), latQuestion: (D, m) => latQuestion(D, m), latDecodeHTML: (D, t) => latDecodeHTML(D, t), latSheet: (t, h) => latSheet(t, h), srs: () => srsLoad(), prune: () => pruneCache(), mergeP: (a, b) => mergeP(a, b), nav: () => S.nav };
@@ -1827,7 +1925,7 @@ function viewSearch(q0) {
   let tm = 0;
   const run = async () => {
     const qv = inp.value.trim();
-    history.replaceState(keepState(), "", "#/ara" + (qv ? "?q=" + encodeURIComponent(qv) : ""));
+    replaceHash("#/ara" + (qv ? "?q=" + encodeURIComponent(qv) : ""));
     const Q = parseQuery(qv);
     if (!Q.ok) { out.innerHTML = '<p class="note">En az iki harf yaz. Türkçe karakterler fark etmez: “ozellik” de “özellik”i bulur. Tırnak içine yazdığın kelimeler yalnız yan yana geçtiği yerlerde aranır: <b>"sodyum pompası"</b>.</p>'; return; }
     if (!S.index) out.innerHTML = '<div class="loading"><div><div class="spin"></div>Arama dizini hazırlanıyor…</div></div>';
@@ -1853,7 +1951,7 @@ function viewSearch(q0) {
     const qq = blob.data.find(x => x.id === h.dataset.qq), L = ["A", "B", "C", "D", "E"];
     const sh = sheet('<p class="muted small">' + esc(it.c) + " · " + esc(it.t) + " · " + esc(qq.t) + '</p><div class="qcard" style="padding:0">' + qHTML(qq) + '<ul class="opts">' + qq.o.map((o, i) => '<li><div class="opt' + (i === qq.a ? " ok" : " dim") + '"><span class="bub">' + L[i] + "</span><span>" + o + "</span></div></li>").join("")
       + '</ul><div class="fb"><p>' + qq.e + '</p><div class="src">Kaynak: ' + esc(qq.s) + "</div></div>" + slideBtn(blob, qq.id) + '</div><div class="row-btns" style="margin-top:14px"><a class="btn" href="#/t/' + it.id + '" data-close>Teste git</a><button class="btn" data-close>Kapat</button><button class="ml-rep" id="srq">⚑ Hata bildir</button></div>');
-    $("#srq", sh).onclick = () => { sh.remove(); reportSheet({ tid: it.id, qid: qq.id, t: it.t, c: it.c, no: blob.data.findIndex(x => x.id === qq.id) + 1, q: strip(qq.q) }); };
+    $("#srq", sh).onclick = () => { sh.close(); reportSheet({ tid: it.id, qid: qq.id, t: it.t, c: it.c, no: blob.data.findIndex(x => x.id === qq.id) + 1, q: strip(qq.q) }); };
   });
   if (q0) run(); else run();
   if (innerWidth >= 900 || !q0) inp.focus();
@@ -2101,6 +2199,7 @@ async function start() {
   if (!PID || !LS.get(PKEY(PID), null)) await viewProfiles(); else useProfile(PID);
   shell();
   if (location.hash === "#/kurulum" && S.cat) location.hash = "#/ayarlar";
+  if (history.state && history.state.ov) { ovSkip = 1; history.go(-history.state.ov); }   // yenilemeden kalan katman kaydı
   navDepth();
   route();
   // ağ işleri ekranı bekletmez: senkron ve sürüm denetimi arka planda (senkron değişiklik getirirse ekran yenilenir)
@@ -2137,7 +2236,7 @@ function viewProfiles() {
     }).catch(() => { if ($("#pf")) draw("Senkrona ulaşılamadı; bu cihazdaki profiller gösteriliyor."); });
   });
 }
-window.addEventListener("hashchange", () => { navDepth(); if (S.cat) route(); else if (!KEY) viewLogin(); });
+window.addEventListener("hashchange", () => { navDepth(); OV.length = 0; if (S.cat) route(); else if (!KEY) viewLogin(); });
 if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {});
 (async () => {
   if (!window.crypto || !crypto.subtle) { app().innerHTML = '<div class="gate"><div class="gate-card"><h1>' + NAME + "</h1><p>Bu tarayıcı desteklenmiyor. Güncel Chrome ya da Safari kullan.</p></div></div>"; return; }

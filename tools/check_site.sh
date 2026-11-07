@@ -10,4 +10,6 @@ python3 -m http.server $PORT --bind 127.0.0.1 >/dev/null 2>&1 &
 SRV=$!
 trap 'kill $SRV 2>/dev/null' EXIT
 sleep 1
-NODE_PATH="$(npm root -g 2>/dev/null)" node tools/e2e.js "http://127.0.0.1:$PORT/" "${1:-}"
+NODE_PATH="$(npm root -g 2>/dev/null)" node tools/e2e.js "http://127.0.0.1:$PORT/" "${1:-}"; R1=$?
+NODE_PATH="$(npm root -g 2>/dev/null)" node tools/back.js "http://127.0.0.1:$PORT/"; R2=$?
+exit $(( R1 || R2 ))
