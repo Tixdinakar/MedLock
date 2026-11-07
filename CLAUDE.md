@@ -106,6 +106,9 @@ Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor.
 - Alttaki sekme çubuğu (telefon/dikey tablet) slayt, test ve tekrarda da hep görünür; gizleme (Buğra istemiyor). Yatay tablette slayt/testte yalnız yan menü gizlenir.
 - Çıkmışlar ayrı sayfa (#/cikmis): kurul › ders, her derste çözülebilir test (ilerleme, net) ve orijinal PDF yan yana. Ana sayfada ve Kütüphane'nin başında girişi var.
 - Test motorunda (engine.html) MedLock içindeyken büyük başlık gizli, araç satırı ince; "Başla · N soru" altta sabit. Optik formda başka sorunun satırına dokunmak önce o soruya götürür, işaret yalnız açık sorunun satırında değişir; formun açılıp kapanmasına dokunma (Buğra'nın isteği). Motor değişiklikleri `tools/make_engine.py` içindeki `PATCHES`'te; `--apply` mevcut motora uygular.
+- Slayt görünümünde "açık sayfa" ekranın üst kısmındaki sayfadır (sayaç, işaret, döndürme, adres); en alta inilince son sayfa.
+- Geri düğmesi geçmiş derinliğini `history.state.d`'den okur; `replaceState` yaparken `keepState()` ver, yoksa derinlik kaybolur.
+- Cihaz önbelleğinde (`ml-data-1`) güncel olmayan `?v=` blobları `pruneCache` siler; yeni blob yolu eklersen oraya da ekle.
 - Arama: tırnak içi ("sodyum pompası") yalnız yan yana geçenleri bulur (ekler serbest); tırnaksız aramada kelimelerin yan yana geçtiği sayfalar öne çıkar.
 
 ## Profiller ve senkron

@@ -4,8 +4,16 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.1.2";
+const VERSION = "1.1.3";
 const CHANGES = [
+  { v: "1.1.3", d: "2026-11-07", l: [
+    "Telefonda sayfa sayacı, işaret ve döndürme artık ekranın üstündeki slayta uygulanıyor (önceden bir iki sonrakine gidiyordu)",
+    "Sayfa numarasına dokunup sayfaya giderken çıkan hata düzeldi",
+    "Geri düğmesi bazen uygulamadan çıkabiliyordu; düzeldi",
+    "Tıbbi Biyoloji Kurul 1 çıkmışında bir sorunun eksik E şıkkı eklendi",
+    "“Kurulu indir” artık aramayı ve Anatomi Latincesi’ni de internetsiz kullanıma alıyor",
+    "Eski sürüm dosyaları cihazda birikmiyor; net ve MB değerleri virgülle yazılıyor",
+  ] },
   { v: "1.1.2", d: "2026-11-07", l: ["Üstteki yol (Tıp › Kurul › Ders) düğmeleri büyüdü, dokunması kolay", "Slaytı kaydırdıktan hemen sonra yol düğmesine basınca slayta geri dönme hatası düzeldi", "Sürüm numarası ve bu yenilik notu"] },
   { v: "1.1.1", d: "2026-11-07", l: ["Alttaki çubuk slayt, test ve tekrarda da görünüyor"] },
   { v: "1.1", d: "2026-11-07", l: [
@@ -21,7 +29,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "c2f7ad35ac";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "c4b41eaf38";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -103,7 +111,7 @@ function fdate(iso, withYear) {
   const d = new Date(iso.length <= 10 ? iso + "T12:00" : iso);
   return d.getDate() + " " + MSHORT[d.getMonth()] + (withYear ? " " + d.getFullYear() : "");
 }
-const fmtMB = b => (b / 1048576).toFixed(b > 104857600 ? 0 : 1) + " MB";
+const fmtMB = b => (b / 1048576).toFixed(b > 104857600 ? 0 : 1).replace(".", ",") + " MB";
 const FOLD = new Map();
 function foldChar(ch) {
   let f = FOLD.get(ch);
@@ -475,6 +483,15 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-back]");
   if (b && S.nav > 1) { e.preventDefault(); history.back(); }
 });
+// Her geçmiş kaydına uygulama içindeki derinliği yazılır. Geri düğmesi yalnız uygulama içinde geri gidilecek yer varsa
+// history.back() yapar; yoksa kendi bağlantısına gider (uygulamadan çıkmaz). Ekranı yeniden çizmek derinliği değiştirmez.
+function navDepth() {
+  const st = history.state;
+  if (st && st.d) { S.nav = st.d; return; }
+  S.nav = (S.nav || 0) + 1;
+  try { history.replaceState(Object.assign({}, st, { d: S.nav }), ""); } catch (e) {}
+}
+const keepState = () => history.state;
 
 /* ---------- router ---------- */
 function parseHash() {
@@ -485,7 +502,6 @@ function parseHash() {
 function cleanup() { S.cleanup.splice(0).forEach(f => { try { f(); } catch (e) {} }); }
 async function route() {
   if (!S.cat) return;
-  S.nav++;
   cleanup();
   const { parts, q } = parseHash();
   const [a, b, c] = parts;
@@ -822,11 +838,19 @@ function mountDoc(el, it, page, opts) {
     } catch (e) { fig.dataset.l = ""; const ph = fig.querySelector(".ph"); if (ph) ph.textContent = "Yüklenemedi · tekrar kaydır"; }
   };
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) loadP(e.target); }), { root: el, rootMargin: "120% 0px" });
-  let curP = page;
-  const seen = new IntersectionObserver(es => {
-    es.forEach(e => { if (e.isIntersecting) { curP = +e.target.dataset.p; opts.onPage && opts.onPage(curP); } });
-  }, { root: el, rootMargin: "-45% 0px -50% 0px" });
-  $$(".pg", el).forEach(f => { io.observe(f); seen.observe(f); });
+  // Açık sayfa: ekranın üst kısmındaki sayfa (telefonda kısa slaytlarda ortadaki değil). En alta inilince son sayfa.
+  let curP = page, raf = 0;
+  const figs = $$(".pg", el);
+  const calc = () => {
+    raf = 0;
+    let p = 1;
+    if (el.scrollTop > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 2) p = it.n;
+    else { const y = el.scrollTop + Math.max(40, el.clientHeight * 0.12); for (const f of figs) { if (f.offsetTop <= y) p = +f.dataset.p; else break; } }
+    if (p !== curP) { curP = p; opts.onPage && opts.onPage(p); }
+  };
+  const onScroll = () => { if (!raf) raf = requestAnimationFrame(calc); };
+  el.addEventListener("scroll", onScroll, { passive: true });
+  figs.forEach(f => io.observe(f));
   const goto = (p, smooth) => { const f = el.querySelector('[data-p="' + Math.min(Math.max(p, 1), it.n) + '"]'); if (f) { loadP(f); el.scrollTo({ top: f.offsetTop - 8, behavior: smooth ? "smooth" : "auto" }); } };
   requestAnimationFrame(() => goto(page));
   const reload = p => {
@@ -834,7 +858,7 @@ function mountDoc(el, it, page, opts) {
     const img = f.querySelector("img"); if (img) { const ph = document.createElement("div"); ph.className = "ph"; ph.style.setProperty("--ar", img.naturalWidth / img.naturalHeight); img.replaceWith(ph); }
     f.dataset.l = ""; loadP(f);
   };
-  return { goto, reload, destroy() { io.disconnect(); seen.disconnect(); }, get page() { return curP; } };
+  return { goto, reload, destroy() { io.disconnect(); el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); }, get page() { return curP; } };
 }
 function viewDoc(id, page, q) {
   const it = S.byId[id];
@@ -858,7 +882,7 @@ function viewDoc(id, page, q) {
       $("#bmb").innerHTML = icon(bmHas(it.id, p) ? "bmf" : "bm");
       clearTimeout(saveT);
       // sayfa adresi yazılmadan başka yere geçildiyse yazma (yoksa yol düğmesine basınca slayta geri döner)
-      saveT = setTimeout(() => { if (!location.hash.startsWith("#/d/" + it.id + "/")) return; history.replaceState(null, "", "#/d/" + it.id + "/" + p + (hl.length ? "?" + q.toString() : "")); setLast("doc", { id: it.id, p }); }, 400);
+      saveT = setTimeout(() => { if (!location.hash.startsWith("#/d/" + it.id + "/")) return; history.replaceState(keepState(), "", "#/d/" + it.id + "/" + p + (hl.length ? "?" + q.toString() : "")); setLast("doc", { id: it.id, p }); }, 400);
     },
   });
   setLast("doc", { id: it.id, p: page });
@@ -885,9 +909,11 @@ function viewDoc(id, page, q) {
     const inp = document.createElement("input");
     inp.type = "number"; inp.min = 1; inp.max = it.n; inp.value = V.page; inp.className = "pgjump"; inp.inputMode = "numeric";
     b.replaceWith(inp); inp.select();
-    const done = () => { const p = parseInt(inp.value, 10); inp.replaceWith(b); if (p) V.goto(p); };
-    inp.onkeydown = e => { if (e.key === "Enter") done(); if (e.key === "Escape") inp.replaceWith(b); };
-    inp.onblur = done;
+    // Enter, Escape ve odak kaybı aynı anda gelebilir: yalnız bir kez geri koy
+    let closed = false;
+    const close = go => { if (closed) return; closed = true; const p = parseInt(inp.value, 10); if (inp.isConnected) inp.replaceWith(b); if (go && p) V.goto(p); };
+    inp.onkeydown = e => { if (e.key === "Enter") close(true); if (e.key === "Escape") close(false); };
+    inp.onblur = () => close(true);
   };
 }
 
@@ -1326,7 +1352,7 @@ function viewProgress() {
     + (courseBlocks || '<div class="card empty">Henüz test yok.</div>')
     + '<h2 class="sec">Deneme geçmişi</h2>' + (H.length ? '<div class="card">' + H.slice(0, 40).map(h => {
       const net = h.ok - h.bad / 4;
-      return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(h.c) + " · " + esc(h.t) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">net ' + (Math.round(net * 100) / 100) + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
+      return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(h.c) + " · " + esc(h.t) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">net ' + fnum(Math.round(net * 100) / 100) + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
     }).join("") + "</div>" : '<div class="card empty">Bitirdiğin denemeler burada listelenir.</div>')
     + (ks.length ? '<h2 class="sec">Kurul sınavı ile karşılaştır</h2><p class="note" style="margin-top:-4px">Kurul sınavından sonra gerçek netini ve soru sayısını gir; denemelerdeki başarınla yan yana görürsün.</p><div class="card">'
       + ks.map(k => {
@@ -1596,7 +1622,7 @@ async function viewLexicon(q) {
     const inp = $("#lq"), out = $("#lxo");
     const run = () => {
       const v = inp.value.trim();
-      history.replaceState(null, "", "#/sozluk?t=coz" + (v ? "&q=" + encodeURIComponent(v) : ""));
+      history.replaceState(keepState(), "", "#/sozluk?t=coz" + (v ? "&q=" + encodeURIComponent(v) : ""));
       out.innerHTML = v ? latDecodeHTML(D, v) : '<p class="note">Bir terim yaz ya da aşağıdan bir örneğe dokun. Kısaltmalar da olur: m., n., a., v., lig.</p>';
     };
     inp.oninput = run; run();
@@ -1689,7 +1715,7 @@ function latSheet(title, html) {
   S.cleanup.push(close);
 }
 // Yalnız yerel denetimde (tools/check_site.sh, 127.0.0.1) testlerin erişebilmesi için
-if (location.hostname === "127.0.0.1") window.__ml = { loadLat: () => loadLat(), latQuestion: (D, m) => latQuestion(D, m), latDecodeHTML: (D, t) => latDecodeHTML(D, t), latSheet: (t, h) => latSheet(t, h), srs: () => srsLoad() };
+if (location.hostname === "127.0.0.1") window.__ml = { loadLat: () => loadLat(), latQuestion: (D, m) => latQuestion(D, m), latDecodeHTML: (D, t) => latDecodeHTML(D, t), latSheet: (t, h) => latSheet(t, h), srs: () => srsLoad(), prune: () => pruneCache(), mergeP: (a, b) => mergeP(a, b), nav: () => S.nav };
 async function latPageTerms(itId, page) {
   const D = await loadLat(), pg = (D.pg[itId] || {})[String(page)] || [];
   return { D, terms: pg.map(i => D.sl[i][0]) };
@@ -1801,7 +1827,7 @@ function viewSearch(q0) {
   let tm = 0;
   const run = async () => {
     const qv = inp.value.trim();
-    history.replaceState(null, "", "#/ara" + (qv ? "?q=" + encodeURIComponent(qv) : ""));
+    history.replaceState(keepState(), "", "#/ara" + (qv ? "?q=" + encodeURIComponent(qv) : ""));
     const Q = parseQuery(qv);
     if (!Q.ok) { out.innerHTML = '<p class="note">En az iki harf yaz. Türkçe karakterler fark etmez: “ozellik” de “özellik”i bulur. Tırnak içine yazdığın kelimeler yalnız yan yana geçtiği yerlerde aranır: <b>"sodyum pompası"</b>.</p>'; return; }
     if (!S.index) out.innerHTML = '<div class="loading"><div><div class="spin"></div>Arama dizini hazırlanıyor…</div></div>';
@@ -1950,6 +1976,8 @@ async function offline(btn, g) {
     if (it.k === "test" || it.k === "kart") urls.push("d/" + it.x + "?v=" + it.v);
     else { urls.push("d/" + it.x + "/t?v=" + it.v); for (let p = 1; p <= it.n; p++) urls.push("d/" + it.x + "/" + p + "?v=" + it.v); }
   });
+  urls.push("d/s?v=" + S.cat.v);                         // arama ve Anatomi Latincesi de çevrimdışı çalışsın
+  ["lat", "lex"].forEach(k => { if (S.cat[k]) urls.push("d/" + S.cat[k].x + "?v=" + S.cat[k].v); });
   btn.disabled = true;
   let done = 0, fail = 0, i = 0;
   const worker = async () => { while (i < urls.length) { const u = urls[i++]; try { const r = await fetch(u); if (!r.ok) fail++; await r.arrayBuffer(); } catch (e) { fail++; } done++; if (done % 10 === 0 || done === urls.length) btn.textContent = Math.round(100 * done / urls.length) + "%"; } };
@@ -2008,6 +2036,24 @@ async function updateShell(target) {
     return true;
   } catch (e) { return false; }
 }
+// Cihazdaki önbellekten eski sürüm blobları silinir (her içerik güncellemesinde arama dizini ve değişen dosyalar
+// yeniden indiriliyor; silinmezse aylar içinde yüzlerce MB birikir).
+async function pruneCache() {
+  if (!("caches" in window) || !S.cat) return;
+  try {
+    const c = await caches.open("ml-data-1"), keys = await c.keys();
+    const want = new Map([["d/c", S.ver.c], ["d/s", S.cat.v]]);
+    S.cat.items.forEach(it => { if (it.x) want.set("d/" + it.x, it.v); });
+    ["lat", "lex"].forEach(k => { if (S.cat[k]) want.set("d/" + S.cat[k].x, S.cat[k].v); });
+    let n = 0;
+    for (const req of keys) {
+      const u = new URL(req.url), m = u.pathname.match(/\/(d\/[^/]+)(\/[^/]+)?$/);
+      if (!m) continue;
+      if (want.get(m[1]) !== u.searchParams.get("v")) { await c.delete(req); n++; }
+    }
+    return n;
+  } catch (e) { return 0; }
+}
 let updBusy = false;
 async function checkUpdate(manual) {
   if (updBusy) return;
@@ -2023,11 +2069,12 @@ async function checkUpdate2(manual) {
     const old = new Set(S.cat.items.map(i => i.id));
     try {
       const cat = await fetchJSON("d/c", j.c);
-      S.ver = Object.assign({}, S.ver, { c: j.c }); setCatalog(cat); S.index = null; S.tests = {}; changed = true;
+      S.ver = Object.assign({}, S.ver, { c: j.c }); setCatalog(cat); S.index = null; S.tests = {}; S.texts = {}; latP = null; lexP = null; changed = true;
       LS.set("ml.v", j);
       const added = cat.items.filter(i => !old.has(i.id));
       toast(added.length ? "Yeni: " + added.slice(0, 2).map(i => i.t).join(", ") + (added.length > 2 ? " ve " + (added.length - 2) + " öğe daha" : "") : "İçerik güncellendi", null, null, 5000);
       footNote();
+      setTimeout(pruneCache, 3000);
       if (passive()) { shell(); route(); }
     } catch (e) {}
   }
@@ -2054,10 +2101,12 @@ async function start() {
   if (!PID || !LS.get(PKEY(PID), null)) await viewProfiles(); else useProfile(PID);
   shell();
   if (location.hash === "#/kurulum" && S.cat) location.hash = "#/ayarlar";
+  navDepth();
   route();
   // ağ işleri ekranı bekletmez: senkron ve sürüm denetimi arka planda (senkron değişiklik getirirse ekran yenilenir)
   if (syncOn()) syncNow();
   setTimeout(() => checkUpdate(false), 300);
+  setTimeout(pruneCache, 8000);
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {}); } catch (e) {}
   try { if (sessionStorage.getItem("ml.upd")) { sessionStorage.removeItem("ml.upd"); toast("Güncellendi"); } } catch (e) {}
   setInterval(() => checkUpdate(false), 15 * 60e3);
@@ -2088,7 +2137,7 @@ function viewProfiles() {
     }).catch(() => { if ($("#pf")) draw("Senkrona ulaşılamadı; bu cihazdaki profiller gösteriliyor."); });
   });
 }
-window.addEventListener("hashchange", () => { if (S.cat) route(); else if (!KEY) viewLogin(); });
+window.addEventListener("hashchange", () => { navDepth(); if (S.cat) route(); else if (!KEY) viewLogin(); });
 if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {});
 (async () => {
   if (!window.crypto || !crypto.subtle) { app().innerHTML = '<div class="gate"><div class="gate-card"><h1>' + NAME + "</h1><p>Bu tarayıcı desteklenmiyor. Güncel Chrome ya da Safari kullan.</p></div></div>"; return; }
