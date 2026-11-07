@@ -1,10 +1,13 @@
-/* MedLock service worker: kabuk ağdan (yoksa önbellekten), sürümlü şifreli bloblar önbellekten. */
+/* MedLock service worker.
+   Kabuk (index, app.js, css, test motoru) önbellekten anında açılır; ağ beklenmez.
+   Yeni sürüm çıkınca uygulama (app.js › updateShell) kabuğu topluca yeniler ve sayfayı yeniden yükler.
+   Sürümlü şifreli bloblar (?v=) önbellekten; v.json ve k.json hep ağdan. */
 const SHELL = "ml-shell-1", DATA = "ml-data-1", FONTS = "ml-fonts-1";
 const CORE = ["./", "index.html", "app.js", "app.css", "engine.html", "manifest.webmanifest", "icons/64.png", "icons/192.png"];
 
 self.addEventListener("install", e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(SHELL).then(c => c.addAll(CORE)).catch(() => {}));
+  e.waitUntil(caches.open(SHELL).then(c => c.addAll(CORE.map(u => new Request(u, { cache: "reload" })))).catch(() => {}));
 });
 self.addEventListener("activate", e => {
   e.waitUntil((async () => {
@@ -22,18 +25,14 @@ async function cacheFirst(req, name) {
   if (r.ok || r.type === "opaque") c.put(req, r.clone());
   return r;
 }
-async function networkFirst(req) {
+async function shellFirst(req) {
   const c = await caches.open(SHELL);
-  try {
-    const r = await fetch(req, { cache: req.cache === "no-store" ? "no-store" : "no-cache" });
-    if (r.ok) c.put(req, r.clone());
-    return r;
-  } catch (e) {
-    const hit = await c.match(req, { ignoreSearch: req.mode === "navigate" });
-    if (hit) return hit;
-    if (req.mode === "navigate") { const idx = await c.match("index.html"); if (idx) return idx; }
-    throw e;
-  }
+  const nav = req.mode === "navigate";
+  const hit = (await c.match(req, { ignoreSearch: nav })) || (nav ? (await c.match("./")) || (await c.match("index.html")) : null);
+  if (hit) return hit;
+  const r = await fetch(req);
+  if (r.ok) c.put(req, r.clone());
+  return r;
 }
 
 self.addEventListener("fetch", e => {
@@ -42,6 +41,8 @@ self.addEventListener("fetch", e => {
   const u = new URL(req.url);
   if (u.hostname === "fonts.googleapis.com" || u.hostname === "fonts.gstatic.com") { e.respondWith(cacheFirst(req, FONTS)); return; }
   if (u.origin !== location.origin) return;
+  if (/\/(v|k)\.json$/.test(u.pathname)) return;                       // sürüm ve anahtar: hep ağdan
   if (u.searchParams.has("v")) { e.respondWith(cacheFirst(req, DATA)); return; }
-  e.respondWith(networkFirst(req));
+  if (req.cache === "reload" || req.cache === "no-store") return;     // updateShell'in taze indirmesi
+  e.respondWith(shellFirst(req));
 });

@@ -1,5 +1,23 @@
 <!doctype html><html lang="tr"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();</script>
+<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();if(window.ML)document.documentElement.classList.add("ml");</script>
+<style>
+/* MedLock içinde: başlık uygulamanın üst çubuğunda; motorun büyük başlığı gizli, araç satırı ince */
+html.ml .cover h1{display:none}
+html.ml .cover{padding-top:14px}
+html.ml .eyebrow{margin-bottom:4px}
+html.ml .top{padding-block:8px;margin-bottom:12px;flex-wrap:nowrap}
+html.ml .top .brand{display:none}
+html.ml .top .tools{flex:1;flex-wrap:nowrap;gap:6px;min-width:0}
+html.ml .top .tools .sp{flex:1}
+html.ml .top .tools .btn{padding:6px 11px;font-size:13px}
+html.ml .top .chip{padding:3px 9px;font-size:12px}
+/* başlat düğmesi ekranın altında sabit */
+.gobar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--line)}
+.gobar .go{width:100%;max-width:520px;justify-content:center;padding:12px 16px;font-size:15px}
+body.has-gobar{padding-bottom:84px}
+.ml-rep{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:10px;font:600 12.5px var(--f-ui,system-ui);color:var(--muted,#666);padding:4px 2px}
+.ml-rep:hover{color:var(--bad,#b00)}
+</style>
 <style>
 .ml-go{display:flex;align-items:center;gap:8px;margin-top:10px;width:100%;text-align:left;font:600 13px/1.35 var(--f-ui,system-ui);
   color:var(--form,#0f5c63);background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:10px;padding:9px 12px;cursor:pointer}
@@ -384,6 +402,7 @@ function optClass(r, id, i){
   return a === i ? "sel" : "";
 }
 const MODE_NAME = { study:"Çalışma modu", exam:"Sınav modu", timed:"Zamana karşı" };
+const MODE_SHORT = { study:"Çalışma", exam:"Sınav", timed:"Zamana karşı" };
 const remaining = r => Math.max(0, (r.limit || 0) - r.elapsed);
 function timerText(r){ return r.mode === "timed" && !r.finished ? fmtTime(remaining(r)) : fmtTime(r.elapsed); }
 function suggestMinutes(n){ return Math.max(1, Math.round(n * (CFG.perQuestion || 1))); }
@@ -394,13 +413,13 @@ function headerHTML(){
   let h = '<div class="brand"><b>' + esc(CFG.title) + '</b><span>' + esc(CFG.sub) + '</span></div>';
   if(S.view === "quiz" && r){
     const timed = r.mode === "timed" && !r.finished;
-    h += '<div class="tools"><span class="chip">' + MODE_NAME[r.mode] + '</span>'
+    h += '<div class="tools"><span class="chip">' + (window.ML ? MODE_SHORT : MODE_NAME)[r.mode] + '</span>'
       + '<span class="chip" title="' + (timed ? "Kalan süre" : "Geçen süre") + '">' + (timed ? "Kalan" : "Süre") + ' <span class="timer' + (timed && remaining(r) <= 60 ? " low" : "") + '" id="timer">' + timerText(r) + '</span></span>'
-      + '<button class="btn ghost" type="button" data-act="home">Kapak</button>'
+      + '<span class="sp"></span><button class="btn ghost" type="button" data-act="home">Kapak</button>'
       + (r.finished ? '<button class="btn" type="button" data-act="to-result">Sonuç</button>' : '<button class="btn" type="button" data-act="finish-ask">Bitir</button>')
       + '</div>';
   } else if(S.view === "result" && r){
-    h += '<div class="tools"><button class="btn ghost" type="button" data-act="home">Kapak</button></div>';
+    h += '<div class="tools"><span class="sp"></span><button class="btn ghost" type="button" data-act="home">Kapak</button></div>';
   }
   return h;
 }
@@ -460,9 +479,9 @@ function startHTML(){
     + '<fieldset><legend>Nasıl çözmek istersin?</legend>' + modes + '</fieldset>'
     + '<label class="check"><input type="checkbox" id="opt-shuffle"' + (S.shuffle ? " checked" : "") + '> Soru sırasını karıştır</label>'
     + '<p class="warn" id="warn" hidden></p>'
-    + '<button class="btn primary go" type="submit">Denemeye başla</button>'
     + resume
     + '</form>'
+    + '<div class="gobar"><button class="btn primary go" type="submit" form="setup">Başla · <span id="go-n">' + nSel + '</span> soru</button></div>'
     + '<div class="dist"><p class="dist-h">Konu dağılımı</p>' + CFG.courses.map(distHTML).join("") + '</div></section>';
 }
 
@@ -474,7 +493,7 @@ function sheetHTML(){
       const c = optClass(r, id, i);
       return '<button type="button" class="b' + (c ? " " + c : "") + '" data-act="bubble" data-k="' + k + '" data-i="' + i + '" tabindex="-1" aria-label="Soru ' + (k + 1) + ', ' + l + ' şıkkı">' + l + '</button>';
     }).join("");
-    return '<div class="row ' + CC(q.c) + (k === r.cur ? " cur" : "") + '"><button type="button" class="no" data-act="jump" data-k="' + k + '" tabindex="-1" aria-label="Soru ' + (k + 1) + '">' + (k + 1) + '</button>' + bs + '</div>';
+    return '<div class="row ' + CC(q.c) + (k === r.cur ? " cur" : "") + '" data-act="jump" data-k="' + k + '"><button type="button" class="no" data-act="jump" data-k="' + k + '" tabindex="-1" aria-label="Soru ' + (k + 1) + '">' + (k + 1) + '</button>' + bs + '</div>';
   }).join("");
   let blocks = "";
   for(let g = 0; g < r.ids.length; g += 40){
@@ -491,7 +510,7 @@ function sheetHTML(){
     : '<span><i class="s"></i>işaretli</span><span><i></i>boş</span>';
   return '<aside class="sheet' + (sheetOpen ? " open" : "") + '" aria-label="Optik form">'
     + '<button type="button" class="sheet-head" data-act="sheet" aria-expanded="' + sheetOpen + '"><b>CEVAP KÂĞIDI <span>' + answered(r) + '/' + r.ids.length + ' <span class="arrow">' + (sheetOpen ? "▴" : "▾") + '</span></span></b>'
-    + '<small>Numaraya dokun, o soruya git</small></button>'
+    + '<small>Satıra dokun, o soruya git; şıkkı orada işaretle</small></button>'
     + '<div class="sheet-body">' + blocks + '<div class="legend">' + leg + '</div></div></aside>';
 }
 
@@ -507,7 +526,7 @@ function quizHTML(){
   if(rev){
     const st = status(r, id);
     const title = st === "ok" ? "Doğru." : st === "bad" ? "Yanlış. Doğru cevap: " + L[q.a] : "Boş bıraktın. Doğru cevap: " + L[q.a];
-    fb = '<div class="fb ' + (st === "ok" ? "ok" : st === "bad" ? "bad" : "") + '" role="status"><h4>' + title + '</h4><p>' + q.e + '</p><div class="src">Kaynak: ' + esc(q.s) + '</div>' + (window.ML ? ML.btn(q.id) : '') + '</div>';
+    fb = '<div class="fb ' + (st === "ok" ? "ok" : st === "bad" ? "bad" : "") + '" role="status"><h4>' + title + '</h4><p>' + q.e + '</p><div class="src">Kaynak: ' + esc(q.s) + '</div>' + (window.ML ? ML.btn(q.id) : '') + (window.ML && ML.rep ? ML.rep(q.id) : '') + '</div>';
   } else if(r.mode !== "study"){
     fb = '<p class="hint">İşaretini değiştirmek için başka bir şıkka, silmek için aynı şıkka dokun.</p>';
   }
@@ -594,6 +613,7 @@ function render(toTop){
   else { S.view = "start"; v.innerHTML = startHTML(); }
   const top = document.getElementById("top");
   top.hidden = S.view === "start";
+  document.body.classList.toggle("has-gobar", S.view === "start");
   top.innerHTML = S.view === "start" ? "" : headerHTML();
   if(toTop) window.scrollTo(0, 0);
 }
@@ -604,6 +624,7 @@ function bringCardIntoView(){
 }
 function refreshCounts(){
   ["all","custom"].concat(CFG.courses.map(c => c.code)).forEach(k => { const el = document.getElementById("n-" + k); if(el) el.textContent = setIds(k).length; });
+  const gn = document.getElementById("go-n"); if(gn) gn.textContent = setIds(S.set).length;
   const m = document.getElementById("minutes");
   if(m && !(S.minutes > 0)) m.value = suggestMinutes(setIds(S.set).length);
 }
@@ -647,9 +668,9 @@ document.addEventListener("click", e => {
     case "finish": finish(false); break;
     case "jump": r.cur = +el.dataset.k; r.confirm = false; save(); render(); bringCardIntoView(); break;
     case "bubble": {
-      const k = +el.dataset.k, i = +el.dataset.i; r.cur = k; r.confirm = false;
-      if(r.mode !== "study" && !r.finished){ const id = r.ids[k]; if(r.ans[id] === i) delete r.ans[id]; else r.ans[id] = i; }
-      save(); render(); if(r.mode === "study" || r.finished) bringCardIntoView();
+      const k = +el.dataset.k, i = +el.dataset.i;
+      if(k !== r.cur){ r.cur = k; r.confirm = false; save(); render(); bringCardIntoView(); break; }
+      choose(i);
       break;
     }
     case "sheet": sheetOpen = !sheetOpen; render(); break;

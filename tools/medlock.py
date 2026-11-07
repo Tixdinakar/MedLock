@@ -19,6 +19,9 @@ MEDLOCK_PASS ortam değişkeninden alır; şifre hiçbir dosyaya yazılmaz.
   python3 tools/medlock.py passwd    # MEDLOCK_NEWPASS ile şifreyi değiştir (içerik yeniden şifrelenmez)
   python3 tools/medlock.py check     # bütün blobları çözüp doğrula
   python3 tools/medlock.py stamp     # sadece arayüz dosyaları değiştiyse v.json'u yenile (cihazlar güncellenir)
+  python3 tools/medlock.py add-video --folder K2/Biyokimya --fid <driveId> --name "Ders 3.mp4" [--by "Yükleyen"]   # video Drive'da kalır
+  python3 tools/medlock.py final 2027-05-24 2027-06-18 # final sınavı dönemi (bu aralıkta öğrenilmiş sorular yeniden gelir)
+  python3 tools/medlock.py scan      # şifre gerekmez: şifresiz içerik ya da anahtar sızıyor mu (pre-commit kancası da bunu çalıştırır)
 
 Gereken: python3, cryptography, pillow, poppler-utils (pdftoppm, pdftotext, pdfinfo).
 """
@@ -32,15 +35,32 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 ITER = 600_000
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 B64 = lambda b: base64.b64encode(b).decode()
-KINDS = ["slayt", "not", "ozet", "cikmis", "soru", "ses", "test", "kart"]
+KINDS = ["slayt", "not", "ozet", "cikmis", "soru", "ses", "test", "kart", "video"]
+# Dönem katmanı: kurul id'leri bütün yıllarda tekildir (Dönem I: k1..k4, Dönem II: d2-k1.. gibi).
+DONEMLER = [
+    {"id": "d1", "no": "I", "name": "Dönem I", "yil": "2026–2027",
+     "final": {"start": "2027-05-15", "end": "2027-07-15", "est": 1}},
+]
+# Ders adı değişiklikleri: eski ad verilirse yenisine çevrilir.
+COURSE_RENAME = {"Psikoloji": "Davranış Bilimleri"}
 
 KURULLAR = [
-    {"id": "k1", "no": "I", "name": "Temel Bilimler I", "start": "2026-09-07", "end": "2026-10-23"},
-    {"id": "k2", "no": "II", "name": "Temel Bilimler II", "start": "2026-10-26", "end": "2026-12-25"},
-    {"id": "k3", "no": "III", "name": "Temel Bilimler III", "start": "2026-12-28", "end": "2027-03-15"},
-    {"id": "k4", "no": "IV", "name": "Temel Bilimler IV", "start": "2027-03-16", "end": "2027-05-14"},
+    {"id": "k1", "no": "I", "name": "Temel Bilimler I", "start": "2026-09-07", "end": "2026-10-23", "dn": "d1"},
+    {"id": "k2", "no": "II", "name": "Temel Bilimler II", "start": "2026-10-26", "end": "2026-12-25", "dn": "d1"},
+    {"id": "k3", "no": "III", "name": "Temel Bilimler III", "start": "2026-12-28", "end": "2027-03-15", "dn": "d1"},
+    {"id": "k4", "no": "IV", "name": "Temel Bilimler IV", "start": "2027-03-16", "end": "2027-05-14", "dn": "d1"},
 ]
-ORTAK = {"id": "ortak", "name": "Ortak Dersler"}
+ORTAK = {"id": "ortak", "name": "Ortak Dersler", "dn": "d1"}
+
+
+def ensure_schema(c):
+    """Eski kataloglara dönem katmanını ekler (idempotent)."""
+    c.setdefault("donemler", json.loads(json.dumps(DONEMLER)))
+    for k in c.get("kurullar", []):
+        k.setdefault("dn", "d1")
+    if c.get("ortak"):
+        c["ortak"].setdefault("dn", "d1")
+    return c
 
 
 def kdf(password, salt, it):
@@ -121,6 +141,7 @@ class Vault:
                 self._cat = self.get_json("d/c")
             else:
                 self._cat = {"kurullar": KURULLAR, "ortak": ORTAK, "items": [], "skip": []}
+            ensure_schema(self._cat)
         return self._cat
 
     def item(self, ident):
@@ -158,16 +179,35 @@ class Vault:
         app = app_version(self.repo)
         if old.get("c") != c["v"] or old.get("app") != app:
             json.dump({"c": c["v"], "app": app}, open(vp, "w"))
+        write_appv(self.repo, app)
         return changed
 
 
+APPV_RE = re.compile(rb'const APPV = "[0-9a-f]*";')
+
+
 def app_version(repo):
+    """Arayüz dosyalarının özeti. app.js içindeki APPV satırı hesaba katılmaz (stamp onu bu değerle yazar)."""
     h = hashlib.sha256()
     for f in sorted(SHELL_FILES):
         p = os.path.join(repo, f)
         if os.path.exists(p):
-            h.update(f.encode() + open(p, "rb").read())
+            b = open(p, "rb").read()
+            if f == "app.js":
+                b = APPV_RE.sub(b'const APPV = "";', b)
+            h.update(f.encode() + b)
     return h.hexdigest()[:10]
+
+
+def write_appv(repo, app):
+    """Uygulama kendi sürümünü bilsin diye app.js'e yazılır; v.json'daki sürümle karşılaştırıp kabuğu yeniler."""
+    p = os.path.join(repo, "app.js")
+    if not os.path.exists(p):
+        return
+    b = open(p, "rb").read()
+    nb = APPV_RE.sub(b'const APPV = "' + app.encode() + b'";', b)
+    if nb != b:
+        open(p, "wb").write(nb)
 
 
 SHELL_FILES = ["index.html", "app.js", "app.css", "engine.html", "manifest.webmanifest", "sw.js"]
@@ -313,15 +353,17 @@ def add_doc(V, pdf=None, rendered=None, **meta):
     V.put_json(f"d/{x}/t", texts)
     date = meta.get("date") or (pdf and date_from_name(os.path.basename(pdf))) or old.get("d") \
         or datetime.datetime.now().strftime("%Y-%m-%dT%H:%M")
-    it = {"id": ident, "k": meta["kind"], "g": meta["kurul"], "c": meta["course"], "h": meta.get("hoca") or "",
+    it = {"id": ident, "k": meta["kind"], "g": meta["kurul"], "c": course_name(meta["course"]), "h": meta.get("hoca") or "",
           "t": meta["title"], "d": date, "n": n, "x": x, "r": round(w / h, 3), "v": hv.hexdigest()[:8], "sz": size}
+    if meta.get("by"):
+        it["u"] = meta["by"]
     if meta.get("approx"):
         it["dq"] = 1
     if meta.get("src"):
         it["src"] = meta["src"]
     if meta.get("sub"):
         it["m"] = meta["sub"]
-    for k in ("dq", "al", "src", "m"):          # yeniden eklemede eski alanları koru
+    for k in ("dq", "al", "src", "m", "u"):     # yeniden eklemede eski alanları koru
         if k not in it and k in old:
             it[k] = old[k]
     V.upsert(it)
@@ -351,13 +393,43 @@ def add_test(V, cfg, data, **meta):
         except Exception:
             pass
     topics = collections.Counter(q["t"] for q in data)
-    it = {"id": ident, "k": "test", "g": meta["kurul"], "c": meta["course"], "h": meta.get("hoca") or "",
+    it = {"id": ident, "k": "test", "g": meta["kurul"], "c": course_name(meta["course"]), "h": meta.get("hoca") or "",
           "t": meta["title"], "d": meta.get("date") or datetime.datetime.now().strftime("%Y-%m-%dT%H:%M"),
           "n": len(data), "x": x, "sk": cfg.get("key"), "tp": topics.most_common()}
     if meta.get("sub"):
         it["m"] = meta["sub"]
     V.upsert(it)
     write_test(V, it, blob)
+    return it
+
+
+def course_name(c):
+    return COURSE_RENAME.get(c, c)
+
+
+VIDEO_EXT = re.compile(r"\.(mp4|m4v|mov|webm|mkv|avi)$", re.I)
+
+
+def add_video(V, fid, folder, name, **o):
+    """Video MedLock'a yüklenmez; Drive'da durur, katalogda yalnız bağlantısı (şifreli) olur."""
+    m = guess_meta(V, folder, VIDEO_EXT.sub(".pdf", name))
+    m["date"] = o.get("date") or m["date"] or datetime.datetime.now().strftime("%Y-%m-%dT%H:%M")
+    for k in ("kurul", "course", "hoca", "title"):
+        if o.get(k):
+            m[k] = o[k]
+    src = "drive:" + fid
+    old = next((it for it in V.cat["items"] if it.get("src") == src), None)
+    ident = old["id"] if old else V.new_id("video-" + m["title"])
+    it = {"id": ident, "k": "video", "g": m["kurul"], "c": course_name(m["course"]), "h": m["hoca"], "t": m["title"],
+          "d": m["date"], "n": 0, "src": src}
+    if o.get("by"):
+        it["u"] = o["by"]
+    if o.get("mb"):
+        it["sz"] = int(float(o["mb"]) * 1048576)
+    if o.get("dur"):
+        it["dur"] = o["dur"]
+    V.upsert(it)
+    V.cat["todo"] = [t for t in V.cat.get("todo", []) if t["src"] != src]
     return it
 
 
@@ -655,6 +727,8 @@ def build_lexicon(V):
 def check(V):
     n = 0
     for it in V.cat["items"]:
+        if it["k"] == "video":
+            continue
         if it["k"] in ("test", "kart"):
             V.get_json(f"d/{it['x']}")
             n += 1
@@ -668,13 +742,76 @@ def check(V):
         if V.cat.get(k):
             V.get_json(f"d/{V.cat[k]['x']}")
             n += 1
+    # d/ altındaki her dosya bu anahtarla çözülebilmeli (yanlışlıkla konmuş şifresiz ya da yabancı dosya kalmasın)
+    bad = []
+    for root, _, files in os.walk(os.path.join(V.repo, "d")):
+        for f in files:
+            rel = os.path.relpath(os.path.join(root, f), V.repo)
+            try:
+                V.get(rel)
+            except Exception:
+                bad.append(rel)
+    if bad:
+        sys.exit("çözülemeyen dosya (şifresiz ya da başka anahtarla): " + ", ".join(bad[:10]))
+    appv = APPV_RE.search(open(os.path.join(V.repo, "app.js"), "rb").read())
+    vj = json.load(open(os.path.join(V.repo, "v.json")))
+    if vj.get("app") != app_version(V.repo) or not appv or appv.group(0) != b'const APPV = "' + vj["app"].encode() + b'";':
+        sys.exit("arayüz sürümü eski: python3 tools/medlock.py stamp")
     return n
+
+
+# ---------- şifresiz içerik denetimi (şifre gerekmez) ----------
+ALLOWED = {"index.html", "app.js", "app.css", "engine.html", "sw.js", "manifest.webmanifest", "v.json", "k.json",
+           "robots.txt", "README.md", "CLAUDE.md", ".gitignore", ".nojekyll"}
+ALLOWED_RE = re.compile(r"^(icons/[\w.-]+\.png|tools/[\w.-]+\.(py|sh|js)|tools/hooks/[\w.-]+)$")
+SECRET_RE = re.compile(rb"(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{20,}|ghs_[A-Za-z0-9]{20,})")
+PLAIN_MAGIC = (b"%PDF", b"\x1f\x8b\x08", b"RIFF", b"\x89PNG", b"\xff\xd8\xff", b"PK\x03\x04", b"ID3\x03", b"ID3\x04",
+               b"<!doctype", b"<!DOCTYPE", b"<html", b"\x00\x00\x00\x18ftyp", b"\x00\x00\x00\x20ftyp")
+
+
+def _printable(b):
+    return sum(1 for c in b if 32 <= c < 127 or c in (9, 10, 13)) / max(1, len(b))
+
+
+def _entropy(b):
+    if not b:
+        return 0.0
+    cnt = collections.Counter(b)
+    return -sum(c / len(b) * math.log2(c / len(b)) for c in cnt.values())
+
+
+def scan_plain(repo=REPO):
+    """Commit'e girecek dosyaları denetler: izin listesi dışında dosya, d/ altında şifresiz görünen dosya,
+    anahtar/şifre sızıntısı. Sorun listesini döndürür (boşsa temiz)."""
+    out = subprocess.run(["git", "-C", repo, "ls-files", "-co", "--exclude-standard"], capture_output=True, text=True)
+    files = [f for f in out.stdout.splitlines() if f and os.path.isfile(os.path.join(repo, f))]
+    pw = os.environ.get("MEDLOCK_PASS", "").encode()
+    probs = []
+    for f in files:
+        p = os.path.join(repo, f)
+        if f.startswith("d/"):
+            b = open(p, "rb").read(4096)
+            # şifreli blob rastgele görünür: bilinen dosya imzası, okunur metin ya da düşük entropi şifresiz demektir
+            if b.startswith(PLAIN_MAGIC) or (len(b) >= 8 and _printable(b[:512]) > 0.85) or (len(b) >= 2048 and _entropy(b) < 7.5):
+                probs.append("şifresiz görünüyor: " + f)
+            continue
+        if f not in ALLOWED and not ALLOWED_RE.match(f):
+            probs.append("izin listesinde değil: " + f)
+            continue
+        if f.endswith(".png"):
+            continue
+        b = open(p, "rb").read()
+        if SECRET_RE.search(b):
+            probs.append("GitHub anahtarı var: " + f)
+        if len(pw) >= 4 and pw in b:
+            probs.append("şifre yazılı: " + f)
+    return probs
 
 
 # ---------- Drive'dan gelen dosyalar ----------
 FOLDER_COURSE = {"TıbbiBiyoloji": "Tıbbi Biyoloji ve Genetik", "TıpTarihi": "Tıp Tarihi", "Biyokimya": "Biyokimya",
-                 "Biyofizik": "Biyofizik", "Biyoistatistik": "Biyoistatistik", "Psikoloji": "Psikoloji",
-                 "DavranışBilimleri": "Psikoloji", "Anatomi": "Anatomi", "Histoloji": "Histoloji ve Embriyoloji",
+                 "Biyofizik": "Biyofizik", "Biyoistatistik": "Biyoistatistik", "Psikoloji": "Davranış Bilimleri",
+                 "DavranışBilimleri": "Davranış Bilimleri", "Anatomi": "Anatomi", "Histoloji": "Histoloji ve Embriyoloji",
                  "Fizyoloji": "Fizyoloji"}
 SMALL = {"ve", "ile", "de", "da", "için", "veya", "ya", "ki", "mi"}
 
@@ -722,7 +859,7 @@ def guess_meta(V, folder, fname, texts=None, portrait=None):
     kind = "slayt"
     if leaf.endswith("Ses") or re.search(r"ses kayd", leaf, re.I):
         kind, leaf = "ses", re.sub(r"\s*Ses(\s*Kayıtları)?$", "", leaf)
-    course = FOLDER_COURSE.get(leaf) or re.sub(r"(?<=[a-zçğıöşü])(?=[A-ZÇĞİÖŞÜ])", " ", leaf) or "Diğer"
+    course = course_name(FOLDER_COURSE.get(leaf) or re.sub(r"(?<=[a-zçğıöşü])(?=[A-ZÇĞİÖŞÜ])", " ", leaf) or "Diğer")
     low = tr_lower(fname)
     if re.search(r"çıkmış|cikmis|çıkm", low):
         kind = "cikmis"
@@ -765,7 +902,7 @@ def print_plan(V, only=None):
         h = plan["saat"].get(g, {})
         print(f"\n== {g} · {h.get('toplam', '?')} saat, {h.get('hafta', '?')} hafta")
         for c, konular in dersler.items():
-            mine = [it for it in docs if it["c"] == c]
+            mine = [it for it in docs if it["c"] == course_name(c)]
             print(f"  {c} ({len(konular)} ders saati)")
             st = lambda t: {w[:5] for w in toks(t) if len(w) > 3}
             for k in konular:
@@ -793,6 +930,26 @@ def main():
     sp.add_parser("check")
     sp.add_parser("passwd")
     sp.add_parser("stamp")
+    sp.add_parser("scan")
+    td = sp.add_parser("test-dump", help="testi düzenlemek için JSON'a yaz (scratchpad'e; commit etme)")
+    td.add_argument("id")
+    td.add_argument("out")
+    tl = sp.add_parser("test-load", help="düzenlenmiş JSON'u teste geri yaz (refs ve arama dizini yenilenir)")
+    tl.add_argument("id")
+    tl.add_argument("src")
+    fn = sp.add_parser("final", help="final sınavı dönemi: başlangıç ve bitiş (YYYY-AA-GG)")
+    fn.add_argument("start")
+    fn.add_argument("end")
+    fn.add_argument("--dn", default="d1")
+    vd = sp.add_parser("add-video", help="Drive'daki videoyu kataloğa bağla (video Drive'da kalır)")
+    vd.add_argument("--folder", required=True)
+    vd.add_argument("--fid", required=True)
+    vd.add_argument("--name", required=True)
+    vd.add_argument("--by", help="yükleyen (Drive'daki sahibi)")
+    vd.add_argument("--mb")
+    vd.add_argument("--dur", help="süre, ör. 48:12")
+    for o in ("kurul", "course", "hoca", "title", "date"):
+        vd.add_argument("--" + o)
     for name in ("add-doc", "add-test"):
         a = sp.add_parser(name)
         a.add_argument("file")
@@ -805,6 +962,7 @@ def main():
         a.add_argument("--date")
         a.add_argument("--id")
         a.add_argument("--src")
+        a.add_argument("--by", help="yükleyen")
     s = sp.add_parser("set")
     s.add_argument("id")
     s.add_argument("kv", nargs="+")
@@ -820,7 +978,7 @@ def main():
     ad.add_argument("--folder", required=True, help="Drive klasörü, ör. K2/Biyokimya")
     ad.add_argument("--fid", required=True, help="Drive dosya id'si")
     ad.add_argument("--name", help="Drive'daki dosya adı (yerel ad farklıysa)")
-    for o in ("kind", "kurul", "course", "hoca", "title", "date"):
+    for o in ("kind", "kurul", "course", "hoca", "title", "date", "by"):
         ad.add_argument("--" + o)
     ad.add_argument("--dry", action="store_true", help="sadece tahmini göster")
     tdp = sp.add_parser("todo")
@@ -830,6 +988,10 @@ def main():
     tdp.add_argument("--kb", type=int, default=0)
     a = ap.parse_args()
 
+    if a.cmd == "scan":
+        probs = scan_plain()
+        print("\n".join(probs) if probs else "temiz")
+        sys.exit(1 if probs else 0)
     V = Vault(create=a.cmd == "init")
     if a.cmd == "init":
         V.save()
@@ -845,7 +1007,7 @@ def main():
         return
     elif a.cmd == "add-doc":
         it = add_doc(V, a.file, kind=a.kind, kurul=a.kurul, course=a.course, hoca=a.hoca, title=a.title,
-                     date=a.date, id=a.id, src=a.src, sub=a.sub)
+                     date=a.date, id=a.id, src=a.src, sub=a.sub, by=a.by)
         print("eklendi", it["id"], it["n"], "sayfa")
         print(compute_refs(V)); build_index(V)
     elif a.cmd == "add-test":
@@ -864,16 +1026,44 @@ def main():
         V.cat["items"].remove(it)
         if it.get("src", "").startswith("drive:"):
             V.cat.setdefault("skip", []).append(it["src"][6:])
-        p = os.path.join(V.repo, "d", it["x"])
-        shutil.rmtree(p) if os.path.isdir(p) else os.path.exists(p) and os.remove(p)
+        if it.get("x"):
+            p = os.path.join(V.repo, "d", it["x"])
+            shutil.rmtree(p) if os.path.isdir(p) else os.path.exists(p) and os.remove(p)
         build_index(V)
     elif a.cmd == "skip":
         V.cat.setdefault("skip", []).append(a.src.replace("drive:", ""))
     elif a.cmd == "known":
         print("\n".join(known_sources(V)))
         return
+    elif a.cmd == "test-dump":
+        it = V.item(a.id) or sys.exit("yok: " + a.id)
+        b = V.get_json(f"d/{it['x']}")
+        json.dump({"cfg": b["cfg"], "data": b["data"]}, open(a.out, "w"), ensure_ascii=False, indent=1)
+        print(a.out, len(b["data"]), "soru")
+        return
+    elif a.cmd == "test-load":
+        it = V.item(a.id) or sys.exit("yok: " + a.id)
+        if it["k"] != "test":
+            sys.exit("test değil: " + a.id)
+        j = json.load(open(a.src))
+        b = V.get_json(f"d/{it['x']}")
+        b["cfg"], b["data"] = j["cfg"], j["data"]
+        it["n"] = len(j["data"])
+        it["tp"] = collections.Counter(q["t"] for q in j["data"]).most_common()
+        write_test(V, it, b)
+        print(compute_refs(V)); build_index(V)
+    elif a.cmd == "add-video":
+        it = add_video(V, a.fid, a.folder, a.name, by=a.by, mb=a.mb, dur=a.dur, kurul=a.kurul, course=a.course,
+                       hoca=a.hoca, title=a.title, date=a.date)
+        print("video eklendi", it["id"], it["g"], it["c"], "·", it["t"])
+    elif a.cmd == "final":
+        d = next((x for x in V.cat["donemler"] if x["id"] == a.dn), None) or sys.exit("dönem yok: " + a.dn)
+        d["final"] = {"start": a.start, "end": a.end}
+        print(d["name"], "final dönemi:", a.start, "–", a.end)
     elif a.cmd == "add-drive":
         name = a.name or os.path.basename(a.file)
+        if VIDEO_EXT.search(name):
+            sys.exit("video dosyası: add-video kullan (video indirilmez, Drive'da kalır)")
         txt = subprocess.run(["pdftotext", "-l", "2", "-enc", "UTF-8", a.file, "-"], capture_output=True, text=True).stdout.split("\f")
         info = subprocess.run(["pdfinfo", a.file], capture_output=True, text=True).stdout
         sz = [l for l in info.splitlines() if l.startswith("Page size:")]
@@ -882,7 +1072,7 @@ def main():
             pw, ph = (float(x) for x in sz[0].split(":", 1)[1].split("pts")[0].split("x"))
             portrait = pw < ph
         m = guess_meta(V, a.folder, name, txt, portrait)
-        for o in ("kind", "kurul", "course", "hoca", "title", "date"):
+        for o in ("kind", "kurul", "course", "hoca", "title", "date", "by"):
             if getattr(a, o):
                 m[o] = getattr(a, o)
         print("tahmin:", json.dumps(m, ensure_ascii=False))
@@ -919,6 +1109,9 @@ def main():
     elif a.cmd == "index":
         print(build_index(V))
     elif a.cmd == "check":
+        probs = scan_plain()
+        if probs:
+            sys.exit("ŞİFRESİZ/SIZINTI:\n  " + "\n  ".join(probs))
         print("ok", check(V), "blob")
         return
     V.save()

@@ -37,6 +37,71 @@ BRIDGE_CSS = """<style>
 </style>"""
 
 
+# MedLock'a özgü motor değişiklikleri. build() bunları uygular; mevcut engine.html'e uygulamak için:
+#   python3 tools/make_engine.py --apply
+ML_CSS = """<style>
+/* MedLock içinde: başlık uygulamanın üst çubuğunda; motorun büyük başlığı gizli, araç satırı ince */
+html.ml .cover h1{display:none}
+html.ml .cover{padding-top:14px}
+html.ml .eyebrow{margin-bottom:4px}
+html.ml .top{padding-block:8px;margin-bottom:12px;flex-wrap:nowrap}
+html.ml .top .brand{display:none}
+html.ml .top .tools{flex:1;flex-wrap:nowrap;gap:6px;min-width:0}
+html.ml .top .tools .sp{flex:1}
+html.ml .top .tools .btn{padding:6px 11px;font-size:13px}
+html.ml .top .chip{padding:3px 9px;font-size:12px}
+/* başlat düğmesi ekranın altında sabit */
+.gobar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--line)}
+.gobar .go{width:100%;max-width:520px;justify-content:center;padding:12px 16px;font-size:15px}
+body.has-gobar{padding-bottom:84px}
+.ml-rep{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:10px;font:600 12.5px var(--f-ui,system-ui);color:var(--muted,#666);padding:4px 2px}
+.ml-rep:hover{color:var(--bad,#b00)}
+</style>"""
+PATCHES = [
+    # MedLock içinde mi? (başlık gizleme vb. için)
+    ("<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();</script>",
+     "<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();if(window.ML)document.documentElement.classList.add(\"ml\");</script>\n" + ML_CSS),
+    # tek başlık: araç satırı kısa mod adıyla, düğmeler sağda
+    ("h += '<div class=\"tools\"><span class=\"chip\">' + MODE_NAME[r.mode] + '</span>'",
+     "h += '<div class=\"tools\"><span class=\"chip\">' + (window.ML ? MODE_SHORT : MODE_NAME)[r.mode] + '</span>'"),
+    ("+ '<button class=\"btn ghost\" type=\"button\" data-act=\"home\">Kapak</button>'\n      + (r.finished",
+     "+ '<span class=\"sp\"></span><button class=\"btn ghost\" type=\"button\" data-act=\"home\">Kapak</button>'\n      + (r.finished"),
+    ("h += '<div class=\"tools\"><button class=\"btn ghost\" type=\"button\" data-act=\"home\">Kapak</button></div>';",
+     "h += '<div class=\"tools\"><span class=\"sp\"></span><button class=\"btn ghost\" type=\"button\" data-act=\"home\">Kapak</button></div>';"),
+    ("const MODE_NAME = { study:\"Çalışma modu\", exam:\"Sınav modu\", timed:\"Zamana karşı\" };",
+     "const MODE_NAME = { study:\"Çalışma modu\", exam:\"Sınav modu\", timed:\"Zamana karşı\" };\nconst MODE_SHORT = { study:\"Çalışma\", exam:\"Sınav\", timed:\"Zamana karşı\" };"),
+    # başlat düğmesi: ekranın altında sabit çubuk, seçili soru sayısıyla
+    ("    + '<button class=\"btn primary go\" type=\"submit\">Denemeye başla</button>'\n    + resume\n    + '</form>'",
+     "    + resume\n    + '</form>'\n    + '<div class=\"gobar\"><button class=\"btn primary go\" type=\"submit\" form=\"setup\">Başla · <span id=\"go-n\">' + nSel + '</span> soru</button></div>'"),
+    ("  top.hidden = S.view === \"start\";",
+     "  top.hidden = S.view === \"start\";\n  document.body.classList.toggle(\"has-gobar\", S.view === \"start\");"),
+    ("  [\"all\",\"custom\"].concat(CFG.courses.map(c => c.code)).forEach(k => { const el = document.getElementById(\"n-\" + k); if(el) el.textContent = setIds(k).length; });",
+     "  [\"all\",\"custom\"].concat(CFG.courses.map(c => c.code)).forEach(k => { const el = document.getElementById(\"n-\" + k); if(el) el.textContent = setIds(k).length; });\n  const gn = document.getElementById(\"go-n\"); if(gn) gn.textContent = setIds(S.set).length;"),
+    # optik form: başka sorunun satırına dokunmak önce o soruya götürür; işaret yalnız açık sorunun satırında değişir
+    ("return '<div class=\"row ' + CC(q.c) + (k === r.cur ? \" cur\" : \"\") + '\">",
+     "return '<div class=\"row ' + CC(q.c) + (k === r.cur ? \" cur\" : \"\") + '\" data-act=\"jump\" data-k=\"' + k + '\">"),
+    ("      const k = +el.dataset.k, i = +el.dataset.i; r.cur = k; r.confirm = false;\n      if(r.mode !== \"study\" && !r.finished){ const id = r.ids[k]; if(r.ans[id] === i) delete r.ans[id]; else r.ans[id] = i; }\n      save(); render(); if(r.mode === \"study\" || r.finished) bringCardIntoView();\n      break;",
+     "      const k = +el.dataset.k, i = +el.dataset.i;\n      if(k !== r.cur){ r.cur = k; r.confirm = false; save(); render(); bringCardIntoView(); break; }\n      choose(i);\n      break;"),
+    ("+ '<small>Numaraya dokun, o soruya git</small></button>'",
+     "+ '<small>Satıra dokun, o soruya git; şıkkı orada işaretle</small></button>'"),
+    # hata bildir
+    ("+ '</div>' + (window.ML ? ML.btn(q.id) : '') + '</div>';",
+     "+ '</div>' + (window.ML ? ML.btn(q.id) : '') + (window.ML && ML.rep ? ML.rep(q.id) : '') + '</div>';"),
+]
+
+
+def apply_patches(s, strict=True):
+    for a, b in PATCHES:
+        if b in s:
+            continue
+        if s.count(a) != 1:
+            if strict:
+                sys.exit("yama uygulanamadı: " + a[:70])
+            continue
+        s = s.replace(a, b)
+    return s
+
+
 def build(test_html):
     s = open(test_html, encoding="utf8").read()
     dec = json.JSONDecoder()
@@ -56,11 +121,17 @@ def build(test_html):
     post = rep(post, "function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }",
                "function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} try{ window.ML && ML.save(S); }catch(e){} }")
     post = rep(post, "S.run = { label, ids:list,", "S.run = { mlid: Date.now(), label, ids:list,")
-    out = pre + "/*ML_DATA*/" + post
+    out = apply_patches(pre + "/*ML_DATA*/" + post)
     assert "</script>" in post
     open(os.path.join(REPO, "engine.html"), "w", encoding="utf8").write(out)
     print("engine.html", len(out))
 
 
 if __name__ == "__main__":
-    build(sys.argv[1])
+    if sys.argv[1:] == ["--apply"]:
+        p = os.path.join(REPO, "engine.html")
+        s = open(p, encoding="utf8").read()
+        open(p, "w", encoding="utf8").write(apply_patches(s))
+        print("engine.html yamalandı")
+    else:
+        build(sys.argv[1])
