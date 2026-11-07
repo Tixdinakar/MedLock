@@ -1,6 +1,7 @@
 # MedLock: bakım notları (Claude için)
 
 Repo sahibinin (tıp, Dönem 1) kişisel ders arşivi. Sadece o ve bir arkadaşı kullanır.
+Cihazlar: Android telefon ve tablet, PC (Chrome tabanlı). iOS/Safari yok; denetimler Chromium'da yeterli.
 Site: https://tixdinakar.github.io/MedLock/ (GitHub Pages, `main` dalının kökü).
 
 ## Kesin kurallar
