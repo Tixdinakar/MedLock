@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.1.4";
+const VERSION = "1.1.5";
 const CHANGES = [
+  { v: "1.1.5", d: "2026-11-07", l: [
+    "Kütüphane’de yeni bölüm: Seçmeli Dersler (ilk ders: Kanser ve Kök Hücre, not ve 100 soruluk vize denemesi)",
+  ] },
   { v: "1.1.4", d: "2026-11-07", l: [
     "Telefonun geri tuşu önce açık pencereyi ya da testteki slayt panelini kapatıyor, testten çıkmıyor",
     "Alt sekmelere ya da yoldaki Kurul/Ders düğmesine basınca geçmiş uzamıyor; geri tuşu geldiğin yolu yukarı doğru izliyor",
@@ -34,7 +37,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "14e697c7c9";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "8cacbf0e5c";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -228,7 +231,10 @@ const loadTexts = async it => S.texts[it.id] || (S.texts[it.id] = await fetchJSO
 let engineP = null;
 const engineTpl = () => engineP || (engineP = fetch("engine.html").then(r => { if (!r.ok) throw new Error("engine"); return r.text(); }));
 
-const kurulById = id => id === "ortak" ? Object.assign({ no: "", start: "", end: "" }, S.cat.ortak) : S.cat.kurullar.find(k => k.id === id);
+// Kurul dışı gruplar: ortak dersler ve seçmeli dersler (tarihsiz, kurul numarası yok)
+const SPECIAL = { ortak: "Ortak Dersler", secmeli: "Seçmeli Dersler" };
+const kurulById = id => SPECIAL[id] ? Object.assign({ no: "", start: "", end: "" }, { id, name: SPECIAL[id], dn: "d1" }, S.cat[id]) : S.cat.kurullar.find(k => k.id === id);
+const specialGs = () => Object.keys(SPECIAL).filter(g => S.cat.items.some(i => i.g === g));
 const DEFDN = { id: "d1", no: "I", name: "Dönem I" };
 const donemler = () => S.cat.donemler && S.cat.donemler.length ? S.cat.donemler : [DEFDN];
 const donemById = id => donemler().find(d => d.id === id) || donemler()[0];
@@ -440,7 +446,7 @@ function shell() {
     + '<a data-nav="lib" href="#/lib">' + icon("lib") + 'Kütüphane</a>'
     + (cxAny() ? '<a class="sub" data-nav="cikmis" href="#/cikmis">Çıkmışlar</a>' : "")
     + kl.map(k => '<a class="sub" data-nav="k:' + k.id + '" href="#/lib/' + k.id + '">Kurul ' + k.no + '</a>').join("")
-    + (S.cat.items.some(i => i.g === "ortak") ? '<a class="sub" data-nav="k:ortak" href="#/lib/ortak">Ortak dersler</a>' : "")
+    + specialGs().map(g => '<a class="sub" data-nav="k:' + g + '" href="#/lib/' + g + '">' + (g === "ortak" ? "Ortak dersler" : "Seçmeli dersler") + "</a>").join("")
     + '<a data-nav="tekrar" href="#/tekrar">' + icon("rep") + 'Tekrar<span class="badge" data-badge hidden></span></a>'
     + '<a data-nav="ilerleme" href="#/ilerleme">' + icon("chart") + 'İlerleme</a>'
     + '<a data-nav="karma" href="#/karma">' + icon("mix") + 'Karma deneme</a>'
@@ -663,7 +669,7 @@ function cxGroups() {
   };
   S.cat.items.forEach(it => { if (it.k === "test" && it.cx) slot(it.g, it.c).tests.push(it); else if (it.k === "cikmis") slot(it.g, it.c).pdfs.push(it); });
   (S.cat.todo || []).filter(t => t.kind === "cikmis").forEach(t => slot(t.g, t.c).pend.push(t));
-  const order = S.cat.kurullar.map(k => k.id).concat(["ortak"]);
+  const order = S.cat.kurullar.map(k => k.id).concat(Object.keys(SPECIAL));
   return Array.from(K.entries()).sort((a, b) => order.indexOf(b[0]) - order.indexOf(a[0]))
     .map(([g, m]) => ({ g, k: kurulById(g), rows: Array.from(m.values()).sort((a, b) => a.c.localeCompare(b.c, "tr")) }));
 }
@@ -800,9 +806,9 @@ function viewLib(q) {
   const sec = d => {
     const ks = S.cat.kurullar.filter(k => (k.dn || "d1") === d.id);
     const started = ks.filter(k => k.start <= t).reverse(), future = ks.filter(k => k.start > t);
-    const ortak = S.cat.ortak && (S.cat.ortak.dn || "d1") === d.id && S.cat.items.some(i => i.g === "ortak");
+    const sp = specialGs().map(kurulById).filter(k => (k.dn || "d1") === d.id);
     return '<h2 class="sec" id="dn-' + d.id + '">' + esc(d.name) + (d.yil ? ' <span class="muted">· ' + esc(d.yil) + "</span>" : "") + "</h2>"
-      + '<div class="grid">' + started.map(k => card(k)).join("") + (ortak ? card(kurulById("ortak")) : "") + future.map(k => card(k, "future")).join("") + "</div>";
+      + '<div class="grid">' + started.map(k => card(k)).join("") + sp.map(k => card(k)).join("") + future.map(k => card(k, "future")).join("") + "</div>";
   };
   main().innerHTML = bar({ title: "Kütüphane", crumb: crumbs([["Tıp", ""]]) }) + '<div class="page">'
     + (cxAny() ? '<a class="card tile" href="#/cikmis" style="margin-top:4px"><span class="big">' + icon("star") + '</span><span class="txt"><b>Çıkmışlar</b><span class="muted small">Kurul sınavlarının çıkmış soruları: çözülebilir test ve orijinal PDF</span></span>' + icon("chev", "chev") + "</a>" : "")
@@ -824,7 +830,7 @@ function viewKurul(g) {
       const cnt = KORDER.map(kk => [kk, o.items.filter(i => i.k === kk && !(kk === "test" && i.cx)).length]).filter(x => x[1]).map(x => "<span><b>" + x[1] + "</b> " + KIND[x[0]].l.toLowerCase() + "</span>").join("");
       return '<a class="course" href="#/lib/' + g + "/" + slug(o.c) + '"><span class="bar-c" style="background:' + ccol(o.c) + '"></span><span class="txt"><b>' + esc(o.c) + '</b><span class="cnt">' + cnt + "</span></span>" + icon("chev", "chev") + "</a>";
     }).join("") + "</div>" : '<div class="card empty">Bu kurula henüz içerik eklenmedi. Ders dosyaları Drive’a yüklendikçe burada görünecek.</div>')
-    + kurulSection(g, "test", "Bu kuruldaki testler", "test")
+    + kurulSection(g, "test", k.no ? "Bu kuruldaki testler" : "Testler", "test")
     + (cx ? '<h2 class="sec" id="sec-cikmis">Çıkmışlar</h2><div class="card list"><a class="it" href="#/cikmis?g=' + g + '">' + kindBox("cikmis") + '<div class="txt"><div class="t">Kurul ' + esc(k.no) + ' çıkmışları</div><div class="m"><span>' + cx.rows.map(r => esc(r.c)).join(" · ") + "</span></div></div>" + icon("chev", "chev") + "</a></div>" : "")
     + "</div>";
   const sec = parseHash().q.get("s");
@@ -1963,7 +1969,7 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); instal
 async function viewSettings() {
   setNav("ayarlar");
   const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate().catch(() => null) : null;
-  const ks = S.cat.kurullar.filter(k => S.cat.items.some(i => i.g === k.id)).concat(S.cat.items.some(i => i.g === "ortak") ? [kurulById("ortak")] : []);
+  const ks = S.cat.kurullar.filter(k => S.cat.items.some(i => i.g === k.id)).concat(specialGs().map(kurulById));
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
   const syncTxt = !syncOn() ? "Senkron kapalı: ilerleme yalnız bu cihazda." : SY.err ? "Senkron hatası: " + SY.err : SY.last ? "Senkron açık · son eşitleme " + new Date(SY.last).toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" }) : "Senkron açık";
   main().innerHTML = bar({ title: "Ayarlar" }) + '<div class="page narrow">'
