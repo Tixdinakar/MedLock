@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.3.1";
+const VERSION = "1.3.2";
 const CHANGES = [
+  { v: "1.3.2", d: "2026-11-08", l: [
+    "Testte işlem alanı: kalemle yaz, parmakla sayfayı kaydır; silgi, geri al, temizle. Hesaplı sorularda kendiliğinden açık, diğerlerinde “İşlem alanı”na dokun",
+    "Sonuçtaki “Bakman gereken slaytlar”: bir numaraya dokununca o destenin bütün işaretli sayfaları vurgulu açılır; üstteki ‹ › ile aralarında geçersin",
+  ] },
   { v: "1.3.1", d: "2026-11-08", l: [
     "Hocanın derste vurguladığı ya da \"soru olarak geldi\" dediği yerler slaytın altında işaretli; slaytın sonunda listesi, ders sayfasında sayısı var (ses kaydı olan derslerde)",
     "Kurul sayfasında \"Çevrimdışı indir\"; sınava 1 hafta kala ana sayfadaki sınav satırında da çıkıyor, indirilmişse \"İndirildi\" yazıyor",
@@ -84,7 +88,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "259a78196a";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "ee84906f34";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1213,11 +1217,14 @@ function hvSheet(it, p) {
 function mountDoc(el, it, page, opts) {
   opts = opts || {};
   const hl = new Set(opts.highlight || []);
-  let html = "";
+  // est: true (hepsi tahmini) ya da tahmini sayfaların kümesi
+  const isEst = p => opts.est instanceof Set ? opts.est.has(p) : !!opts.est;
+  const hls = Array.from(hl).sort((a, b) => a - b);
+  let html = hls.length > 1 ? '<div class="hlnav"><div><button type="button" class="ibtn" data-hn="-1" aria-label="Önceki işaretli sayfa">' + icon("back") + '</button><span>İşaretli <b class="hli">–</b> / ' + hls.length + '</span><button type="button" class="ibtn" data-hn="1" aria-label="Sonraki işaretli sayfa">' + icon("back") + "</button></div></div>" : "";
   for (let p = 1; p <= it.n; p++) {
     // sayfa numarası ve "soruyla ilgili" etiketi görselin üstüne değil altına yazılır
     html += '<figure class="pg' + ((it.r || 1.333) < 1 ? " portrait" : "") + (hl.has(p) ? " hl" : "") + '" data-p="' + p + '"><div class="pgi"><div class="ph" style="--ar:' + (it.r || 1.333) + '">' + p + "</div></div>"
-      + '<figcaption class="pn">' + p + " / " + it.n + (hl.has(p) ? ' <b class="hlt">' + (opts.est ? "tahmini sayfa" : "soruyla ilgili") + "</b>" : "") + hvBadge(it, p) + "</figcaption></figure>";
+      + '<figcaption class="pn">' + p + " / " + it.n + (hl.has(p) ? ' <b class="hlt">' + (isEst(p) ? "tahmini sayfa" : "soruyla ilgili") + "</b>" : "") + hvBadge(it, p) + "</figcaption></figure>";
   }
   el.innerHTML = html + (opts.foot || "");
   el.querySelectorAll("[data-hv]").forEach(b => b.onclick = e => { e.stopPropagation(); hvSheet(it, +b.dataset.hv); });
@@ -1242,12 +1249,18 @@ function mountDoc(el, it, page, opts) {
     if (el.scrollTop > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 2) p = it.n;
     else { const y = el.scrollTop + Math.max(40, el.clientHeight * 0.12); for (const f of figs) { if (f.offsetTop <= y) p = +f.dataset.p; else break; } }
     if (p !== curP) { curP = p; opts.onPage && opts.onPage(p); }
+    hlLbl();
   };
+  const hlLbl = () => { const b = el.querySelector(".hli"); if (b) { const i = hls.filter(x => x <= curP).length; b.textContent = hls.includes(curP) || i ? String(i || 1) : "–"; } };
   const onScroll = () => { if (!raf) raf = requestAnimationFrame(calc); };
   el.addEventListener("scroll", onScroll, { passive: true });
   figs.forEach(f => io.observe(f));
   const goto = (p, smooth) => { const f = el.querySelector('[data-p="' + Math.min(Math.max(p, 1), it.n) + '"]'); if (f) { loadP(f); el.scrollTo({ top: f.offsetTop - 8, behavior: smooth ? "smooth" : "auto" }); } };
-  requestAnimationFrame(() => goto(page));
+  requestAnimationFrame(() => { goto(page); hlLbl(); });
+  el.querySelectorAll("[data-hn]").forEach(b => b.onclick = () => {
+    const d = +b.dataset.hn, t = d > 0 ? hls.find(x => x > curP) : hls.slice().reverse().find(x => x < curP);
+    if (t) { curP = t; goto(t, true); opts.onPage && opts.onPage(t); hlLbl(); } else toast(d > 0 ? "Son işaretli sayfadasın" : "İlk işaretli sayfadasın");
+  });
   const reload = p => {
     const f = el.querySelector('[data-p="' + p + '"]'); if (!f) return;
     const img = f.querySelector("img"); if (img) { const ph = document.createElement("div"); ph.className = "ph"; ph.style.setProperty("--ar", img.naturalWidth / img.naturalHeight); img.replaceWith(ph); }
@@ -1275,10 +1288,11 @@ function viewDoc(id, page, q) {
     + (rel.length ? '<b>Bu ' + (it.k === "slayt" ? "slayttan" : "dosyadan") + " soru olan testler</b><div class=\"row-btns\">"
       + rel.map(t => '<a class="btn" href="#/t/' + t.id + '">' + icon("test") + esc(t.c === it.c ? t.t : t.c + " · " + t.t) + ' <span class="muted">' + (t.dk.find(d => d[0] === it.id)[1]) + " soru</span></a>").join("") + "</div>" : "")
     + "</div>";
-  const hl = (q && q.get("h") || "").split(",").map(Number).filter(Boolean);
+  const hraw = (q && q.get("h") || "").split(",").filter(Boolean);
+  const hl = hraw.map(x => +x.replace("~", "")).filter(Boolean), hest = new Set(hraw.filter(x => x[0] === "~").map(x => +x.slice(1)));
   let saveT = 0;
   const V = mountDoc($("#doc"), it, page, {
-    highlight: hl, est: q && q.get("e") === "1", foot,
+    highlight: hl, est: q && q.get("e") === "1" ? true : hest, foot,
     onPage: p => {
       $("#pgc").textContent = p + " / " + it.n;
       $("#bmb").innerHTML = icon(bmHas(it.id, p) ? "bmf" : "bm");
@@ -1341,7 +1355,10 @@ function viewDoc(id, page, q) {
 
 /* ---------- slide panel (from tests & review) ---------- */
 let slideTok = null;
-function openSlide(docId, pages, est) {
+function openSlide(docId, pages, est, start) {
+  start = start || pages[0];
+  const isEst = p => est instanceof Set ? est.has(p) : !!est;
+  const hq = pages.map(p => (isEst(p) && est instanceof Set ? "~" : "") + p).join(",") + (est === true ? "&e=1" : "");
   const it = S.byId[docId];
   if (!it) return toast("Bu kaynak henüz kütüphanede yok.");
   const wasOpen = $("#spane") && !$("#spane").hidden;
@@ -1350,8 +1367,8 @@ function openSlide(docId, pages, est) {
   if (!pane) { pane = document.createElement("aside"); pane.className = "spane"; pane.id = "spane"; pane.dataset.float = "1"; document.body.appendChild(pane); }
   pane.hidden = false;
   pane.innerHTML = '<div class="shead"><button class="ibtn" data-sclose aria-label="Kapat">' + icon(innerWidth < 900 ? "back" : "close") + '</button><div class="t">' + esc(it.t)
-    + "<small>" + (est ? "Tahmini " : "") + (it.k === "slayt" ? "slayt " : "sayfa ") + esc(pages.join(", ")) + " · " + esc(it.c) + '</small></div><a class="ibtn" href="#/d/' + it.id + "/" + pages[0] + "?h=" + pages.join(",") + (est ? "&e=1" : "") + '" title="Tam ekran aç">' + icon("expand") + '</a></div><div class="doc"></div>';
-  pane._v = mountDoc($(".doc", pane), it, pages[0], { highlight: pages, est });
+    + "<small>" + (est === true ? "Tahmini " : "") + (it.k === "slayt" ? "slayt " : "sayfa ") + esc(pages.length > 6 ? pages.length + " sayfa işaretli" : pages.map(p => (isEst(p) && est instanceof Set ? "~" : "") + p).join(", ")) + " · " + esc(it.c) + '</small></div><a class="ibtn" href="#/d/' + it.id + "/" + start + "?h=" + hq + '" title="Tam ekran aç">' + icon("expand") + '</a></div><div class="doc"></div>';
+  pane._v = mountDoc($(".doc", pane), it, start, { highlight: pages, est });
   $("[data-sclose]", pane).onclick = () => closeSlide(false);
   if (!wasOpen || !slideTok) slideTok = ovOpen(() => closeSlide(true));   // telefonun geri tuşu paneli kapatsın
   S.cleanup.push(() => { slideTok = null; closeSlide(true); });
@@ -1411,7 +1428,10 @@ window.MLBridge = function (win) {
     if (!b) return;
     e.preventDefault();
     if (b.dataset.ml) { const r = C.blob.refs[b.dataset.ml]; if (r) openSlide(r[0], r[1], r[2]); }
-    else openSlide(b.dataset.mld, b.dataset.mlp.split(",").map(Number), b.dataset.est === "1");
+    else if (b.dataset.mlh) {
+      const h = b.dataset.mlh.split(",");
+      openSlide(b.dataset.mld, h.map(x => +x.replace("~", "")), new Set(h.filter(x => x[0] === "~").map(x => +x.slice(1))), +b.dataset.mlp);
+    } else openSlide(b.dataset.mld, b.dataset.mlp.split(",").map(Number), b.dataset.est === "1");
   });
   return {
     btn(qid) {
@@ -1432,11 +1452,14 @@ window.MLBridge = function (win) {
       if (!g.size) return "";
       const rows = Array.from(g.entries()).sort((a, b) => b[1].n - a[1].n).map(([id, o]) => {
         const d = S.byId[id];
-        const chips = Array.from(o.pages.entries()).sort((a, b) => a[0] - b[0]).map(([p, est]) =>
-          '<button type="button" class="ml-chip' + (est ? " est" : "") + '" data-mld="' + id + '" data-mlp="' + p + '" data-est="' + (est ? 1 : 0) + '">' + (est ? "~" : "") + p + "</button>").join("");
-        return '<div class="ml-deck"><b>' + esc(d.t) + '<span class="ml-n">' + o.n + " soru</span></b><div class=\"ml-chips\">" + chips + "</div></div>";
+        const ps = Array.from(o.pages.entries()).sort((a, b) => a[0] - b[0]);
+        const all = ps.map(([p, est]) => (est ? "~" : "") + p).join(",");
+        const chips = ps.map(([p, est]) =>
+          '<button type="button" class="ml-chip' + (est ? " est" : "") + '" data-mld="' + id + '" data-mlp="' + p + '" data-mlh="' + all + '">' + (est ? "~" : "") + p + "</button>").join("");
+        return '<div class="ml-deck"><b>' + esc(d.t) + '<span class="ml-n">' + o.n + " soru</span></b><div class=\"ml-chips\">" + chips
+          + (ps.length > 1 ? '<button type="button" class="ml-chip ml-all" data-mld="' + id + '" data-mlp="' + ps[0][0] + '" data-mlh="' + all + '">Hepsi · ' + ps.length + " sayfa →</button>" : "") + "</div></div>";
       }).join("");
-      return '<div class="panel"><h2>Bakman gereken slaytlar</h2><div class="ml-decks">' + rows + '</div><p class="ml-note">Numaraya dokununca o sayfa açılır. Kesikli çerçeveli (~) numaralar tahminidir.</p></div>';
+      return '<div class="panel"><h2>Bakman gereken slaytlar</h2><div class="ml-decks">' + rows + '</div><p class="ml-note">Numaraya dokununca deste o sayfada açılır; bu destedeki bütün işaretli sayfalar vurgulu olur, üstteki ‹ › ile aralarında geçersin. Kesikli çerçeveli (~) numaralar tahminidir.</p></div>';
     },
     rep(qid) { return '<button type="button" class="ml-rep" data-mlr="' + esc(qid) + '">⚑ Hata bildir</button>'; },
     fb(run, ok, n) { return fbPanel(C, run, ok, n); },

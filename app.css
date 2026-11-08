@@ -639,3 +639,12 @@ div.hvr{cursor:default;margin-bottom:6px}
 .hvr b{font-size:14px}.hvr span{font-size:14px}.hvr small{color:var(--muted);font-size:12px}
 .tag.hv{color:var(--flame)}
 .btn.done{opacity:.8}
+
+/* 1.3.1: işaretli sayfalar arasında gezinme şeridi (slayt ve yan panel) */
+.hlnav{position:sticky;top:6px;z-index:4;height:0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none}
+.hlnav>div{pointer-events:auto;display:inline-flex;align-items:center;gap:2px;padding:2px 4px;border-radius:999px;background:rgba(17,24,39,.92);color:#fff;box-shadow:0 3px 12px rgba(0,0,0,.28);font:600 13px var(--f-ui,system-ui)}
+.hlnav>div span{padding:0 6px;white-space:nowrap}
+.hlnav .ibtn{width:34px;height:34px;color:#fff;background:transparent;border:0}
+.hlnav .ibtn:hover,.hlnav .ibtn:focus-visible{background:rgba(255,255,255,.14)}
+.hlnav [data-hn="1"] svg{transform:rotate(180deg)}
+.shell.fs .hlnav{top:58px}

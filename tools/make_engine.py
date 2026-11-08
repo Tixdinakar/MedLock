@@ -261,6 +261,119 @@ html.mlfs body.dock-r .sheet.docked .sheet-head{padding-right:56px}
 ]
 
 
+# 1.3.1 işlem alanı
+PATCHES += [
+    (r"""function unsHTML(r, id){""",
+     r"""/* 1.3.1 işlem alanı: kalem yazar, parmak sayfayı kaydırır (isteğe bağlı parmakla da yazılır); silgi, geri al, temizle */
+const SCRK = KEY + ".scr";
+let SCR = {}; try{ SCR = JSON.parse(sessionStorage.getItem(SCRK) || "{}") || {}; }catch(e){ SCR = {}; }
+const scrUI = { open:{}, finger:false, tool:"pen", big:false };
+try{ scrUI.finger = localStorage.getItem("ml.scrf") === "1"; }catch(e){}
+let scrRO = null;
+function scrSave(){ try{ sessionStorage.setItem(SCRK, JSON.stringify(SCR)); }catch(e){} }
+function isCalc(q){
+  const t = plain((q.p || "") + " " + q.q + " " + (q.q2 || "") + " " + (q.l || []).join(" ") + " " + (q.o || []).join(" "));
+  return /\d/.test(t) && /hesapla|kaçtır|kaç olur|kaç olarak|kaç bulunur|değeri nedir|değeri kaç|ortalama|standart sapma|varyans|medyan|ortanca|yüzde/i.test(t) && (t.match(/\d+(?:[.,]\d+)?/g) || []).length >= 2;
+}
+function scrHTML(id){
+  const q = byId[id], has = SCR[id] && SCR[id].s && SCR[id].s.length;
+  const open = scrUI.open[id] !== undefined ? scrUI.open[id] : (has || isCalc(q));
+  if(!open) return '<button type="button" class="scr-open" data-act="scr" data-t="open">✎ İşlem alanı</button>';
+  const b = (t, l, on) => '<button type="button" class="stb' + (on ? " on" : "") + '" data-act="scr" data-t="' + t + '">' + l + '</button>';
+  return '<div class="scr" id="scr"><div class="scr-bar"><b>İşlem alanı</b>'
+    + b("pen", "Kalem", scrUI.tool === "pen") + b("er", "Silgi", scrUI.tool === "er") + b("undo", "Geri al") + b("clr", "Temizle")
+    + b("fin", "Parmakla da yaz", scrUI.finger) + b("big", scrUI.big ? "Küçült" : "Büyüt") + b("close", "Kapat") + '</div>'
+    + '<canvas id="scrc"' + (scrUI.big ? ' class="big"' : '') + ' aria-label="İşlem alanı"></canvas>'
+    + '<p class="scr-n">' + (scrUI.finger ? "Parmak da yazıyor; sayfayı alanın dışından kaydır." : "Kalem yazar, parmak sayfayı kaydırır. Kalemin silgi tuşu da siler.") + ' Çizimler bu test açıkken her soruda ayrı durur.</p></div>';
+}
+function scrMount(){
+  if(scrRO){ scrRO.disconnect(); scrRO = null; }
+  const cv = document.getElementById("scrc"); if(!cv || !S.run) return;
+  const id = S.run.ids[S.run.cur];
+  const d = SCR[id] || (SCR[id] = { w:0, s:[] });
+  const ctx = cv.getContext("2d");
+  let W = 0, H = 0, cur = null, erasing = false, pid = null;
+  const k = () => W / (d.w || W || 1);
+  const ink = () => getComputedStyle(cv).color;
+  const line = (st, from) => {
+    const f = k(); ctx.strokeStyle = ink(); ctx.fillStyle = ctx.strokeStyle; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if(st.length === 1){ ctx.beginPath(); ctx.arc(st[0][0] * f, st[0][1] * f, 1.5, 0, 7); ctx.fill(); return; }
+    for(let i = Math.max(1, from || 1); i < st.length; i++){
+      const a = st[i - 1], b = st[i];
+      ctx.lineWidth = (1.3 + 2.4 * b[2] / 100) * Math.max(.6, f);
+      ctx.beginPath(); ctx.moveTo(a[0] * f, a[1] * f); ctx.lineTo(b[0] * f, b[1] * f); ctx.stroke();
+    }
+  };
+  const draw = () => { ctx.clearRect(0, 0, W, H); d.s.forEach(st => line(st)); };
+  const size = () => {
+    const rc = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    W = rc.width; H = rc.height; if(!W) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if(!d.w) d.w = W;
+    draw();
+  };
+  const pos = e => { const rc = cv.getBoundingClientRect(), f = k(); return [Math.round((e.clientX - rc.left) / f * 10) / 10, Math.round((e.clientY - rc.top) / f * 10) / 10, Math.round((e.pressure > 0 ? e.pressure : .5) * 100)]; };
+  const canDraw = e => e.pointerType === "pen" || e.pointerType === "mouse" || scrUI.finger;
+  const setTA = e => { cv.style.touchAction = (e.pointerType === "pen" || scrUI.finger) ? "none" : "pan-y"; };
+  const eraseAt = p => { const R = 12 / k(), n = d.s.length; d.s = d.s.filter(st => !st.some(q => Math.abs(q[0] - p[0]) < R && Math.abs(q[1] - p[1]) < R)); if(d.s.length !== n) draw(); };
+  cv.style.touchAction = scrUI.finger ? "none" : "pan-y";
+  cv.addEventListener("pointerover", setTA);
+  cv.addEventListener("pointerdown", e => {
+    setTA(e);
+    if(!canDraw(e) || pid !== null) return;
+    e.preventDefault(); pid = e.pointerId; try{ cv.setPointerCapture(pid); }catch(_){}
+    erasing = scrUI.tool === "er" || (e.buttons & 32) === 32 || e.button === 5;
+    const p = pos(e);
+    if(erasing) eraseAt(p); else { cur = [p]; d.s.push(cur); line(cur); }
+  });
+  cv.addEventListener("pointermove", e => {
+    if(e.pointerId !== pid){ if(pid === null) setTA(e); return; }
+    e.preventDefault();
+    const evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+    (evs.length ? evs : [e]).forEach(ev => { const p = pos(ev); if(erasing) eraseAt(p); else if(cur){ cur.push(p); line(cur, cur.length - 1); } });
+  });
+  const end = e => { if(e.pointerId !== pid) return; pid = null; scrSave(); cur = null; erasing = false; };
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", e => { if(e.pointerId === pid && cur && cur.length < 3){ d.s.splice(d.s.indexOf(cur), 1); draw(); } end(e); });
+  size();
+  if(window.ResizeObserver){ scrRO = new ResizeObserver(() => { if(!cv.isConnected) return; const rc = cv.getBoundingClientRect(); if(Math.abs(rc.width - W) > 1 || Math.abs(rc.height - H) > 1) size(); }); scrRO.observe(cv); }
+}
+function unsHTML(r, id){"""),
+    (r"""+ fb + '</div></article>'
+    + nav + confirm""",
+     r"""+ fb + '</div></article>'
+    + scrHTML(id) + nav + confirm"""),
+    (r"""if(S.view === "quiz" && S.run) v.innerHTML = quizHTML();""",
+     r"""if(S.view === "quiz" && S.run){ v.innerHTML = quizHTML(); scrMount(); }"""),
+    (r"""    case "finish": finish(false); break;""",
+     r"""    case "scr": {
+      if(!r) break;
+      const id = r.ids[r.cur], t = el.dataset.t;
+      if(t === "open"){ scrUI.open[id] = true; render(); const s = document.getElementById("scr"); if(s) s.scrollIntoView({ block:"nearest", behavior:"smooth" }); }
+      else if(t === "close"){ scrUI.open[id] = false; render(); }
+      else if(t === "pen" || t === "er"){ scrUI.tool = t; render(); }
+      else if(t === "undo"){ const d = SCR[id]; if(d && d.s.length){ d.s.pop(); scrSave(); render(); } }
+      else if(t === "clr"){ if(SCR[id]){ SCR[id].s = []; scrSave(); render(); } }
+      else if(t === "fin"){ scrUI.finger = !scrUI.finger; try{ localStorage.setItem("ml.scrf", scrUI.finger ? "1" : "0"); }catch(e){} render(); }
+      else if(t === "big"){ scrUI.big = !scrUI.big; render(); }
+      break;
+    }
+    case "finish": finish(false); break;"""),
+    (r""".ml-fb .ml-done{font-size:13px;color:var(--ok);font-weight:600;margin:8px 0 0}""",
+     r""".ml-fb .ml-done{font-size:13px;color:var(--ok);font-weight:600;margin:8px 0 0}
+/* 1.3.1 işlem alanı */
+.scr-open{all:unset;box-sizing:border-box;cursor:pointer;display:block;margin:10px 0 0;padding:9px 14px;border:1px dashed var(--line);border-radius:10px;font:600 13px var(--f-ui,system-ui);color:var(--muted);text-align:center}
+.scr{margin:10px 0 0}
+.scr-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 6px}
+.scr-bar b{font:700 12.5px var(--f-ui,system-ui);color:var(--muted);margin-right:4px}
+.scr canvas{display:block;width:100%;height:240px;box-sizing:border-box;border:1px dashed var(--line);border-radius:10px;background:var(--surface) radial-gradient(circle, var(--line) 1px, transparent 1.3px) 0 0/24px 24px;color:var(--ink);cursor:crosshair;touch-action:pan-y}
+.scr canvas.big{height:min(70vh, 560px)}
+.scr-n{font-size:11.5px;color:var(--muted);margin:5px 2px 0}
+.ml-chip.ml-all{font-family:var(--f-ui,system-ui)}"""),
+]
+
+
 def apply_patches(s, strict=True):
     for a, b in PATCHES:
         if b in s:
@@ -301,7 +414,11 @@ def build(test_html):
 if __name__ == "__main__":
     if sys.argv[1:] == ["--apply"]:
         p = os.path.join(REPO, "engine.html")
-        s = apply_patches(open(p, encoding="utf8").read())  # önce yamala: yama tutmazsa dosya boşalmasın
+        # önce yamala: yama tutmazsa dosya boşalmasın. Mevcut motorda eski yamaların sonucu sonraki yamalarla
+        # değişmiş olabilir; tutmayanlar atlanır ve listelenir (yeni yamanın tutması gerekir).
+        s = apply_patches(open(p, encoding="utf8").read(), strict=False)
+        miss = [a[:60] for a, b in PATCHES if b not in s]
+        if miss: print("atlanan yama (öncekiyle değişmiş olabilir):", *miss, sep="\n  ")
         open(p, "w", encoding="utf8").write(s)
         print("engine.html yamalandı")
     else:
