@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.3";
+const VERSION = "1.3.1";
 const CHANGES = [
+  { v: "1.3.1", d: "2026-11-08", l: [
+    "Hocanın derste vurguladığı ya da \"soru olarak geldi\" dediği yerler slaytın altında işaretli; slaytın sonunda listesi, ders sayfasında sayısı var (ses kaydı olan derslerde)",
+    "Kurul sayfasında \"Çevrimdışı indir\"; sınava 1 hafta kala ana sayfadaki sınav satırında da çıkıyor, indirilmişse \"İndirildi\" yazıyor",
+  ] },
   { v: "1.3", d: "2026-11-08", l: [
     "Testte “?” düğmesi: emin olmadığın soruyu işaretle; optik formda sarı görünür, doğru bilsen de ertesi gün tekrar sorulur",
     "Test içinde “Boş” ve “Emin değilim” süzgeci; bitirirken “Boşlara dön” ve “Emin olmadıklarıma dön”",
@@ -80,7 +84,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "a6e69920e7";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "259a78196a";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -885,7 +889,8 @@ function examRows() {
     const oz = pick("ozet"), ts = pick("test");
     return '<div class="trow exam' + (n <= 2 ? " soon" : "") + '"><span class="ex-n">' + (n === 0 ? "Bugün" : n === 1 ? "Yarın" : n + " gün") + '</span><span class="tx"><b>' + esc(x.c) + " · " + esc(x.t || "Sınav") + '</b><small>' + fdate(x.d) + " " + wd + "</small>"
       + '<span class="row-btns">' + (x.g ? '<a class="btn sm" href="#/karma?g=' + x.g + '&prova=1">Prova</a><a class="btn sm" href="#/lib/' + x.g + '">Kurul</a>'
-        : (oz ? '<a class="btn sm" href="#/d/' + oz.id + '/1">Özet</a>' : "") + (ts ? '<a class="btn sm" href="#/t/' + ts.id + '">Deneme</a>' : "") + (g ? '<a class="btn sm" href="#/lib/' + g + "/" + slug(x.c) + '">Ders</a>' : "")) + "</span></span></div>";
+        : (oz ? '<a class="btn sm" href="#/d/' + oz.id + '/1">Özet</a>' : "") + (ts ? '<a class="btn sm" href="#/t/' + ts.id + '">Deneme</a>' : "") + (g ? '<a class="btn sm" href="#/lib/' + g + "/" + slug(x.c) + '">Ders</a>' : ""))
+      + (g && n <= 7 && S.cat.items.some(i => i.g === g && i.k !== "video") ? '<button class="btn sm" data-off="' + g + '">' + icon("dl") + "İndir</button>" : "") + "</span></span></div>";
   }).join("");
 }
 // Kaldığın yer: bütün yarım testler, yarım karma deneme ve sonuna kadar okunmamış slaytlar (en yeni üstte)
@@ -972,6 +977,7 @@ function viewHome() {
     + "</div>";
   bindUpd(); bindScoreCard();
   const sx = $("#syhx"); if (sx) sx.onclick = () => { LS.set("ml.syh", 1); $("#synch").remove(); };
+  bindOff();
 }
 // Güncellemeden sonra ana sayfada bir kez görünen kısa not (cihaz başına)
 function updCard() {
@@ -1055,6 +1061,7 @@ function viewKurul(g) {
   main().innerHTML = bar({ title: k.no ? "Kurul " + k.no + " · " + k.name : k.name, crumb: crumbFor(g, null, "dn"), back: "#/lib" })
     + '<div class="page">' + (k.start ? '<p class="muted small" style="margin:0 0 6px">' + fdate(k.start, true) + " – " + fdate(k.end, true) + (k.end >= today() ? " · kurul sınavına " + dayDiff(today(), k.end) + " gün" : "") + "</p>" : "")
     + (() => { const pr = kurulPrep(g), L = prepLine(pr, 1); return L || pr.nQ ? '<div class="kprep"><span class="muted small">' + L + "</span>" + (pr.nQ && k.no ? '<a class="btn sm" href="#/karma?g=' + g + '&prova=1">' + icon("test") + "Kurul provası</a>" : "") + "</div>" : ""; })()
+    + (S.cat.items.some(i => i.g === g && i.k !== "video") ? '<div class="kprep"><span class="muted small">Çevrimdışı: internet olmadan da açılsın diye bütün kurulu indir (yaklaşık ' + fmtMB(offSize(g)) + ")</span>" + '<button class="btn sm" data-off="' + g + '">' + icon("dl") + "İndir</button></div>" : "")
     + (cs.length ? '<div class="card list crs">' + cs.map(o => {
       const cnt = KORDER.map(kk => [kk, o.items.filter(i => i.k === kk && !(kk === "test" && i.cx)).length]).filter(x => x[1]).map(x => "<span><b>" + x[1] + "</b> " + KIND[x[0]].l.toLowerCase() + "</span>").join("");
       return '<a class="course" href="#/lib/' + g + "/" + slug(o.c) + '"><span class="bar-c" style="background:' + ccol(o.c) + '"></span><span class="txt"><b>' + esc(o.c) + '</b><span class="cnt">' + cnt + "</span></span>" + icon("chev", "chev") + "</a>";
@@ -1064,6 +1071,7 @@ function viewKurul(g) {
     + "</div>";
   const sec = parseHash().q.get("s");
   if (sec) { const el = document.getElementById("sec-" + sec); if (el) el.scrollIntoView(); }
+  bindOff();
 }
 function kurulSection(g, kind, title, id) {
   const its = S.cat.items.filter(i => i.g === g && i.k === kind && !i.cx);
@@ -1114,7 +1122,8 @@ function viewCourse(g, cs) {
     if (F.by === "konu") {
       rows = groups.sort((a, b) => (b.d.d || "").localeCompare(a.d.d || "")).map(G => {
         const n = deckQn(G.d.id), cx = cxDeckN(G.d.id);
-        return grp(G.d.t, G.its, (cx ? '<span class="tag cx">' + icon("star") + "çıkmışta " + cx + " soru</span>" : "") + (n ? '<span class="tag">' + n + " soru</span>" : ""));
+        const hv = (G.d.hv || []).length;
+        return grp(G.d.t, G.its, (cx ? '<span class="tag cx">' + icon("star") + "çıkmışta " + cx + " soru</span>" : "") + (hv ? '<span class="tag hv">' + icon("star") + "hoca " + hv + " yer vurguladı</span>" : "") + (n ? '<span class="tag">' + n + " soru</span>" : ""));
       }).join("")
         + grp("Birden çok konudan testler", multi) + grp(groups.length ? "Diğer notlar" : "Notlar ve dosyalar", loose) + grp("Çıkmışlar", cxs);
     } else {
@@ -1188,6 +1197,19 @@ async function rotURL(u, a, key) {
   const blob = await new Promise(r => c.toBlob(r, "image/webp", 0.88));
   const url = URL.createObjectURL(blob); urlCache(key, url); return url;
 }
+// Hocanın derste vurguladığı yerler (ses kaydı dökümünden; katalogda it.hv = [{p, t: "dk:sn", s: ses dosyası, n: not, q: 1 = "soru olarak geldi" dedi}])
+const hvList = (it, p) => (it.hv || []).filter(h => !p || h.p === p).sort((a, b) => a.p - b.p);
+function hvBadge(it, p) {
+  const L = hvList(it, p);
+  return L.length ? ' <button class="hvb" data-hv="' + p + '">' + icon("star") + (L.some(h => h.q) ? "Hoca: soru olarak geldi" : "Hoca vurguladı") + "</button>" : "";
+}
+function hvRows(it, L, jump) {
+  return L.map(h => (jump ? '<button class="hvr" data-hvp="' + h.p + '">' : '<div class="hvr">')
+    + '<b>' + (it.k === "slayt" ? "Slayt " : "Sayfa ") + h.p + (h.q ? ' <span class="tag cx">' + icon("star") + "soru olarak geldi</span>" : "") + "</b><span>" + esc(h.n) + '</span><small>Ses kaydı: ' + esc(h.s) + ", " + esc(h.t) + "</small>" + (jump ? "</button>" : "</div>")).join("");
+}
+function hvSheet(it, p) {
+  sheet("<h3>Hoca derste vurguladı</h3>" + hvRows(it, hvList(it, p)) + '<p class="muted small">Ders kaydının yapay zekâ dökümünden; döküm birebir değil, slaytla karşılaştırılarak yazıldı.</p><div class="row-btns" style="margin-top:10px"><button class="btn" data-close>Kapat</button></div>');
+}
 function mountDoc(el, it, page, opts) {
   opts = opts || {};
   const hl = new Set(opts.highlight || []);
@@ -1195,9 +1217,10 @@ function mountDoc(el, it, page, opts) {
   for (let p = 1; p <= it.n; p++) {
     // sayfa numarası ve "soruyla ilgili" etiketi görselin üstüne değil altına yazılır
     html += '<figure class="pg' + ((it.r || 1.333) < 1 ? " portrait" : "") + (hl.has(p) ? " hl" : "") + '" data-p="' + p + '"><div class="pgi"><div class="ph" style="--ar:' + (it.r || 1.333) + '">' + p + "</div></div>"
-      + '<figcaption class="pn">' + p + " / " + it.n + (hl.has(p) ? ' <b class="hlt">' + (opts.est ? "tahmini sayfa" : "soruyla ilgili") + "</b>" : "") + "</figcaption></figure>";
+      + '<figcaption class="pn">' + p + " / " + it.n + (hl.has(p) ? ' <b class="hlt">' + (opts.est ? "tahmini sayfa" : "soruyla ilgili") + "</b>" : "") + hvBadge(it, p) + "</figcaption></figure>";
   }
   el.innerHTML = html + (opts.foot || "");
+  el.querySelectorAll("[data-hv]").forEach(b => b.onclick = e => { e.stopPropagation(); hvSheet(it, +b.dataset.hv); });
   const loadP = async fig => {
     if (fig.dataset.l) return; fig.dataset.l = "1";
     try {
@@ -1244,7 +1267,9 @@ function viewDoc(id, page, q) {
   }) + '<div class="doc" id="doc" tabindex="-1"></div><button class="fsdoc" id="fsb" type="button" title="Tam ekran" aria-label="Tam ekran">' + icon("full") + "</button></div>";
   const rel = S.cat.items.filter(t => t.k === "test" && (t.dk || []).some(d => d[0] === it.id));
   const first = !PS.get("rd", {})[it.id], nq = deckQn(it.id), canRead = it.k !== "cikmis" && it.k !== "soru";
+  const hvL = hvList(it);
   const foot = '<div class="doc-foot">'
+    + (hvL.length ? '<b>Hocanın derste vurguladıkları</b><div class="hvl">' + hvRows(it, hvL, 1) + "</div>" : "")
     + (canRead || nq ? '<div class="rdrow">' + (canRead ? '<button class="btn" id="rdok"></button>' : "")
       + (nq ? '<button class="btn" id="dq10">' + icon("test") + "Bu " + (it.k === "slayt" ? "desteden" : "dosyadan") + " " + Math.min(10, nq) + " soru</button>" : "") + "</div>" : "")
     + (rel.length ? '<b>Bu ' + (it.k === "slayt" ? "slayttan" : "dosyadan") + " soru olan testler</b><div class=\"row-btns\">"
@@ -1264,6 +1289,7 @@ function viewDoc(id, page, q) {
   });
   setLast("doc", { id: it.id, p: page }); rdSet(it.id, page);
   fsBind();
+  $$("[data-hvp]").forEach(b => b.onclick = () => V.goto(+b.dataset.hvp, true));
   S.cleanup.push(() => { clearTimeout(saveT); V.destroy(); });
   // Okudum işareti ve deste testi (sayfaların sonunda)
   const rb = $("#rdok"), drawRd = () => { const ok = (PS.get("rd", {})[it.id] || {}).ok; rb.className = "btn" + (ok ? " done" : " primary"); rb.innerHTML = icon("check") + (ok ? "Okundu" : "Okudum"); };
@@ -2749,7 +2775,7 @@ async function viewSettings() {
   $("#chk").onclick = async () => { await checkUpdate(true); };
   bindRepSection();
   const ib = $("#inst"); if (ib) ib.onclick = async () => { installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; viewSettings(); };
-  $$("[data-off]").forEach(b => b.onclick = () => offline(b, b.dataset.off));
+  bindOff();
   $("#psw").onclick = () => { saveProfile(); LS.del("ml.prof"); location.hash = ""; location.reload(); };
   const stf = $("#stf");
   if (stf) stf.onsubmit = async e => {
@@ -2823,21 +2849,47 @@ function bindRepSection() {
     PS.set("rep", M); LS.del("ml.errs"); viewSettings(); toast("Temizlendi");
   };
 }
-async function offline(btn, g) {
-  const its = S.cat.items.filter(i => i.g === g && i.k !== "video");
+// Çevrimdışı: bir kurulun (ya da ortak derslerin) bütün dosyaları cihaz önbelleğine (ml-data-1) iner
+function offUrls(g) {
   const urls = [];
-  its.forEach(it => {
+  S.cat.items.filter(i => i.g === g && i.k !== "video").forEach(it => {
     if (it.k === "test" || it.k === "kart") urls.push("d/" + it.x + "?v=" + it.v);
     else { urls.push("d/" + it.x + "/t?v=" + it.v); for (let p = 1; p <= it.n; p++) urls.push("d/" + it.x + "/" + p + "?v=" + it.v); }
   });
   urls.push("d/s?v=" + S.cat.v);                         // arama ve Anatomi Latincesi de çevrimdışı çalışsın
   ["lat", "lex"].forEach(k => { if (S.cat[k]) urls.push("d/" + S.cat[k].x + "?v=" + S.cat[k].v); });
-  btn.disabled = true;
+  return urls;
+}
+const offSize = g => S.cat.items.filter(i => i.g === g && i.k !== "video").reduce((n, i) => n + (i.sz || 0), 0);
+let OFFK = null;                                          // önbellekteki adresler (bir kez okunur, indirince yenilenir)
+async function offKeys(fresh) {
+  if (!("caches" in window)) return new Set();
+  if (!OFFK || fresh) { try { OFFK = new Set((await (await caches.open("ml-data-1")).keys()).map(r => r.url)); } catch (e) { OFFK = new Set(); } }
+  return OFFK;
+}
+async function offMiss(g) { const K = await offKeys(); return offUrls(g).filter(u => !K.has(new URL(u, location.href).href)).length; }
+// data-off düğmeleri: indirildiyse "İndirildi", eksik varsa "Güncelle", hiç yoksa "İndir · boyut"
+async function bindOff() {
+  const bs = $$("[data-off]"); if (!bs.length) return;
+  for (const b of bs) {
+    b.onclick = () => offline(b, b.dataset.off);
+    if (b.dataset.busy) continue;
+    const g = b.dataset.off, miss = await offMiss(g), all = offUrls(g).length;
+    b.classList.toggle("done", !miss);
+    b.innerHTML = !miss ? icon("check") + "İndirildi" : icon("dl") + (miss < all ? "Güncelle" : "İndir" + (b.dataset.sz ? " · " + fmtMB(offSize(g)) : ""));
+  }
+}
+async function offline(btn, g) {
+  const urls = offUrls(g);
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = 1; btn.disabled = true;
   let done = 0, fail = 0, i = 0;
   const worker = async () => { while (i < urls.length) { const u = urls[i++]; try { const r = await fetch(u); if (!r.ok) fail++; await r.arrayBuffer(); } catch (e) { fail++; } done++; if (done % 10 === 0 || done === urls.length) btn.textContent = Math.round(100 * done / urls.length) + "%"; } };
   await Promise.all(Array.from({ length: 6 }, worker));
-  btn.textContent = fail ? "Eksik: " + fail : "Hazır";
-  toast(fail ? fail + " dosya indirilemedi; bağlantıyı kontrol edip tekrar dene." : "Kurul çevrimdışı kullanıma hazır.");
+  delete btn.dataset.busy; btn.disabled = false;
+  await offKeys(true);
+  if (btn.isConnected) bindOff();
+  toast(fail ? fail + " dosya indirilemedi; bağlantıyı kontrol edip tekrar dene." : (g === "ortak" ? "Ortak dersler" : "Kurul") + " çevrimdışı kullanıma hazır.");
 }
 
 /* ---------- install guide (public) ---------- */

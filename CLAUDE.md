@@ -14,7 +14,7 @@ Site: https://tixdinakar.github.io/MedLock/ (GitHub Pages, `main` dalının kök
 ## Yapı
 - `k.json`: veri anahtarı (DEK), şifreden türetilen anahtarla sarılı (PBKDF2-SHA256 600k + AES-GCM). Şifre değişince sadece bu dosya değişir (`passwd`).
 - `d/c`: katalog (gzip JSON, şifreli). Öğeler: id, k (slayt|not|ozet|cikmis|soru|test|kart|video), g (k1..k4|ortak), c (ders), h (hoca), t (başlık), d (tarih), n (sayfa/soru), x (blob klasörü; videoda yok), v (sürüm), src (drive:<fileId>), dq (tarih tahmini), u (yükleyen), dur (video süresi), cx (çıkmıştan test), kn (not/özet/video → bağlı slayt destesi id'si ya da listesi; ders sayfası konuya göre gruplar), tp (testin konu sayıları), dk (testin destelere göre soru sayıları; `refs` yazar).
-  `kurullar[].saat`: {ders: ders saati} (`saat` komutu, d/plan'dan; kurul provasında dersler arası dağılım). `ta`: {ders: {eski konu adı: yeni}} (`konu-ad`). `sinavlar`: [{d, c, t, w}] (w = uyarının kaç gün önceden çıkacağı; ortak dersler ve seçmeliler 5).
+  `kurullar[].saat`: {ders: ders saati} (`saat` komutu, d/plan'dan; kurul provasında dersler arası dağılım). `ta`: {ders: {eski konu adı: yeni}} (`konu-ad`). `sinavlar`: [{d, c, t, w}] (w = uyarının kaç gün önceden çıkacağı; ortak dersler ve seçmeliler 5). `hv` (öğede): hocanın derste vurguladığı yerler [{p, t: "dk:sn", s: ses dökümü adı, n: not, q: 1 = "soru olarak geldi/gelir"}] (`vurgu`).
   `donemler`: [{id: d1, no, name, yil, final: {start, end, est}}]; kurullar ve `ortak` `dn` ile döneme bağlı. Kurul id'leri bütün yıllarda tekil: Dönem I `k1..k4`, Dönem II gelince `d2-k1..` ve `d2-ortak` (yeni dönemi `DONEMLER`/`KURULLAR`'a ekle).
   `skip`: bilerek eklenmeyen Drive dosyaları. `todo`: eklenmesi bekleyen Drive dosyaları (çoğu 10 MB'tan büyük olduğu için connector indiremedi; sahibinden ek olarak istenir).
 - `d/<x>/<n>`: sayfa görselleri (WebP), `d/<x>/t`: sayfa metinleri; `d/<x>` (dosya): test ya da kart verisi; `d/s`: arama dizini.
@@ -49,6 +49,8 @@ python3 tools/medlock.py test-dump <id> x.json        # testi düzelt (x.json sc
 python3 tools/medlock.py test-load <id> x.json        # … ve geri yaz (refs + arama dizini yenilenir)
 python3 tools/medlock.py final 2027-05-15 2027-05-31  # final dönemi (K4 bitişi → bütünleme); final sınavı 24.05.2027
 python3 tools/medlock.py sinav 2026-11-13 "Kanser ve Kök Hücre" --t Vize --gun 5   # ana sayfada sınav uyarısı; --gun kaç gün önceden (ortak dersler ve seçmeliler 5; kurul sınavı 14, dönem finali 21), --rm siler
+#   Sınav eklenince ya da tarihi değişince Buğra'nın Google Takvim'ine de yaz (Calendar connector; açıklamada "MedLock'tan eklendi", önce aynı sınav var mı bak). Tahmini K3/K4 tarihleri takvimde "(tahmini)"; kesinleşince güncelle.
+python3 tools/medlock.py vurgu redoks-tepkimeleri-slayt 9 41:02 "Redoks 1" "Hoca ne dedi (slayta göre düzeltilmiş)" [--soru] [--rm]   # ses kaydındaki hoca vurgusu
 python3 tools/medlock.py konu [--force]               # not/özet → slayt destesi bağı (kn); add-doc kendisi de tahmin eder
 python3 tools/medlock.py saat                         # kurul provası için ders saatleri (kurullar[].saat, d/plan'dan)
 python3 tools/medlock.py konu-ad Biyokimya "Tepkime tipleri" "Tepkime Kategorileri"   # aynı konunun iki adı (argümansız: liste)
@@ -82,7 +84,10 @@ Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama 
 ## Soru yazarken kaynak gösterme
 Motor `s` alanını açıklamanın altında "Kaynak: …" olarak zaten gösterir; `e` içine aynı slaytı tekrar yazma. `e`nin sonuna yalnız `s`de olmayan ek kaynağı ekle: slayt (ve sayfası), gerekiyorsa ses kaydı ve çıkmış. Ses kaydı dökümünü kullandıysan dosya ve dakika:saniye yaz (dökümlerde "Konuşmacı 1 (mm:ss)" damgası var), hangi slaytla karşılaştırdığını ve varsa çıkmışı ekle. Uzatma:
 `Kaynak: Redoks slayt 14 · Ses: Redoks 1, 37:21 · Çıkmış: Biyokimya K1, s. 4`
-Hoca derste "sınavda çıktı / soru olarak gelir" dediyse açıklamaya "Hoca derste sınavda geldiğini söyledi" ekle. `s` alanı yine "Deste adı, slayt N" biçiminde kalır ("Slayta git" bununla çalışır).
+Hoca derste "sınavda çıktı / soru olarak gelir" dediyse açıklamaya "Hoca derste sınavda geldiğini söyledi" ekle.
+
+## Ses kaydı vurguları
+Drive'da ses kaydı dökümü (Ders › "[Ders] Ses Kayıtları", içinde "Konuşmacı 1 (dk:sn)") olan her derste, dökümü okurken (not, test ya da Drive denetimi) hocanın "önemli, dikkat, mutlaka, sınavda/soru olarak gelir/geldi" dediği yerleri bul, slaytla karşılaştır ve `vurgu` ile o slayt sayfasına yaz (dökümler yapay zekâ çıktısı, bozuk: notu slayttaki doğru ifadeyle yaz, emin olmadığını ekleme). Başka destenin konusuysa (ör. Redoks dersinde tampon sorusu) o destenin sayfasına bağla. Uygulamada slaytın altında "Hoca vurguladı / soru olarak geldi" rozeti, slayt sonunda liste, ders sayfasında sayısı görünür. Şu an işlenen: Redoks 1–2 (redoks ve tamponlar destesi). `s` alanı yine "Deste adı, slayt N" biçiminde kalır ("Slayta git" bununla çalışır).
 
 ## Hata bildirimleri
 Sorularda "Hata bildir" düğmesi var; bildirimler profilde (`rep`) birikir, Buğra Ayarlar › Hata bildirimleri › Kopyala ile metni sohbete yapıştırır (test id, soru id ve sırası, neden, not, uygulama hataları). Düzeltme: normal testte `test-dump` → düzelt → `test-load`; çıkmış testinde `build_cx.py --dump/--src`. Cevap anahtarı değiştiyse açıklamada belirt.
@@ -127,6 +132,7 @@ Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor.
 - Alt çubuk (1.2): Ana sayfa · Kütüphane · Tekrar · Ara · Diğer. Diğer yukarı açılan menü (İlerleme, Saat, Düello, Karma, Çıkmışlar, Latince, İşaretler, Ayarlar), `ovOpen` ile; geri tuşu kapatır. Yatay tablette hepsi yan menüde.
 - Ana sayfa sırası: hoş geldin (yeni kullanıcı) ya da yeni sürüm notu → sınav puanı kartı (sınav geçince 30 gün, bir kez; `real`) → Bugün kartı (seri, bugünkü soru/süre, yaklaşan sınavlar, tekrar, Kaldığın yer: yarım testler/karma/okumalar en çok 4, Sıradaki okunmamış deste) → kurul kartı (sınava kalan gün, okunan deste/çözülen soru, Kurul provası) → kutular → senkron önerisi.
 - Ders sayfası varsayılan konuya göre: slayt destesi = konu; not/özet `kn` ile, test sorularının ≥%60'ı hangi destedense orada; kalanlar "Birden çok konudan testler", "Diğer notlar", "Çıkmışlar". Ders içi arama başlıkları süzer, slayt/not içinde geçen sayfaları da gösterir.
+- Çevrimdışı: kurul sayfasında, Ayarlar › Çevrimdışı'da ve sınava 7 gün kala sınav satırında "İndir" (`data-off`, `bindOff`); önbellekte tamamı varsa "İndirildi", eksik varsa "Güncelle".
 - Slayt sonunda "Okudum" (`rd`) ve "Bu desteden 10 soru" (deste testi); sorusu ≥5 olan deste ilk açılınca üstte "Okumadan önce 5 soru?" (ön test). Deste testi karma motoruyla açılır, geri ok desteye döner.
 - Karma: kurul seçici; mod karma ekranında seçilir ve motor kapaksız başlar (`CFG.autostart`); zamana karşıda soru başına 1 dk (`perQuestion: 1`). Kurul provası (`#/karma?g=k2&prova=1`): en çok 100 soru, soru sayısı kadar dakika, dersler arası dağılım `kurullar[].saat`'e göre, önce hiç çözülmemişler; prova bağlantısıyla gelinince adres testle değiştirilir (geri tuşu provayı yeniden başlatmaz).
 - Saat (#/saat): kronometre, Pomodoro 25/5 (4 turda 15 dk), 50/10, Serbest (mola = çalışmanın beşte biri). Süre zaman damgasından (cihazda `ml.clk`); çalışma süresi profilde `tm[gün][cihaz][ders]` (saniye). Ekran kararmaz (Wake Lock), aşama değişince titreşim, ses yok. Saat çalışırken başka ekranlarda alt çubuğun üstünde sayaç şeridi (`.cc-m`; yatayda yan menüde `.cc-s`); hiçbir düğmeyi örtmez.

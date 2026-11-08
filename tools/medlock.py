@@ -1117,6 +1117,14 @@ def main():
     kn = sp.add_parser("konu", help="not/özet/video → slayt destesi bağları (ders sayfasında konuya göre gruplama)")
     kn.add_argument("--force", action="store_true", help="elle verilenler dahil hepsini yeniden hesapla")
     sp.add_parser("saat", help="kurul provası için ders saatleri (d/plan'dan)")
+    hv = sp.add_parser("vurgu", help="hocanın derste vurguladığı yer (ses kaydı dökümünden): slayt sayfası, dk:sn, ses dosyası, not")
+    hv.add_argument("id")
+    hv.add_argument("page", type=int)
+    hv.add_argument("time", help="dk:sn, dökümdeki 'Konuşmacı 1 (dk:sn)'")
+    hv.add_argument("source", help="ses kaydı dökümünün adı, ör. 'Redoks 1'")
+    hv.add_argument("note", nargs="?", default="", help="kısa not: hoca ne dedi (slayta göre düzeltilmiş)")
+    hv.add_argument("--soru", action="store_true", help="hoca 'sınavda soru olarak geldi / gelir' dedi")
+    hv.add_argument("--rm", action="store_true", help="bu sayfa ve zamandaki vurguyu sil")
     ka = sp.add_parser("konu-ad", help="aynı konunun farklı adlarını birleştir (testler, ilerleme, karma); argümansız: listele")
     ka.add_argument("course", nargs="?")
     ka.add_argument("old", nargs="?")
@@ -1199,6 +1207,22 @@ def main():
         print(len(n), "öğe desteye bağlandı")
     elif a.cmd == "saat":
         set_saat(V)
+    elif a.cmd == "vurgu":
+        it = V.item(a.id)
+        if not 1 <= a.page <= it["n"]:
+            sys.exit(f"sayfa 1..{it['n']} olmalı")
+        L = [h for h in it.get("hv", []) if not (h["p"] == a.page and h["t"] == a.time)]
+        if not a.rm:
+            if not a.note:
+                sys.exit("not eksik")
+            L.append({"p": a.page, "t": a.time, "s": a.source, "n": a.note, **({"q": 1} if a.soru else {})})
+        L.sort(key=lambda h: (h["p"], h["t"]))
+        if L:
+            it["hv"] = L
+        else:
+            it.pop("hv", None)
+        for h in L:
+            print(f'{it["id"]} s.{h["p"]} · {h["s"]} {h["t"]}{" · soru" if h.get("q") else ""} · {h["n"]}')
     elif a.cmd == "konu-ad":
         # katalogda ta = {ders: {eski ad: yeni ad}}; uygulama eski adla kaydedilmiş geçmişi de yeni adla gösterir
         TA = V.cat.setdefault("ta", {})
