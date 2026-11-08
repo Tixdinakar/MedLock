@@ -364,10 +364,12 @@ def add_doc(V, pdf=None, rendered=None, **meta):
         it["src"] = meta["src"]
     if meta.get("sub"):
         it["m"] = meta["sub"]
-    for k in ("dq", "al", "src", "m", "u"):     # yeniden eklemede eski alanları koru
+    for k in ("dq", "al", "src", "m", "u", "kn"):     # yeniden eklemede eski alanları koru
         if k not in it and k in old:
             it[k] = old[k]
     V.upsert(it)
+    if it["k"] in ("not", "ozet", "soru") and not it.get("kn"):
+        assign_konu(V, [it])
     if tmp:
         shutil.rmtree(tmp)
     return it
@@ -897,6 +899,135 @@ def guess_meta(V, folder, fname, texts=None, portrait=None):
     return {"kind": kind, "kurul": kur, "course": course, "hoca": hoca, "title": title, "date": date}
 
 
+# ---------- konu bağları (1.2): not/özet/video → slayt destesi ----------
+KN_GENERIC = {"hasta", "tibbi", "genel", "temel", "giris", "notu", "notla", "ozeti", "ozet", "ders", "dersi", "sinav", "konu", "anlat",
+              "kurul", "cikmi", "soru", "sorul", "son", "tekra", "yapay", "zeka", "makal", "vize", "final", "rehbe", "calis", "komit"}
+
+
+def _kn_stems(t, drop=()):
+    return {w[:5] for w in toks(t) if len(w) > 3} - KN_GENERIC - set(drop)
+
+
+def assign_konu(V, items=None, force=False, verbose=False):
+    """Not, özet, video ve soru dosyalarını ilgili slayt destesine bağlar (katalogda "kn": deste id'si ya da listesi).
+    Kural: deste başlığı öğe başlığında bütünüyle geçiyorsa o; değilse ortak (genel olmayan) kelimeler. Özet en çok 2 desteye
+    bağlanır; daha çok desteye uyan özet genel sayılır. Elle verilen kn korunur (force ile yeniden hesaplanır)."""
+    decks = [d for d in V.cat["items"] if d["k"] == "slayt"]
+    done = []
+    for it in (items or V.cat["items"]):
+        if it["k"] not in ("not", "ozet", "video", "soru") or (it.get("kn") and not force):
+            continue
+        cand = [d for d in decks if d["g"] == it["g"] and d["c"] == it["c"]]
+        cdrop = {w[:5] for w in toks(it["c"]) if len(w) > 3}
+        parts = [x for x in re.split(r"\s*·\s*", it["t"]) if x.strip()] if "·" in it["t"] else [it["t"]]
+        chosen = []
+        for part in parts:
+            pt = set(toks(part))
+            full = [d for d in cand if toks(d["t"]) and set(toks(d["t"])) <= pt]
+            if full:
+                chosen += [max(full, key=lambda d: len(toks(d["t"])))]
+                continue
+            st = _kn_stems(part, cdrop)
+            sc = sorted(((len(st & _kn_stems(d["t"], cdrop)), d) for d in cand), key=lambda x: -x[0])
+            hits = [(n, d) for n, d in sc if n >= 1]
+            if not hits:
+                continue
+            if it["k"] == "ozet" and len(parts) == 1:
+                if len(hits) <= 2:
+                    chosen += [d for n, d in hits]
+            else:
+                best = hits[0][0]
+                top = [d for n, d in hits if n == best]
+                if len(top) == 1:
+                    chosen.append(top[0])
+        ids = list(dict.fromkeys(d["id"] for d in chosen))
+        if ids:
+            it["kn"] = ids[0] if len(ids) == 1 else ids
+            done.append((it["id"], it["t"], [V.item(i)["t"] for i in ids]))
+        elif force and "kn" in it:
+            del it["kn"]
+    if verbose:
+        for i, t, ds in done:
+            print(f"  {t}  →  {' + '.join(ds)}")
+    return done
+
+
+def set_saat(V, verbose=True):
+    """Kurul provası için ders saatleri: d/plan'daki geçen yılın planından (her satır 1 ders saati); planda olmayan derse
+    o kuruldaki slayt destesi sayısı. Katalogda kurullar[].saat = {ders: saat}."""
+    plan = V.get_json("d/plan")
+    for k in V.cat["kurullar"]:
+        g = k["id"]
+        sa = {course_name(c): len(konular) for c, konular in plan["kurullar"].get(g, {}).items()}
+        for it in V.cat["items"]:
+            if it["g"] == g and it["c"] not in sa:
+                n = sum(1 for d in V.cat["items"] if d["g"] == g and d["c"] == it["c"] and d["k"] == "slayt")
+                if n:
+                    sa[it["c"]] = n
+        k["saat"] = sa
+        if verbose:
+            print(g, ", ".join(f"{c} {n}" for c, n in sa.items()))
+
+
+def fix_rot(V, ident, dry=False, min_conf=2.0, pages=None, angle=None):
+    """Taranmış PDF'te yan dönmüş sayfaları düzeltir. Yön Tesseract'ın tespitinden (yanılabilir: önce --dry, sayfaları gözle
+    doğrula, --pages ile yalnız onları düzelt); tespit edemediği sayfaya --angle (saat yönünde 90/180/270) verilir.
+    Dönen sayfanın metni yeniden okunur (arama ve soru–sayfa eşleşmesi için)."""
+    import subprocess
+    from PIL import Image
+    it = V.item(ident) or sys.exit("yok: " + ident)
+    texts = V.get_json(f"d/{it['x']}/t")
+    hv = hashlib.sha256()
+    changed = []
+    tmp = tempfile.mkdtemp()
+    for i in range(1, it["n"] + 1):
+        b = V.get(f"d/{it['x']}/{i}")
+        if not pages or i in pages:
+            src = os.path.join(tmp, f"{i}.png")
+            Image.open(io.BytesIO(b)).convert("RGB").save(src)
+            cw, conf = angle or 0, 0.0
+            if not angle:
+                r = subprocess.run(["tesseract", src, "-", "--psm", "0"], capture_output=True, text=True)
+                m1 = re.search(r"Rotate:\s*(\d+)", r.stdout or ""); m2 = re.search(r"Orientation confidence:\s*([\d.]+)", r.stdout or "")
+                rot, conf = (int(m1.group(1)) if m1 else 0), (float(m2.group(1)) if m2 else 0.0)
+                cw = (360 - rot) % 360 if rot and conf >= min_conf else 0     # Tesseract "Rotate" saat yönünün tersine
+            if cw:
+                changed.append((i, cw, conf))
+                if not dry:
+                    im = Image.open(io.BytesIO(b)).rotate(-cw, expand=True)    # PIL: pozitif açı saat yönünün tersi
+                    out = io.BytesIO(); im.save(out, "WEBP", quality=62, method=6); b = out.getvalue()
+                    V.put(f"d/{it['x']}/{i}", b)
+                    im.convert("RGB").save(src)
+                    o = subprocess.run(["tesseract", src, "-", "-l", "tur", "--psm", "3"], capture_output=True, text=True).stdout
+                    if len(re.findall(r"\w{3,}", o)) >= len(re.findall(r"\w{3,}", texts[i - 1] or "")):
+                        texts[i - 1] = " ".join(o.split())
+        hv.update(hashlib.sha256(b).digest())
+    shutil.rmtree(tmp)
+    if changed and not dry:
+        V.put_json(f"d/{it['x']}/t", texts)
+        it["v"] = hv.hexdigest()[:8]
+    return changed
+
+
+def drive_check(V, listing, fix=False):
+    """Drive'daki klasör yerleşimi ile katalogdaki kurul/ders karşılaştırması. listing: [{id, name, folder}] (folder ör. "K2/Biyokimya").
+    Dosya Drive'da başka klasöre taşındıysa ya da yanlış kategorideyse öneri (fix ile uygular)."""
+    out = []
+    by_src = {it["src"][6:]: it for it in V.cat["items"] if it.get("src", "").startswith("drive:")}
+    for f in listing:
+        it = by_src.get(f["id"])
+        if not it:
+            continue
+        m = guess_meta(V, f["folder"], f.get("name") or it["t"])
+        want_g = m["kurul"] if re.search(r"(^|/)[Kk][1-4](/|$)", f["folder"]) else it["g"]
+        want_c = m["course"] if m["course"] != "Diğer" else it["c"]
+        if (want_g, want_c) != (it["g"], it["c"]):
+            out.append((it["id"], it["t"], (it["g"], it["c"]), (want_g, want_c)))
+            if fix:
+                it["g"], it["c"] = want_g, want_c
+    return out
+
+
 def print_plan(V, only=None):
     """d/plan (geçen yılın ders planı) ile katalogdaki slayt/notları karşılaştırır. ✓ = kaynağı var."""
     plan = V.get_json("d/plan")
@@ -982,6 +1113,22 @@ def main():
     sk = sp.add_parser("skip")
     sk.add_argument("src")
     sp.add_parser("known")
+    kn = sp.add_parser("konu", help="not/özet/video → slayt destesi bağları (ders sayfasında konuya göre gruplama)")
+    kn.add_argument("--force", action="store_true", help="elle verilenler dahil hepsini yeniden hesapla")
+    sp.add_parser("saat", help="kurul provası için ders saatleri (d/plan'dan)")
+    ka = sp.add_parser("konu-ad", help="aynı konunun farklı adlarını birleştir (testler, ilerleme, karma); argümansız: listele")
+    ka.add_argument("course", nargs="?")
+    ka.add_argument("old", nargs="?")
+    ka.add_argument("new", nargs="?")
+    ka.add_argument("--rm", action="store_true", help="eski adın eşlemesini sil")
+    fr = sp.add_parser("fix-rot", help="taranmış PDF'te yan dönmüş sayfaları düzelt")
+    fr.add_argument("id")
+    fr.add_argument("--dry", action="store_true")
+    fr.add_argument("--pages", help="yalnız bu sayfalar, ör. 7,8,10")
+    fr.add_argument("--angle", type=int, help="tespit yerine saat yönünde bu kadar döndür (90/180/270)")
+    dc = sp.add_parser("drive-check", help="Drive klasör listesiyle kategori karşılaştırması (JSON: [{id,name,folder}])")
+    dc.add_argument("listing")
+    dc.add_argument("--fix", action="store_true")
     pl = sp.add_parser("plan", help="müfredat: kurul › ders › konu, kaynağı olanlar işaretli")
     pl.add_argument("kurul", nargs="?")
     ad = sp.add_parser("add-drive")
@@ -1046,6 +1193,44 @@ def main():
     elif a.cmd == "known":
         print("\n".join(known_sources(V)))
         return
+    elif a.cmd == "konu":
+        n = assign_konu(V, force=a.force, verbose=True)
+        print(len(n), "öğe desteye bağlandı")
+    elif a.cmd == "saat":
+        set_saat(V)
+    elif a.cmd == "konu-ad":
+        # katalogda ta = {ders: {eski ad: yeni ad}}; uygulama eski adla kaydedilmiş geçmişi de yeni adla gösterir
+        TA = V.cat.setdefault("ta", {})
+        if a.course and a.old:
+            m = TA.setdefault(a.course, {})
+            if a.rm:
+                m.pop(a.old, None)
+            elif a.new:
+                known = {t for it in V.cat["items"] if it["k"] == "test" and it["c"] == a.course for t, _ in it.get("tp") or []}
+                if a.new not in known:
+                    print("uyarı: '" + a.new + "' bu dersin testlerinde konu adı olarak geçmiyor")
+                m[a.old] = a.new
+            else:
+                sys.exit("yeni ad eksik")
+            if not m:
+                TA.pop(a.course)
+        for c, m in TA.items():
+            for o, n in m.items():
+                print(f"{c}: {o} → {n}")
+        if not (a.course and a.old):
+            return
+    elif a.cmd == "fix-rot":
+        ch = fix_rot(V, a.id, dry=a.dry, pages=[int(x) for x in a.pages.split(",")] if a.pages else None, angle=a.angle)
+        print(("düzeltilecek" if a.dry else "düzeltildi") + ":", ", ".join(f"s.{i} (saat yönünde {r}°" + (f", güven {c:.1f})" if c else ")") for i, r, c in ch) or "yok")
+        if ch and not a.dry:
+            build_index(V)
+    elif a.cmd == "drive-check":
+        res = drive_check(V, json.load(open(a.listing)), fix=a.fix)
+        for i, t, old, new in res:
+            print(f"  {i} · {t}: {old[0]}/{old[1]} → {new[0]}/{new[1]}")
+        print(len(res), "uyuşmazlık" + (" düzeltildi" if a.fix else ""))
+        if not a.fix:
+            return
     elif a.cmd == "test-dump":
         it = V.item(a.id) or sys.exit("yok: " + a.id)
         b = V.get_json(f"d/{it['x']}")

@@ -31,8 +31,19 @@ const ok = (c, m) => { if (!c) fails.push(m); };
   });
 
   await step("sekmeler geçmişi şişirmez", async () => {
-    await tap('.tabs a[href="#/tekrar"]'); await tap('.tabs a[href="#/ilerleme"]'); await tap('.tabs a[href="#/ara"]'); await tap('.tabs a[href="#/"]');
+    await tap('.tabs a[href="#/tekrar"]'); await tap("#morebtn"); await tap('.more a[href="#/ilerleme"]'); await tap('.tabs a[href="#/ara"]'); await tap('.tabs a[href="#/"]');
     ok((await depth()) === 1, "sekmeler: ana sayfaya dönünce derinlik " + (await depth()));
+  });
+
+  await step("Diğer menüsü", async () => {
+    await tap("#morebtn");
+    ok(await pg.$(".more-bg"), "Diğer menüsü açılmadı");
+    await sysBack();
+    ok(!(await pg.$(".more-bg")) && H() === "/", "telefon geri: Diğer menüsü kapanmadı ya da sayfa değişti (" + H() + ")");
+    await tap("#morebtn"); await tap('.more a[href="#/saat"]');
+    ok(H() === "/saat" && !(await pg.$(".more-bg")), "Diğer › Saat açılmadı (" + H() + ")");
+    await sysBack();
+    ok(H() === "/", "Saat'ten telefon geri: " + H());
   });
 
   await step("testte slayt paneli", async () => {
@@ -85,7 +96,7 @@ const ok = (c, m) => { if (!c) fails.push(m); };
     await pg.goto(BASE + "#/"); await sleep(300);
     await tap('.tabs a[href="#/ara"]');
     await pg.fill("#sq", "enzim"); await sleep(900);
-    await tap(".hit[href^='#/d/'], a.hit");
+    await tap(".dhit a.h, a.hit");
     await sysBack();
     ok(/^\/ara\?q=enzim/.test(H()), "aramadan slayta, telefon geri: " + H());
 

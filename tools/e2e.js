@@ -39,7 +39,7 @@ async function openTest(pg, href) {
     const shot = async n => { if (OUT) await pg.screenshot({ path: OUT + "/" + name + "-" + n + ".png" }); };
     try {
       await login(pg);
-      ok(await pg.$(".duo .tile.mini"), name + ": ana sayfada Tekrar/seri yan yana değil");
+      ok(await pg.$(".today .trow"), name + ": ana sayfada Bugün kartı (tekrar satırı) yok");
       ok(await pg.$("#updc"), name + ": ana sayfada yeni sürüm notu yok");
       await shot("0-surum-notu");
       if (await pg.$("#updok")) { await pg.click("#updok"); await sleep(200); ok(!(await pg.$("#updc")), name + ": sürüm notu kapanmadı"); }

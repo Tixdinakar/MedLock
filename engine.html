@@ -17,12 +17,16 @@ html.ml .top .chip{padding:3px 9px;font-size:12px}
 body.has-gobar{padding-bottom:84px}
 .ml-rep{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:10px;font:600 12.5px var(--f-ui,system-ui);color:var(--muted,#666);padding:4px 2px}
 .ml-rep:hover{color:var(--bad,#b00)}
+.ml-gss{margin-left:14px;color:var(--form,#0f5c63)}
+.ml-gsd{margin-left:14px;cursor:default;color:var(--ok,#1b7f3b)}
+.ml-ozet{all:unset;box-sizing:border-box;cursor:pointer;margin-left:6px;font:600 12px var(--f-ui,system-ui);color:var(--form,#0f5c63);text-decoration:underline;text-underline-offset:2px}
+.ml-cx .ml-ic{color:#b7791f}
 </style>
 <style>
 .ml-go{display:flex;align-items:center;gap:8px;margin-top:10px;width:100%;text-align:left;font:600 13px/1.35 var(--f-ui,system-ui);
   color:var(--form,#0f5c63);background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:10px;padding:9px 12px;cursor:pointer}
 .ml-go:hover{border-color:var(--form,#0f5c63)}
-.ml-go .ml-ic{flex:none;width:18px;height:18px}
+.ml-go .ml-ic{flex:none;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ml-go .ml-t{flex:1;min-width:0}
 .ml-go .ml-t small{display:block;font-weight:500;color:var(--muted,#666);font-size:12px}
 .ml-go .ml-arrow{flex:none;font-weight:700}
@@ -527,7 +531,7 @@ function quizHTML(){
   if(rev){
     const st = status(r, id);
     const title = st === "ok" ? "Doğru." : st === "bad" ? "Yanlış. Doğru cevap: " + L[q.a] : "Boş bıraktın. Doğru cevap: " + L[q.a];
-    fb = '<div class="fb ' + (st === "ok" ? "ok" : st === "bad" ? "bad" : "") + '" role="status"><h4>' + title + '</h4><p>' + q.e + '</p><div class="src">Kaynak: ' + esc(q.s) + '</div>' + (window.ML ? ML.btn(q.id) : '') + (window.ML && ML.rep ? ML.rep(q.id) : '') + '</div>';
+    fb = '<div class="fb ' + (st === "ok" ? "ok" : st === "bad" ? "bad" : "") + '" role="status"><h4>' + title + '</h4><p>' + q.e + '</p><div class="src">Kaynak: ' + esc(q.s) + '</div>' + (window.ML ? ML.btn(q.id) : '') + (window.ML && ML.rep ? ML.rep(q.id) : '') + (window.ML && ML.guess && st === "ok" ? ML.guess(q.id) : '') + '</div>';
   } else if(r.mode !== "study"){
     fb = '<p class="hint">İşaretini değiştirmek için başka bir şıkka, silmek için aynı şıkka dokun.</p>';
   }
@@ -579,10 +583,11 @@ function resultHTML(){
   }
   const groups = {}, order = [];
   r.ids.forEach(id => { const q = byId[id], key = tkey(q); if(!groups[key]){ groups[key] = []; order.push(key); } groups[key].push(id); });
-  const topics = order.map(key => { const s = stats(r, groups[key]); return { key, c:key.split("|")[0], t:key.split("|")[1], s, p: s.ok / s.total }; })
-    .sort((x, y) => x.p - y.p || y.s.total - x.s.total);
-  const weakN = topics.filter(o => o.p < 0.6).length;
-  const trows = topics.map(o => '<tr class="' + (o.p < 0.6 ? "weak" : "") + '"><td><span class="tname">' + (multi ? '<span class="cchip ' + CC(o.c) + '">' + esc(COURSES[o.c].short) + '</span>' : '') + esc(o.t) + (o.p < 0.6 ? ' <span class="wtag">zayıf</span>' : '') + '</span></td>'
+  const full = answered(r) >= 0.8 * r.ids.length;
+  const topics = order.map(key => { const s = stats(r, groups[key]), base = full ? s.total : s.ok + s.bad; return { key, c:key.split("|")[0], t:key.split("|")[1], s, p: base ? s.ok / base : 1, w: base >= 3 && s.ok / base < 0.6 }; })
+    .sort((x, y) => (y.w ? 1 : 0) - (x.w ? 1 : 0) || x.p - y.p || y.s.total - x.s.total);
+  const weakN = topics.filter(o => o.w).length;
+  const trows = topics.map(o => '<tr class="' + (o.w ? "weak" : "") + '"><td><span class="tname">' + (multi ? '<span class="cchip ' + CC(o.c) + '">' + esc(COURSES[o.c].short) + '</span>' : '') + esc(o.t) + (o.w ? ' <span class="wtag">zayıf</span>' + (window.ML && ML.ozet ? ML.ozet(groups[o.key], o.t) : '') : '') + '</span></td>'
     + '<td class="n">' + o.s.ok + '</td><td class="n">' + o.s.bad + '</td><td class="n">' + o.s.empty + '</td><td class="bar">' + stackHTML(o.s) + '</td><td class="n">' + pct(o.s.ok, o.s.total) + '</td></tr>').join("");
   const wrong = r.ids.map((id, k) => ({ id, k })).filter(o => status(r, o.id) !== "ok");
   const wl = wrong.length ? '<ul class="wl">' + wrong.map(o => {
@@ -600,8 +605,8 @@ function resultHTML(){
     + '<button class="btn" type="button" data-act="review" data-k="0" data-only="0">Bütün cevapları incele</button>'
     + '<button class="btn ghost" type="button" data-act="home">Yeni deneme</button></div>'
     + split
-    + '<div class="panel"><h2>Konu analizi · en zayıftan güçlüye</h2>' + (weakN ? '<p class="note">%60\'ın altındaki ' + weakN + ' konu zayıf olarak işaretli.</p>' : '') + '<div class="tablewrap"><table class="topics"><thead><tr><th>Konu</th><th class="n">D</th><th class="n">Y</th><th class="n">B</th><th></th><th class="n">%</th></tr></thead><tbody>' + trows + '</tbody></table></div></div>'
-    + (window.ML ? ML.panel(wrong.map(o => o.id)) : '')
+    + '<div class="panel"><h2>Konu analizi · en zayıftan güçlüye</h2>' + '<p class="note">' + (weakN ? 'En az 3 sorusunu cevapladığın ve %60’ın altında kalan ' + weakN + ' konu zayıf olarak işaretli.' : 'Zayıf konu yok.') + (full ? '' : ' Denemeyi yarıda bitirdiğin için boşlar zayıf sayılmadı.') + '</p>' + '<div class="tablewrap"><table class="topics"><thead><tr><th>Konu</th><th class="n">D</th><th class="n">Y</th><th class="n">B</th><th></th><th class="n">%</th></tr></thead><tbody>' + trows + '</tbody></table></div></div>'
+    + (window.ML ? ML.panel(wrong.filter(o => full || status(r, o.id) === "bad").map(o => o.id)) : '')
     + '<div class="panel"><h2>Yanlış ve boş sorular</h2>' + wl + '</div>'
     + '</section>';
 }
@@ -633,7 +638,7 @@ function refreshCounts(){
 /* ---------- actions ---------- */
 function startRun(ids, label, mode, minutes){
   const list = S.shuffle ? shuffle(ids) : ids.slice();
-  S.run = { mlid: Date.now(), label, ids:list, ans:{}, cur:0, finished:false, elapsed:0, mode, limit: mode === "timed" ? minutes * 60 : 0, onlyWrong:false, confirm:false, timeUp:false };
+  S.run = { mlid: Date.now(), mlc: [], label, ids:list, ans:{}, cur:0, finished:false, elapsed:0, mode, limit: mode === "timed" ? minutes * 60 : 0, onlyWrong:false, confirm:false, timeUp:false };
   S.view = "quiz"; sheetOpen = false; save(); render(true);
 }
 function choose(i){
@@ -746,6 +751,7 @@ window.addEventListener("pagehide", save);
 
 function boot(data){
   if(data && data.S && data.S.v === 2) S = data.S;
+  if(CFG.autostart && !S.run){ const A = CFG.autostart; S.mode = A.mode || "study"; startRun(DATA.map(q => q.id), A.label || (DATA.length + " soru"), S.mode, A.minutes || DATA.length); return; }
   render();
 }
 const hot = window.claude && window.claude.hot;

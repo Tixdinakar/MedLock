@@ -9,11 +9,12 @@ Site: https://tixdinakar.github.io/MedLock/ (GitHub Pages, `main` dalının kök
 - Şifre sadece `MEDLOCK_PASS` ortam değişkeniyle verilir; hiçbir dosyaya, commit mesajına ya da loga yazılmaz.
 - Commit'ten önce `python3 tools/medlock.py check` çalıştır. `check` (ve şifre istemeyen `scan`) izin listesi dışındaki dosyayı, `d/` altında şifresiz görünen ya da bu anahtarla çözülmeyen dosyayı, GitHub anahtarı ve şifre sızıntısını reddeder. Bir şey bulursa: içerik ise `add-doc`/`add-test` ile şifreli ekle, şifresiz kopyayı ve geçici dosyaları sil, sonra yeniden `check`. Kurulumda `git config core.hooksPath tools/hooks` (pre-commit kancası `scan` çalıştırır).
 - Arayüz dosyalarını (index.html, app.js, app.css, engine.html, sw.js, manifest) değiştirdikten sonra `python3 tools/medlock.py stamp` çalıştır. Kabuk cihazda önbellekten açılır; uygulama `v.json`'daki `app` ile app.js'teki `APPV`'yi karşılaştırıp kabuğu topluca yeniler. `stamp` ikisini birlikte yazar; `check` uyuşmazlığı yakalar.
-- Kullanıcıya görünen sürüm `app.js`'te `VERSION` (1.0 ilk sürüm, 1.1 = 7 Kasım genel güncellemesi). Her arayüz değişikliğinde artır: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.2 → 1.1.3); `CHANGES`'in başına kısa Türkçe not ekle (Buğra'nın anlayacağı dille, kod terimi yok). Ana sayfada her cihazda bir kez "Yeni sürüm" notu çıkar; Ayarlar › Yenilikler'de hepsi durur. `check` VERSION ile ilk notun aynı olduğuna bakar.
+- Kullanıcıya görünen sürüm `app.js`'te `VERSION` (1.0 ilk sürüm, 1.1 = 7 Kasım genel güncellemesi, 1.2 = 8 Kasım: Bugün kartı, Saat, Düello, konuya göre ders sayfası). Her arayüz değişikliğinde artır: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.2 → 1.1.3); `CHANGES`'in başına kısa Türkçe not ekle (Buğra'nın anlayacağı dille, kod terimi yok). Ana sayfada her cihazda bir kez "Yeni sürüm" notu çıkar; Ayarlar › Yenilikler'de hepsi durur. `check` VERSION ile ilk notun aynı olduğuna bakar.
 
 ## Yapı
 - `k.json`: veri anahtarı (DEK), şifreden türetilen anahtarla sarılı (PBKDF2-SHA256 600k + AES-GCM). Şifre değişince sadece bu dosya değişir (`passwd`).
-- `d/c`: katalog (gzip JSON, şifreli). Öğeler: id, k (slayt|not|ozet|cikmis|soru|test|kart|video), g (k1..k4|ortak), c (ders), h (hoca), t (başlık), d (tarih), n (sayfa/soru), x (blob klasörü; videoda yok), v (sürüm), src (drive:<fileId>), dq (tarih tahmini), u (yükleyen), dur (video süresi), cx (çıkmıştan test).
+- `d/c`: katalog (gzip JSON, şifreli). Öğeler: id, k (slayt|not|ozet|cikmis|soru|test|kart|video), g (k1..k4|ortak), c (ders), h (hoca), t (başlık), d (tarih), n (sayfa/soru), x (blob klasörü; videoda yok), v (sürüm), src (drive:<fileId>), dq (tarih tahmini), u (yükleyen), dur (video süresi), cx (çıkmıştan test), kn (not/özet/video → bağlı slayt destesi id'si ya da listesi; ders sayfası konuya göre gruplar), tp (testin konu sayıları), dk (testin destelere göre soru sayıları; `refs` yazar).
+  `kurullar[].saat`: {ders: ders saati} (`saat` komutu, d/plan'dan; kurul provasında dersler arası dağılım). `ta`: {ders: {eski konu adı: yeni}} (`konu-ad`). `sinavlar`: [{d, c, t}].
   `donemler`: [{id: d1, no, name, yil, final: {start, end, est}}]; kurullar ve `ortak` `dn` ile döneme bağlı. Kurul id'leri bütün yıllarda tekil: Dönem I `k1..k4`, Dönem II gelince `d2-k1..` ve `d2-ortak` (yeni dönemi `DONEMLER`/`KURULLAR`'a ekle).
   `skip`: bilerek eklenmeyen Drive dosyaları. `todo`: eklenmesi bekleyen Drive dosyaları (çoğu 10 MB'tan büyük olduğu için connector indiremedi; sahibinden ek olarak istenir).
 - `d/<x>/<n>`: sayfa görselleri (WebP), `d/<x>/t`: sayfa metinleri; `d/<x>` (dosya): test ya da kart verisi; `d/s`: arama dizini.
@@ -48,9 +49,14 @@ python3 tools/medlock.py test-dump <id> x.json        # testi düzelt (x.json sc
 python3 tools/medlock.py test-load <id> x.json        # … ve geri yaz (refs + arama dizini yenilenir)
 python3 tools/medlock.py final 2027-05-15 2027-05-31  # final dönemi (K4 bitişi → bütünleme); final sınavı 24.05.2027
 python3 tools/medlock.py sinav 2026-11-13 "Kanser ve Kök Hücre" --t Vize   # ana sayfada 3 hafta önceden sınav uyarısı (--rm siler)
+python3 tools/medlock.py konu [--force]               # not/özet → slayt destesi bağı (kn); add-doc kendisi de tahmin eder
+python3 tools/medlock.py saat                         # kurul provası için ders saatleri (kurullar[].saat, d/plan'dan)
+python3 tools/medlock.py konu-ad Biyokimya "Tepkime tipleri" "Tepkime Kategorileri"   # aynı konunun iki adı (argümansız: liste)
+python3 tools/medlock.py fix-rot <id> --dry           # taranmış PDF'te yan sayfalar; sayfaları gözle doğrula, sonra --pages 1,7 [--angle 90|180|270]
 python3 tools/medlock.py check && git add -A && git commit && git push
 ```
 `add-doc`/`add-test` soru→slayt bağlantılarını (`refs`) ve arama dizinini kendisi yeniler. Testteki `s` alanı "Ders adı, slayt 12, 14" biçimindeyse sayfa doğrudan alınır; numara yoksa metin benzerliğiyle tahmin edilir ("tahmini" diye gösterilir). Testteki ders adı slayt başlığından farklıysa slayt öğesine `al` (takma ad listesi) ekle: `set <id> al='["Testteki ad"]'`, sonra `refs`.
+Yeni testte konu adlarını (`t`) aynı dersin mevcut testlerindeki adlarla aynı yaz (İlerleme, Karma ve tekrar konuya göre toplar); farklı kalmışsa `konu-ad` ile eşle. Not/özet eklenince `kn` yanlış tahmin edildiyse: `set <id> kn='["deste-id"]'`.
 
 `--by`: dosyayı yükleyen (Drive'da sahibi). Buğra'nın ve arkadaşının kendi notları, özetleri ve videolarında her zaman; hoca slaytlarında yalnız Buğra dışında biri yüklediyse. Uygulamada "Yükleyen: …" olarak görünür.
 
@@ -67,7 +73,9 @@ Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tari
    `python3 tools/medlock.py add-drive dosya.pdf --folder K2/Biyokimya --fid <id> --name "<Drive'daki ad>"`
    Tür (yatay = slayt, dikey A4 = not; ad "çıkmış/soru/özet/el" içeriyorsa ona göre), kurul (klasör ya da tarih), ders (klasör), hoca (PDF'teki isim, yoksa dersin bilinen hocası) ve başlık tahmin edilir. Emin değilsen önce `--dry`, gerekirse `--kind/--hoca/--title` ile düzelt.
 4. 10 MB üstündeyse `todo <id> --folder ... --name ... --kb ...` ile kaydet ve sahibinden ek olarak iste.
-5. `check`, commit, push. Ne eklendiğini, tahmin edilen hocaları ve yükleyenleri kısaca bildir.
+   Taranmış PDF'te yan duran sayfa varsa `fix-rot <id> --dry`, sayfaları gözle doğrula, `--pages` ile düzelt.
+5. Kategori denetimi: Drive listesini `[{"id", "name", "folder": "K2/Biyokimya"}]` olarak scratchpad'e yaz, `python3 tools/medlock.py drive-check liste.json`; Drive'da başka kurul/ders klasörüne taşınmış dosyaları gösterir, doğruysa `--fix`.
+6. `check`, commit, push. Ne eklendiğini, tahmin edilen hocaları ve yükleyenleri kısaca bildir.
 
 Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama ve soru–slayt eşleşmesi bunlarda da çalışır.
 
@@ -79,7 +87,8 @@ Hoca derste "sınavda çıktı / soru olarak gelir" dediyse açıklamaya "Hoca d
 ## Hata bildirimleri
 Sorularda "Hata bildir" düğmesi var; bildirimler profilde (`rep`) birikir, Buğra Ayarlar › Hata bildirimleri › Kopyala ile metni sohbete yapıştırır (test id, soru id ve sırası, neden, not, uygulama hataları). Düzeltme: normal testte `test-dump` → düzelt → `test-load`; çıkmış testinde `build_cx.py --dump/--src`. Cevap anahtarı değiştiyse açıklamada belirt.
 
-## Final dönemi
+## Tekrar, sınav öncesi ve final dönemi
+Aralıklar 1, 3, 7, 14, 30 gün; yanlışta kutu bir basamak geri iner (sıfırlanmaz), soru ertesi gün gelir. "Tahmin ettim" (testte ve tekrarda doğru cevaptan sonra): yarın yeniden sorulur, aralık uzamaz. Yaklaşan sınavın (7 gün içinde; kurul sonu ya da `sinavlar`) soruları önce gelir; sınavdan önceki 3 gün (`EXW`) o sınavın öğrenilmiş soruları bir kez daha sorulur (son tur, `xr`). Şıklar her seferinde karışır ("hepsi", "I ve II" gibi şıkka dayanan sorular hariç, `NOSHUF`).
 `donemler[].final` aralığında Tekrar listesine öğrenilmiş (m=1) sorular bir kez daha gelir (doğruysa yine öğrenilmiş kalır, yanlışsa normal aralıklara döner), ana sayfada "Final dönemi" kartı ve bütün kurullardan "Final denemesi" (#/karma?final=1) çıkar. Uzun SRS aralığı yok. Tarihler belli olunca `final` komutuyla güncelle.
 
 ## Müfredat
@@ -113,11 +122,21 @@ Eski merkez sayfa (claude.ai artifact) bir prototipti ve artık güncellenmiyor.
 - Slayt görünümünde "açık sayfa" ekranın üst kısmındaki sayfadır (sayaç, işaret, döndürme, adres); en alta inilince son sayfa.
 - Geri tuşu (Buğra'nın en çok şikâyet ettiği yer): geçmiş bir yığın (`history.state.d` + sessionStorage `ml.navstack`). Uygulama içi bağlantılar `navTo`'dan geçer: yığında zaten olan ekrana (alt sekmeler, yol) yeni kayıt açmadan geri dönülür; sol üstteki ok geldiğin yer üstteyse geri gider, değilse üst ekrana çıkar (slayta geri inmez). Alt pencereler (`sheet`, `latSheet`) ve testteki slayt paneli `ovOpen`/`ovDone` ile geçmişe kayıt ekler; telefonun geri tuşu önce onları kapatır. Adres değiştirirken `replaceHash` kullan (`history.replaceState`'i doğrudan çağırma). `tools/back.js` bunları dener.
 - Cihaz önbelleğinde (`ml-data-1`) güncel olmayan `?v=` blobları `pruneCache` siler; yeni blob yolu eklersen oraya da ekle.
-- Arama: tırnak içi ("sodyum pompası") yalnız yan yana geçenleri bulur (ekler serbest); tırnaksız aramada kelimelerin yan yana geçtiği sayfalar öne çıkar.
+- Arama: tırnak içi ("sodyum pompası") yalnız yan yana geçenleri bulur (ekler serbest); tırnaksız aramada kelimelerin yan yana geçtiği sayfalar öne çıkar. 3'ten az sonuçta kelimelerin ilk 5 harfiyle yeniden arar (kültürünün → kültür). Sonuçlar belgeye göre toplu.
+- Alt çubuk (1.2): Ana sayfa · Kütüphane · Tekrar · Ara · Diğer. Diğer yukarı açılan menü (İlerleme, Saat, Düello, Karma, Çıkmışlar, Latince, İşaretler, Ayarlar), `ovOpen` ile; geri tuşu kapatır. Yatay tablette hepsi yan menüde.
+- Ana sayfa sırası: hoş geldin (yeni kullanıcı) ya da yeni sürüm notu → sınav puanı kartı (sınav geçince 30 gün, bir kez; `real`) → Bugün kartı (seri, bugünkü soru/süre, yaklaşan sınavlar, tekrar, Kaldığın yer: yarım testler/karma/okumalar en çok 4, Sıradaki okunmamış deste) → kurul kartı (sınava kalan gün, okunan deste/çözülen soru, Kurul provası) → kutular → senkron önerisi.
+- Ders sayfası varsayılan konuya göre: slayt destesi = konu; not/özet `kn` ile, test sorularının ≥%60'ı hangi destedense orada; kalanlar "Birden çok konudan testler", "Diğer notlar", "Çıkmışlar". Ders içi arama başlıkları süzer, slayt/not içinde geçen sayfaları da gösterir.
+- Slayt sonunda "Okudum" (`rd`) ve "Bu desteden 10 soru" (deste testi); sorusu ≥5 olan deste ilk açılınca üstte "Okumadan önce 5 soru?" (ön test). Deste testi karma motoruyla açılır, geri ok desteye döner.
+- Karma: kurul seçici; mod karma ekranında seçilir ve motor kapaksız başlar (`CFG.autostart`); zamana karşıda soru başına 1 dk (`perQuestion: 1`). Kurul provası (`#/karma?g=k2&prova=1`): en çok 100 soru, soru sayısı kadar dakika, dersler arası dağılım `kurullar[].saat`'e göre, önce hiç çözülmemişler; prova bağlantısıyla gelinince adres testle değiştirilir (geri tuşu provayı yeniden başlatmaz).
+- Saat (#/saat): kronometre, Pomodoro 25/5 (4 turda 15 dk), 50/10, Serbest (mola = çalışmanın beşte biri). Süre zaman damgasından (cihazda `ml.clk`); çalışma süresi profilde `tm[gün][cihaz][ders]` (saniye). Ekran kararmaz (Wake Lock), aşama değişince titreşim, ses yok. Saat çalışırken başka ekranlarda alt çubuğun üstünde sayaç şeridi (`.cc-m`; yatayda yan menüde `.cc-s`); hiçbir düğmeyi örtmez.
+- Düello (#/duello): aynı senkron gist'indeki diğer profiller (`SY.others`): bugün süre ve soru, hafta, seri, ortak seri, haftalık ortak hedef (`dz`, en son değiştirenin değeri). Senkron yoksa açıklama gösterir.
+- Test sonucunda zayıf konu (en az 3 cevaplı soru ve %60 altı; sorularının %80'inden azı cevaplanmışsa boşlar sayılmaz) yanında "özetten oku": desteye `kn` ile bağlı özet, yoksa not, yoksa deste; konu adının en çok geçtiği sayfa. Çıkmış açıklamasındaki "Çıkmışın aslı: <PDF adı>, sayfa N" düğme olur.
 
 ## Profiller ve senkron
 - Her kullanıcının ilerlemesi (tekrar listesi, test sonuçları ve yarım kalan test durumları, işaretler, döndürülmüş sayfalar, ilerleme istatistikleri, hata bildirimleri) cihazda `ml.p.<profil>` anahtarında durur. Uygulama hataları cihazda `ml.errs`.
 - Senkron anahtarı (yalnız `gist` yetkili GitHub anahtarı) **repoya ve kataloğa asla konmaz**; her cihazda Ayarlar › Profil › Cihazlar arası senkron'dan girilir ve yalnız o cihazda durur. Profiller "MedLock senkron" adlı gizli gist'te `p-<profil>.txt` olarak, uygulama anahtarıyla AES-GCM şifreli tutulur ve cihazlar arasında birleştirilir (kayıt bazında en yeni kazanır; deneme geçmişi ve günlük sayılar birleşir). Profil kimliği adın kendisidir: her cihazda aynı adı kullanmak gerekir.
+- Profil alanları (1.2): `rd` okuma {id: {p, m, ok, at}}, `tm` çalışma süresi, `dz` ortak hedef, `real` sınav puanları, `qh` soru geçmişi ({n, k, l, d, hh: [[gün, 0/1]]}).
+- Sayım: her cevap bir kez (`days`): motorda sayılan soru id'leri `run.mlc`'de; tekrarda aynı oturumda yeniden sorulan sayılmaz. Konu hakimiyeti ve "ilk denemede doğru" yalnız o günün ilk cevabından (`qhRecord`). Seri: en az 1 soru ya da Saat'le 15 dk; Pazartesi–Pazar haftasında 1 gün ara serbest (`STREAK_TXT`).
 - Denetim betiği api.github.com isteklerini engeller; gerçek senkron verisine dokunmaz.
 
 ## Boyut

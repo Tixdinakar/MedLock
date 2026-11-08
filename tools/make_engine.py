@@ -20,7 +20,7 @@ BRIDGE_CSS = """<style>
 .ml-go{display:flex;align-items:center;gap:8px;margin-top:10px;width:100%;text-align:left;font:600 13px/1.35 var(--f-ui,system-ui);
   color:var(--form,#0f5c63);background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:10px;padding:9px 12px;cursor:pointer}
 .ml-go:hover{border-color:var(--form,#0f5c63)}
-.ml-go .ml-ic{flex:none;width:18px;height:18px}
+.ml-go .ml-ic{flex:none;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ml-go .ml-t{flex:1;min-width:0}
 .ml-go .ml-t small{display:block;font-weight:500;color:var(--muted,#666);font-size:12px}
 .ml-go .ml-arrow{flex:none;font-weight:700}
@@ -56,6 +56,10 @@ html.ml .top .chip{padding:3px 9px;font-size:12px}
 body.has-gobar{padding-bottom:84px}
 .ml-rep{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:10px;font:600 12.5px var(--f-ui,system-ui);color:var(--muted,#666);padding:4px 2px}
 .ml-rep:hover{color:var(--bad,#b00)}
+.ml-gss{margin-left:14px;color:var(--form,#0f5c63)}
+.ml-gsd{margin-left:14px;cursor:default;color:var(--ok,#1b7f3b)}
+.ml-ozet{all:unset;box-sizing:border-box;cursor:pointer;margin-left:6px;font:600 12px var(--f-ui,system-ui);color:var(--form,#0f5c63);text-decoration:underline;text-underline-offset:2px}
+.ml-cx .ml-ic{color:#b7791f}
 </style>"""
 PATCHES = [
     # yatay tablet ve PC: soru sütunu geniş, yazı büyük (tabletin genişliği boşa gitmesin)
@@ -91,9 +95,21 @@ PATCHES = [
      "      const k = +el.dataset.k, i = +el.dataset.i;\n      if(k !== r.cur){ r.cur = k; r.confirm = false; save(); render(); bringCardIntoView(); break; }\n      choose(i);\n      break;"),
     ("+ '<small>Numaraya dokun, o soruya git</small></button>'",
      "+ '<small>Satıra dokun, o soruya git; şıkkı orada işaretle</small></button>'"),
-    # hata bildir
+    # hata bildir; doğru ama tahminle bildiysen tekrar listesine ekle
     ("+ '</div>' + (window.ML ? ML.btn(q.id) : '') + '</div>';",
-     "+ '</div>' + (window.ML ? ML.btn(q.id) : '') + (window.ML && ML.rep ? ML.rep(q.id) : '') + '</div>';"),
+     "+ '</div>' + (window.ML ? ML.btn(q.id) : '') + (window.ML && ML.rep ? ML.rep(q.id) : '') + (window.ML && ML.guess && st === \"ok\" ? ML.guess(q.id) : '') + '</div>';"),
+    # her cevap bir kez sayılsın (MedLock tekrar ve günlük sayaç)
+    ("S.run = { mlid: Date.now(), label, ids:list,", "S.run = { mlid: Date.now(), mlc: [], label, ids:list,"),
+    # karma deneme kendiliğinden başlar (mod MedLock'un karma ekranında seçilir; ikinci bir kapak açılmaz)
+    ("function boot(data){\n  if(data && data.S && data.S.v === 2) S = data.S;\n  render();\n}",
+     "function boot(data){\n  if(data && data.S && data.S.v === 2) S = data.S;\n  if(CFG.autostart && !S.run){ const A = CFG.autostart; S.mode = A.mode || \"study\"; startRun(DATA.map(q => q.id), A.label || (DATA.length + \" soru\"), S.mode, A.minutes || DATA.length); return; }\n  render();\n}"),
+    # zayıf konu: en az 3 cevaplı soru; yarıda bitirilen denemede boşlar sayılmaz
+    ("  const topics = order.map(key => { const s = stats(r, groups[key]); return { key, c:key.split(\"|\")[0], t:key.split(\"|\")[1], s, p: s.ok / s.total }; })\n    .sort((x, y) => x.p - y.p || y.s.total - x.s.total);\n  const weakN = topics.filter(o => o.p < 0.6).length;\n  const trows = topics.map(o => '<tr class=\"' + (o.p < 0.6 ? \"weak\" : \"\") + '\"><td><span class=\"tname\">' + (multi ? '<span class=\"cchip ' + CC(o.c) + '\">' + esc(COURSES[o.c].short) + '</span>' : '') + esc(o.t) + (o.p < 0.6 ? ' <span class=\"wtag\">zayıf</span>' : '') + '</span></td>'",
+     "  const full = answered(r) >= 0.8 * r.ids.length;\n  const topics = order.map(key => { const s = stats(r, groups[key]), base = full ? s.total : s.ok + s.bad; return { key, c:key.split(\"|\")[0], t:key.split(\"|\")[1], s, p: base ? s.ok / base : 1, w: base >= 3 && s.ok / base < 0.6 }; })\n    .sort((x, y) => (y.w ? 1 : 0) - (x.w ? 1 : 0) || x.p - y.p || y.s.total - x.s.total);\n  const weakN = topics.filter(o => o.w).length;\n  const trows = topics.map(o => '<tr class=\"' + (o.w ? \"weak\" : \"\") + '\"><td><span class=\"tname\">' + (multi ? '<span class=\"cchip ' + CC(o.c) + '\">' + esc(COURSES[o.c].short) + '</span>' : '') + esc(o.t) + (o.w ? ' <span class=\"wtag\">zayıf</span>' + (window.ML && ML.ozet ? ML.ozet(groups[o.key], o.t) : '') : '') + '</span></td>'"),
+    ("(weakN ? '<p class=\"note\">%60\\'ın altındaki ' + weakN + ' konu zayıf olarak işaretli.</p>' : '')",
+     "'<p class=\"note\">' + (weakN ? 'En az 3 sorusunu cevapladığın ve %60’ın altında kalan ' + weakN + ' konu zayıf olarak işaretli.' : 'Zayıf konu yok.') + (full ? '' : ' Denemeyi yarıda bitirdiğin için boşlar zayıf sayılmadı.') + '</p>'"),
+    ("+ (window.ML ? ML.panel(wrong.map(o => o.id)) : '')",
+     "+ (window.ML ? ML.panel(wrong.filter(o => full || status(r, o.id) === \"bad\").map(o => o.id)) : '')"),
 ]
 
 
