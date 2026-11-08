@@ -4,8 +4,15 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.2.2";
+const VERSION = "1.3";
 const CHANGES = [
+  { v: "1.3", d: "2026-11-08", l: [
+    "Testte “?” düğmesi: emin olmadığın soruyu işaretle; optik formda sarı görünür, doğru bilsen de ertesi gün tekrar sorulur",
+    "Test içinde “Boş” ve “Emin değilim” süzgeci; bitirirken “Boşlara dön” ve “Emin olmadıklarıma dön”",
+    "Optik form sol kenarda, ortada küçük bir sekme; artık Sonraki düğmesini örtmüyor. İçindeki “Yana sabitle” ile solda ya da sağda sütun olur, soru kalan alana sığar",
+    "Slayt ve testte tam ekran düğmesi: üst ve alt çubuklar gizlenir; sağ üstteki düğmeyle ya da geri tuşuyla çıkılır",
+    "Test bitince “Test nasıldı?”: zorluk ve sorular hakkında kısa yorum; hata bildirimleriyle birlikte Ayarlar’dan kopyalanır",
+  ] },
   { v: "1.2.2", d: "2026-11-08", l: [
     "Sayfayı aşağı çekince alttaki çubuğun kaybolması düzeldi",
   ] },
@@ -73,7 +80,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "896e33acbf";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "a6e69920e7";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -87,6 +94,8 @@ const LS = {
 
 /* ---------- icons ---------- */
 const ICONS = {
+  full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  unfull: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
   home: '<path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>',
   lib: '<path d="M5 4h4v16H5z"/><path d="M11 4h4v16h-4z"/><path d="m17 5.2 2.6-.7 2.4 15-2.6.7z"/>',
   rep: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/>',
@@ -1232,7 +1241,7 @@ function viewDoc(id, page, q) {
   main().innerHTML = '<div class="fill">' + bar({
     title: it.t, solid: 1, back, crumb: crumbFor(it.g, it.c),
     actions: (S.cat.lat && (S.cat.lat.ids || []).includes(it.id) ? '<button class="ibtn" id="latb" title="Bu sayfadaki Latince terimler">' + icon("lex") + "</button>" : "") + '<button class="ibtn" id="zmb" title="Yakınlaştır">' + icon("zoom") + '</button><button class="ibtn" id="rotb" title="Sayfayı döndür">' + icon("rot") + '</button><button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
-  }) + '<div class="doc" id="doc" tabindex="-1"></div></div>';
+  }) + '<div class="doc" id="doc" tabindex="-1"></div><button class="fsdoc" id="fsb" type="button" title="Tam ekran" aria-label="Tam ekran">' + icon("full") + "</button></div>";
   const rel = S.cat.items.filter(t => t.k === "test" && (t.dk || []).some(d => d[0] === it.id));
   const first = !PS.get("rd", {})[it.id], nq = deckQn(it.id), canRead = it.k !== "cikmis" && it.k !== "soru";
   const foot = '<div class="doc-foot">'
@@ -1254,6 +1263,7 @@ function viewDoc(id, page, q) {
     },
   });
   setLast("doc", { id: it.id, p: page }); rdSet(it.id, page);
+  fsBind();
   S.cleanup.push(() => { clearTimeout(saveT); V.destroy(); });
   // Okudum işareti ve deste testi (sayfaların sonunda)
   const rb = $("#rdok"), drawRd = () => { const ok = (PS.get("rd", {})[it.id] || {}).ok; rb.className = "btn" + (ok ? " done" : " primary"); rb.innerHTML = icon("check") + (ok ? "Okundu" : "Okudum"); };
@@ -1331,11 +1341,40 @@ function closeSlide(fromPop) {
 const pagesLabel = (it, pages) => (it && it.k === "slayt" ? "slayt " : "sayfa ") + pages.join(", ");
 
 /* ---------- tests (engine in iframe) ---------- */
+/* ---------- tam ekran (slayt ve test) ----------
+   Üst çubuk, alt sekmeler ve yan menü gizlenir; sağ üstte çıkış düğmesi. Geri tuşu önce tam ekrandan çıkar (ovOpen). */
+let FS = null;
+function fsBind() { const b = $("#fsb"); if (b) b.onclick = fsEnter; S.cleanup.push(() => fsExit(true)); }
+function fsFrame(on) { const fr = $(".tpane iframe"); try { if (fr && fr.contentDocument) fr.contentDocument.documentElement.classList.toggle("mlfs", on); } catch (e) {} }
+function fsEnter() {
+  if (FS) return;
+  const sh = $("#shell"); if (!sh) return;
+  sh.classList.add("fs");
+  const x = document.createElement("button");
+  x.type = "button"; x.className = "fsx"; x.title = "Tam ekrandan çık"; x.setAttribute("aria-label", "Tam ekrandan çık"); x.innerHTML = icon("unfull");
+  x.onclick = () => fsExit(false);
+  document.body.appendChild(x);
+  fsFrame(true);
+  try { const de = document.documentElement, p = de.requestFullscreen && de.requestFullscreen({ navigationUI: "hide" }); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+  FS = { x, tok: null };
+  FS.tok = ovOpen(() => fsExit(true));
+}
+function fsExit(fromPop) {
+  if (!FS) return;
+  const f = FS; FS = null;
+  const sh = $("#shell"); if (sh) sh.classList.remove("fs");
+  f.x.remove(); fsFrame(false);
+  if (document.fullscreenElement) { try { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  if (!fromPop) ovDone(f.tok); else { const i = OV.indexOf(f.tok); if (i >= 0) OV.splice(i, 1); }
+}
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && FS) fsExit(false); });
 window.MLBridge = function (win) {
   const C = S.cur;
   if (!C) return null;
   win.addEventListener("error", e => logErr(e.error || e.message, "test"));
   win.addEventListener("click", e => {
+    const fz = e.target.closest && e.target.closest("[data-mlfz],[data-mlfs],[data-mlfsave],[data-mlfedit]");
+    if (fz) { e.preventDefault(); return fbClick(C, fz); }
     const rb = e.target.closest && e.target.closest("[data-mlr]");
     if (rb) { e.preventDefault(); return reportQ(C, rb.dataset.mlr); }
     const gb = e.target.closest && e.target.closest("[data-mlg]");
@@ -1374,6 +1413,7 @@ window.MLBridge = function (win) {
       return '<div class="panel"><h2>Bakman gereken slaytlar</h2><div class="ml-decks">' + rows + '</div><p class="ml-note">Numaraya dokununca o sayfa açılır. Kesikli çerçeveli (~) numaralar tahminidir.</p></div>';
     },
     rep(qid) { return '<button type="button" class="ml-rep" data-mlr="' + esc(qid) + '">⚑ Hata bildir</button>'; },
+    fb(run, ok, n) { return fbPanel(C, run, ok, n); },
     save(state) { onEngineSave(C, state); },
   };
 };
@@ -1441,7 +1481,10 @@ function onEngineSave(C, st) {
       r.mlc.push(id); nNew++; chq = true;
       qhRecord(qh, key, a === q.a, { t: q.t, c: C.srcC ? C.srcC[id] : C.it.c });
     }
-    if (a === q.a) return;                       // boşlar ve doğrular tekrar listesine girmez
+    if (a === q.a) {                             // doğrular tekrar listesine girmez; "emin değilim" dediysen girer (Tahmin ettim gibi, yarın)
+      if (r.uns && r.uns[id]) { const e = srs[key]; if (!(e && e.r === r.mlid)) { srs[key] = Object.assign({ b: 0, w: 0, t: Date.now() }, e, { m: 0, due: addDays(td, 1), u: Date.now(), r: r.mlid }); ch = true; } }
+      return;
+    }
     const e = srs[key];
     if (e && e.r === r.mlid) return;
     srs[key] = { b: 0, due: addDays(td, 1), w: (e ? e.w : 0) + 1, r: r.mlid, t: Date.now(), u: Date.now() };
@@ -1485,7 +1528,7 @@ async function viewTest(id) {
   setNav("lib", true);
   main().innerHTML = '<div class="fill">' + bar({
     title: it.t, solid: 1, back, crumb: id === "mix" ? crumbs([[it.back ? "Desteye dön" : "Karma deneme", it.back || "#/karma"], [it.c, ""]]) : it.cx ? crumbs([["Tıp", "#/lib"], ["Çıkmışlar", "#/cikmis?g=" + it.g], [it.c, "#/lib/" + it.g + "/" + slug(it.c)]]) : crumbFor(it.g, it.c),
-    actions: id === "mix" ? "" : '<button class="ibtn" id="tinfo" title="Testin kaynakları">' + icon("info") + "</button>",
+    actions: '<button class="ibtn" id="fsb" title="Tam ekran">' + icon("full") + "</button>" + (id === "mix" ? "" : '<button class="ibtn" id="tinfo" title="Testin kaynakları">' + icon("info") + "</button>"),
   }) + '<div class="tsplit"><div class="tpane"><div class="loading"><div><div class="spin"></div>Test açılıyor…</div></div></div><aside class="spane" id="spane" hidden></aside></div></div>';
   if (id === "mix") { const m = await mixBlob(PS.get("mix", null)); blob = m.blob; extra = { mix: 1, src: m.src, srcC: m.srcC }; }
   else {                                            // konu adları her yerde aynı (tname); önbellekteki test değişmez
@@ -1504,8 +1547,10 @@ async function viewTest(id) {
   fr.title = it.t;
   fr.srcdoc = tpl.replace("/*ML_DATA*/", () => "const CFG = " + jsLit(Object.assign({}, blob.cfg, { key: ekey, perQuestion: 1 })) + ";\nconst DATA = " + jsLit(blob.data));
   if (id === "mix") new Set(blob.data.map(q => (blob.refs[q.id] || [])[0]).filter(Boolean)).forEach(d => preloadOzet({ dk: [[d]] })); else preloadOzet(it);
+  fr.addEventListener("load", () => { if (FS) fsFrame(true); });
   $(".tpane").replaceChildren(fr);
   const ti = $("#tinfo"); if (ti) ti.onclick = () => testInfo(it);
+  fsBind();
   if (id !== "mix") setLast("test", { id: it.id });
 }
 function sheet(html) {
@@ -1532,6 +1577,38 @@ function testInfo(it) {
       : tp.map(([t, n]) => '<div class="r"><span>' + esc(t) + '</span><span class="muted">' + n + ' soru</span><span class="b"><i style="width:' + Math.round(100 * n / Math.max(...tp.map(x => x[1]))) + '%"></i></span></div>').join(""))
     + '</div><p class="note">Bir derse dokunursan slaytları açılır. Test içinde her açıklamanın altında “Slayta git” düğmesi var; test bitince sonuç sayfasında yanlışlarının slaytları listelenir.</p>'
     + '<div class="row-btns" style="margin-top:12px"><button class="btn" data-close>Kapat</button></div>');
+}
+
+/* ---------- test sonu yorumu (hata bildirimleriyle birlikte birikir) ---------- */
+const FBZ = ["Kolay", "Uygun", "Zor"];
+const FBS = ["Kaynağa uygundu", "Kaynakta olmayan soru vardı", "Fazla ayrıntıcı", "Cevap şıktan belli oluyordu", "Açıklamalar yetersiz"];
+const fbKey = (C, run) => (C.it.id || "mix") + "|fb:" + run;
+function fbPanel(C, run, ok, n, edit) {
+  const cur = PS.get("rep", {})[fbKey(C, run)], old = cur && !cur.x ? cur : null, sc = old && old.sc ? old.sc : ok + "/" + n;
+  const head = '<div class="panel ml-fb" data-run="' + run + '" data-sc="' + sc + '"><h2>Test nasıldı?</h2>';
+  if (old && !edit) return head + '<p class="ml-done">Yorumun kaydedildi' + (old.z ? " · " + esc(old.z) : "") + (old.s && old.s.length ? " · " + esc(old.s.join(", ")) : "") + "</p>"
+    + (old.n ? '<p class="ml-note">' + esc(old.n) + "</p>" : "") + '<button type="button" class="ml-rep" data-mlfedit="1">Düzenle</button></div>';
+  const z = old ? old.z : "", ss = old ? old.s || [] : [];
+  return head
+    + '<div class="ml-fq"><span>Zorluk</span><div class="ml-chips">' + FBZ.map(x => '<button type="button" class="ml-chip' + (z === x ? " on" : "") + '" data-mlfz="' + x + '">' + x + "</button>").join("") + "</div></div>"
+    + '<div class="ml-fq"><span>Sorular</span><div class="ml-chips">' + FBS.map(x => '<button type="button" class="ml-chip' + (ss.includes(x) ? " on" : "") + '" data-mlfs="' + x + '">' + x + "</button>").join("") + "</div></div>"
+    + '<textarea rows="2" maxlength="800" placeholder="İstersen kısaca yaz: neyi beğendin, ne eksikti?">' + esc(old ? old.n || "" : "") + "</textarea>"
+    + '<button type="button" class="btn ml-fsave" data-mlfsave="1">Kaydet</button>'
+    + '<p class="ml-note">Ayarlar › Hata bildirimleri’nde birikir; oradan kopyalayıp Claude’a yapıştırırsın.</p></div>';
+}
+function fbClick(C, el) {
+  const box = el.closest(".ml-fb"); if (!box) return;
+  const run = box.dataset.run, [ok, n] = (box.dataset.sc || "0/0").split("/");
+  if (el.dataset.mlfz) { box.querySelectorAll("[data-mlfz]").forEach(b => b.classList.toggle("on", b === el && !el.classList.contains("on"))); return; }
+  if (el.dataset.mlfs) { el.classList.toggle("on"); return; }
+  if (el.dataset.mlfedit) { box.outerHTML = fbPanel(C, run, ok, n, true); return; }
+  const z = (box.querySelector("[data-mlfz].on") || {}).textContent || "", s = Array.from(box.querySelectorAll("[data-mlfs].on")).map(b => b.textContent), note = box.querySelector("textarea").value.trim();
+  if (!z && !s.length && !note) return toast("Bir şey seç ya da yaz");
+  const M = Object.assign({}, PS.get("rep", {}));
+  M[fbKey(C, run)] = { k: "fb", tid: C.it.id || "mix", qid: "fb:" + run, t: C.it.t, c: C.it.c, sc: box.dataset.sc, z, s, n: note, at: Date.now(), x: 0 };
+  PS.set("rep", M);
+  box.outerHTML = fbPanel(C, run, ok, n);
+  toast("Yorum kaydedildi");
 }
 
 /* ---------- hata bildirimleri ---------- */
@@ -1561,6 +1638,10 @@ function reportText() {
   const reps = openReps(), errs = LS.get("ml.errs", []);
   const L = ["MedLock hata bildirimleri · " + (P.name || "") + " · " + fdate(today(), true) + " · sürüm " + (APPV || "?"), ""];
   reps.forEach((r, i) => {
+    if (r.k === "fb") {
+      L.push((i + 1) + ") Test yorumu · " + r.c + " · " + r.t + " [" + r.tid + "]" + (r.sc ? " · sonuç " + r.sc : ""));
+      if (r.z) L.push("   Zorluk: " + r.z); if (r.s && r.s.length) L.push("   Sorular: " + r.s.join(", ")); if (r.n) L.push("   Not: " + r.n); L.push(""); return;
+    }
     L.push((i + 1) + ") " + r.c + " · " + r.t + " [" + r.tid + " / " + r.qid + (r.no > 0 ? ", " + r.no + ". soru" : "") + "]");
     L.push("   Neden: " + reasonLabel(r.r)); if (r.n) L.push("   Not: " + r.n); if (r.q) L.push("   Soru: " + r.q); L.push("");
   });
@@ -2712,8 +2793,8 @@ async function viewSettings() {
 function repSection() {
   const reps = openReps(), errs = LS.get("ml.errs", []);
   return '<h2 class="sec" id="hb">Hata bildirimleri</h2><div class="card set">'
-    + (reps.length ? reps.map(r => '<div class="row"><div class="txt"><b>' + esc(r.c + " · " + r.t + (r.no > 0 ? " · " + r.no + ". soru" : "")) + "</b><span>" + esc(reasonLabel(r.r)) + (r.n ? " · " + esc(r.n) : "") + '</span></div><button class="ibtn" data-rdel="' + esc(r.tid + "|" + r.qid) + '" aria-label="Sil">' + icon("close") + "</button></div>").join("")
-      : '<div class="row"><div class="txt"><span>Bir sorunun açıklamasındaki “Hata bildir”e dokunduğunda burada birikir.</span></div></div>')
+    + (reps.length ? reps.map(r => '<div class="row"><div class="txt"><b>' + esc((r.k === "fb" ? "Test yorumu · " : "") + r.c + " · " + r.t + (r.no > 0 ? " · " + r.no + ". soru" : "")) + "</b><span>" + esc(r.k === "fb" ? [r.z].concat(r.s || []).filter(Boolean).join(", ") : reasonLabel(r.r)) + (r.n ? " · " + esc(r.n) : "") + '</span></div><button class="ibtn" data-rdel="' + esc(r.tid + "|" + r.qid) + '" aria-label="Sil">' + icon("close") + "</button></div>").join("")
+      : '<div class="row"><div class="txt"><span>Bir sorunun açıklamasındaki “Hata bildir”e dokunduğunda ya da test sonundaki “Test nasıldı?”yı doldurduğunda burada birikir.</span></div></div>')
     + (errs.length ? '<div class="row"><div class="txt"><b>Uygulama hataları · ' + errs.length + "</b><span>" + esc(errs[errs.length - 1].m.slice(0, 90)) + "</span></div></div>" : "")
     + (reps.length || errs.length ? '<div class="row" style="justify-content:flex-end"><button class="btn primary" id="rcopy">' + icon("copy") + 'Kopyala</button><button class="btn" id="rclr">Temizle</button></div>' : "")
     + "</div>" + (reps.length || errs.length ? '<p class="note">“Kopyala”ya dokunup Claude’a yapıştır. Düzeltildikten sonra “Temizle”.</p>' : "");

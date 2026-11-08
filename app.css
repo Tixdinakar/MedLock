@@ -619,3 +619,13 @@ details.tlist>summary::-webkit-details-marker{display:none}
 .dcol .ic{width:14px;height:14px;vertical-align:-2px;color:var(--flame)}
 .set .row .txt b .ic{width:16px;height:16px;vertical-align:-3px;color:var(--flame)}
 .set .prog{background:var(--line)}
+/* 1.3 tam ekran (slayt ve test): üst çubuk, alt sekmeler ve yan menü gizli; sağ üstte çıkış düğmesi */
+.shell.fs{grid-template-columns:1fr!important;grid-template-rows:1fr!important}
+.shell.fs .side,.shell.fs .tabs,.shell.fs .clockchip,.shell.fs .main .bar{display:none!important}
+.fsx{position:fixed;top:calc(8px + var(--sat, 0px));right:calc(8px + env(safe-area-inset-right, 0px));z-index:80;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 90%,transparent);color:var(--ink);display:grid;place-items:center;box-shadow:0 2px 12px rgba(0,0,0,.2);cursor:pointer;padding:0}
+.fsx .ic{width:20px;height:20px}
+/* slaytta tam ekran düğmesi sağ altta (başlığa yer kalsın) */
+.fill{position:relative}
+.fsdoc{position:absolute;right:12px;bottom:12px;z-index:6;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 90%,transparent);color:var(--ink);display:grid;place-items:center;box-shadow:0 2px 10px rgba(0,0,0,.16);cursor:pointer;padding:0}
+.fsdoc .ic{width:20px;height:20px}
+.shell.fs .fsdoc{display:none}

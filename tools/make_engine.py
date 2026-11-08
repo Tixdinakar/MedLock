@@ -113,6 +113,154 @@ PATCHES = [
 ]
 
 
+# 1.3 (8 Kasım): emin değilim işareti, boş/emin değilim süzgeci, bitirirken "boşlara dön", optik form sol kenarda
+# sekme ve "yana sabitle" (sol/sağ sütun), tam ekranda araç satırı yer açar, test sonu yorumu.
+PATCHES += [
+    # süzgeç: boşlar / emin olmadıklarım (açık soru hep görünür kalır, cevaplayınca gezinme bozulmasın)
+    (r"""  if(!(r.finished && r.onlyWrong)) return all;
+  return all.filter(i => status(r, r.ids[i]) !== "ok");
+}""",
+     r"""  if(r.finished && r.onlyWrong) return all.filter(i => status(r, r.ids[i]) !== "ok");
+  if(r.filter === "empty") return all.filter(i => r.ans[r.ids[i]] === undefined || i === r.cur);
+  if(r.filter === "uns") return all.filter(i => (r.uns && r.uns[r.ids[i]]) || i === r.cur);
+  return all;
+}
+const nEmpty = r => r.ids.filter(id => r.ans[id] === undefined).length;
+const nUns = r => r.ids.filter(id => r.uns && r.uns[id]).length;
+function setFilter(f){
+  const r = S.run; r.filter = f || ""; r.onlyWrong = false; r.confirm = false;
+  if(r.filter){
+    const ok = r.filter === "empty" ? (i => r.ans[r.ids[i]] === undefined) : (i => !!(r.uns && r.uns[r.ids[i]]));
+    const f2 = r.ids.map((_, i) => i).find(ok);
+    if(f2 !== undefined) r.cur = f2;
+  }
+  save(); render(); bringCardIntoView();
+}
+const DOCKK = "ml.optdock";
+function dockSide(){ try{ return localStorage.getItem(DOCKK) || ""; }catch(e){ return ""; } }
+function lastDock(){ try{ return localStorage.getItem(DOCKK + ".last") || "l"; }catch(e){ return "l"; } }
+function setDock(d){ try{ if(d){ localStorage.setItem(DOCKK, d); localStorage.setItem(DOCKK + ".last", d); } else localStorage.removeItem(DOCKK); }catch(e){} }"""),
+    # soru kartı: "?" (emin değilim) ve süzgeç satırı
+    (r"""function quizHTML(){""",
+     r"""function unsHTML(r, id){
+  const on = !!(r.uns && r.uns[id]);
+  if(r.finished) return on ? '<span class="unsb on" title="Emin olmadığını işaretlemiştin">?</span>' : '';
+  return '<button type="button" class="unsb' + (on ? ' on' : '') + '" data-act="unsure" aria-pressed="' + on + '" title="Bu sorudan emin değilim">?</button>';
+}
+function filterHTML(r){
+  const u = nUns(r), ch = (f, t) => '<button type="button" class="fchip' + ((r.filter || "") === f && !r.onlyWrong ? ' on' : '') + '" data-act="filt" data-f="' + f + '">' + t + '</button>';
+  if(r.finished) return u ? '<div class="qfilt">' + ch("", "Hepsi") + ch("uns", "Emin olmadıklarım · " + u) + '</div>' : '';
+  const e = nEmpty(r);
+  if(!r.filter && !u && e === r.ids.length) return '';
+  return '<div class="qfilt">' + ch("", "Hepsi · " + r.ids.length) + ch("empty", "Boş · " + e) + ch("uns", "Emin değilim · " + u) + '</div>';
+}
+function quizHTML(){"""),
+    (r"""<span class="count">Soru ' + (k + 1) + ' / ' + r.ids.length + '</span></div>'""",
+     r"""<span class="count">Soru ' + (k + 1) + ' / ' + r.ids.length + '</span>' + unsHTML(r, id) + '</div>'"""),
+    (r"""    + review
+    + '<div class="qhead">'""",
+     r"""    + review + filterHTML(r)
+    + '<div class="qhead">'"""),
+    # optik form: emin olmadığın sorular renkli; sol kenarda sekme; yana sabitleme
+    (r"""(k === r.cur ? " cur" : "") + '" data-act="jump" data-k=""",
+     r"""(k === r.cur ? " cur" : "") + (r.uns && r.uns[id] ? " uns" : "") + '" data-act="jump" data-k="""),
+    (r"""<span><i class="k"></i>doğru şık</span>'""",
+     r"""<span><i class="k"></i>doğru şık</span><span><i class="u"></i>emin değildim</span>'"""),
+    (r"""'<span><i class="s"></i>işaretli</span><span><i></i>boş</span>';""",
+     r"""'<span><i class="s"></i>işaretli</span><span><i></i>boş</span><span><i class="u"></i>emin değilim</span>';"""),
+    (r"""  return '<aside class="sheet' + (sheetOpen ? " open" : "") + '" aria-label="Optik form">'
+    + '<button type="button" class="sheet-head" data-act="sheet" aria-expanded="' + sheetOpen + '"><b>CEVAP KÂĞIDI <span>' + answered(r) + '/' + r.ids.length + ' <span class="arrow">' + (sheetOpen ? "▴" : "▾") + '</span></span></b>'""",
+     r"""  const dk = dockSide(), open = sheetOpen || !!dk;
+  const tools = dk ? '<button type="button" class="stb" data-act="dock" data-d="">Sabitlemeyi kaldır</button><span class="seg"><button type="button" class="stb' + (dk === "l" ? " on" : "") + '" data-act="dock" data-d="l">Solda</button><button type="button" class="stb' + (dk === "r" ? " on" : "") + '" data-act="dock" data-d="r">Sağda</button></span>'
+    : '<button type="button" class="stb" data-act="dock" data-d="' + lastDock() + '">Yana sabitle</button><span class="snote">Optik ekranın bir yanında sütun olur, soru kalan alana sığar</span>';
+  return '<aside class="sheet' + (open ? " open" : "") + (dk ? " docked" : "") + '" aria-label="Optik form">'
+    + '<button type="button" class="sheet-head" data-act="sheet" aria-expanded="' + open + '"><b><span class="sh-t">CEVAP KÂĞIDI</span> <span>' + answered(r) + '/' + r.ids.length + ' <span class="arrow">' + (dk ? "✕" : open ? "✕" : "▸") + '</span></span></b>'"""),
+    (r"""    + '<div class="sheet-body">' + blocks + '<div class="legend">' + leg + '</div></div></aside>';""",
+     r"""    + '<div class="sheet-tools">' + tools + '</div>'
+    + '<div class="sheet-body">' + blocks + '<div class="legend">' + leg + '</div></div></aside>';"""),
+    (r"""  document.body.classList.toggle("has-gobar", S.view === "start");""",
+     r"""  document.body.classList.toggle("has-gobar", S.view === "start");
+  const dk = S.view === "quiz" ? dockSide() : "";
+  document.body.classList.toggle("dock-l", dk === "l"); document.body.classList.toggle("dock-r", dk === "r");"""),
+    (r"""    case "sheet": sheetOpen = !sheetOpen; render(); break;""",
+     r"""    case "sheet": if(dockSide()){ setDock(""); sheetOpen = false; } else sheetOpen = !sheetOpen; render(); break;
+    case "dock": setDock(el.dataset.d); sheetOpen = false; render(); break;
+    case "unsure": if(r && !r.finished){ const id = r.ids[r.cur]; r.uns = r.uns || {}; if(r.uns[id]) delete r.uns[id]; else r.uns[id] = 1; save(); render(); } break;
+    case "filt": if(r) setFilter(el.dataset.f); break;"""),
+    # bitirirken: boşlara / emin olmadıklarına dön
+    (r"""(empty ? empty + " soru boş." : "Bütün soruları cevapladın.") + '</p>'""",
+     r"""(empty ? empty + " soru boş." : "Bütün soruları cevapladın.") + (nUns(r) ? " " + nUns(r) + " soruda emin değilim dedin." : "") + '</p>'"""),
+    (r"""<button class="btn" type="button" data-act="finish-cancel">Devam et</button></div>';""",
+     r"""<button class="btn" type="button" data-act="finish-cancel">Hayır, devam et</button>'
+      + (empty ? '<button class="btn" type="button" data-act="filt" data-f="empty">Boşlara dön (' + empty + ')</button>' : '')
+      + (nUns(r) ? '<button class="btn" type="button" data-act="filt" data-f="uns">Emin olmadıklarıma dön (' + nUns(r) + ')</button>' : '')
+      + '</div>';"""),
+    (r"""function finish(timeUp){ const r = S.run; r.finished = true; r.timeUp = !!timeUp; r.confirm = false; r.onlyWrong = false;""",
+     r"""function finish(timeUp){ const r = S.run; r.finished = true; r.timeUp = !!timeUp; r.confirm = false; r.onlyWrong = false; r.filter = "";"""),
+    (r"""      r.onlyWrong = el.dataset.only === "1";
+      r.cur = Math.min(+el.dataset.k || 0, r.ids.length - 1);""",
+     r"""      r.onlyWrong = el.dataset.only === "1"; r.filter = el.dataset.f || "";
+      r.cur = Math.min(+el.dataset.k || 0, r.ids.length - 1);
+      if(r.filter === "uns"){ const f = r.ids.findIndex(id => r.uns && r.uns[id]); if(f >= 0) r.cur = f; }"""),
+    (r"""      r.onlyWrong = !r.onlyWrong;""", r"""      r.onlyWrong = !r.onlyWrong; r.filter = "";"""),
+    # sonuç: emin olmadıklarını incele, yanlış listesinde işaret, test yorumu
+    (r"""+ '<button class="btn" type="button" data-act="review" data-k="0" data-only="0">Bütün cevapları incele</button>'""",
+     r"""+ '<button class="btn" type="button" data-act="review" data-k="0" data-only="0">Bütün cevapları incele</button>'
+    + (nUns(r) ? '<button class="btn" type="button" data-act="review" data-k="0" data-only="0" data-f="uns">Emin olmadıklarını incele (' + nUns(r) + ')</button>' : '')"""),
+    (r"""+ '<button class="btn ghost" type="button" data-act="home">Yeni deneme</button></div>'
+    + split""",
+     r"""+ '<button class="btn ghost" type="button" data-act="home">Yeni deneme</button></div>'
+    + (window.ML && ML.fb ? ML.fb(r.mlid, st.ok, st.total) : '')
+    + split"""),
+    (r"""+ esc(q.t) + '</span><p>' + esc(plain(q.q))""",
+     r"""+ esc(q.t) + (r.uns && r.uns[o.id] ? ' <span class="wtag u">emin değildin</span>' : '') + '</span><p>' + esc(plain(q.q))"""),
+    # görünüm
+    (r""".sheet.open .sheet-body{display:block;max-height:min(62vh, 560px)}""",
+     r""".sheet.open .sheet-body{display:block;max-height:min(62vh, 560px)}
+/* 1.3 optik: kapalıyken sol kenarda ortalı dikey sekme (Sonraki düğmesini örtmez); açıkken soldan panel; "Yana sabitle" ile sütun */
+.sheet{left:0;right:auto;top:50%;bottom:auto;transform:translateY(-50%);border-radius:0 12px 12px 0;border-left:0}
+.sheet:not(.open){box-shadow:0 3px 12px rgba(0,0,0,.2)}
+.sheet:not(.open) .sheet-head{padding:12px 6px}
+.sheet:not(.open) .sheet-head b{writing-mode:vertical-rl;transform:rotate(180deg);display:flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.14em}
+.sheet:not(.open) .sheet-head b span{font-size:10.5px}
+.sheet:not(.open) .sheet-head .arrow{display:none}
+.sheet:not(.open) .sheet-tools{display:none}
+.sheet.open{width:min(420px, calc(100vw - 24px));max-height:calc(100vh - 24px)}
+.sheet-tools{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:9px 12px 2px}
+.stb{all:unset;box-sizing:border-box;cursor:pointer;font:600 12.5px var(--f-ui,system-ui);border:1px solid var(--line);border-radius:999px;padding:4px 11px;color:var(--ink);background:var(--surface)}
+.stb.on{background:var(--form);border-color:var(--form);color:var(--surface)}
+.sheet-tools .seg{display:inline-flex;gap:4px}
+.snote{font-size:11px;color:var(--muted);flex:1 1 150px}
+body{--dw:clamp(176px, 30vw, 300px)}
+.sheet.docked{top:0;bottom:0;transform:none;border-radius:0;width:var(--dw);max-width:none;max-height:none;box-shadow:none;display:flex;flex-direction:column}
+.sheet.docked .sheet-head small{display:none}
+.sheet.docked .sheet-body{max-height:none;flex:1;min-height:0}
+.sheet.docked .blk{grid-template-columns:1fr}
+.sheet.docked .sheet-tools .seg{margin-left:0}
+body.dock-l .sheet.docked{left:0;right:auto;border:0;border-right:1px solid var(--line)}
+body.dock-r .sheet.docked{right:0;left:auto;border:0;border-left:1px solid var(--line)}
+body.dock-l .app{padding-left:var(--dw)}
+body.dock-r .app{padding-right:var(--dw)}
+.row.uns .no{background:#f5b301;color:#3a2a00;border-radius:4px}
+.legend i.u{background:#f5b301;border-color:#f5b301;border-radius:3px}
+.unsb{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:30px;height:30px;margin-left:8px;border-radius:50%;border:1.5px solid var(--line);display:inline-grid;place-items:center;font:700 15px var(--f-ui,system-ui);color:var(--muted);background:var(--surface)}
+.unsb.on{background:#f5b301;border-color:#f5b301;color:#3a2a00}
+.qfilt{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.fchip{all:unset;box-sizing:border-box;cursor:pointer;font:600 12.5px var(--f-ui,system-ui);border:1px solid var(--line);border-radius:999px;padding:4px 11px;color:var(--muted);background:var(--surface)}
+.fchip.on{border-color:var(--form);color:var(--form);background:var(--form-soft)}
+.wtag.u{color:#7a5600;background:#fff1c2}
+/* MedLock tam ekranındayken sağ üstteki çıkış düğmesine yer */
+html.mlfs .top{padding-right:56px}
+html.mlfs body.dock-r .sheet.docked .sheet-head{padding-right:56px}
+.ml-fb .ml-fq{display:grid;gap:6px;margin:0 0 10px}
+.ml-fb .ml-fq>span{font-size:12.5px;font-weight:600;color:var(--muted)}
+.ml-fb .ml-chip.on{background:var(--form);border-color:var(--form);color:var(--surface)}
+.ml-fb textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface);color:var(--ink);resize:vertical}
+.ml-fb .ml-fsave{margin-top:8px}
+.ml-fb .ml-done{font-size:13px;color:var(--ok);font-weight:600;margin:8px 0 0}"""),
+]
+
+
 def apply_patches(s, strict=True):
     for a, b in PATCHES:
         if b in s:
