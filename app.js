@@ -4,8 +4,14 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.1.7";
+const VERSION = "1.1.8";
 const CHANGES = [
+  { v: "1.1.8", d: "2026-11-08", l: [
+    "Slayt ve notlarda yakınlaştırma: büyüteç düğmesi ya da sayfaya çift dokunma (1× → 1,6× → 2,2×); özetler telefonda okunur",
+    "Telefonda üstteki yol sığmayınca yarım kesilmiyor, baştaki parça gizleniyor",
+    "Yeni profilde bütün sürüm geçmişi değil yalnız son sürüm notu çıkıyor",
+    "Tekrar ve İlerleme'de ders adı iki kez yazılmıyor",
+  ] },
   { v: "1.1.7", d: "2026-11-08", l: [
     "Net kaldırıldı (sınavlarda yanlış doğruyu götürmüyor): sonuçlarda doğru sayısı ve yüzde var",
     "İlerleme › Kurul sınavı ile karşılaştır: artık kuruldan aldığın puanı (100 üzerinden) yazıyorsun",
@@ -45,7 +51,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "215f768297";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "7224e7eff9";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -83,6 +89,7 @@ const ICONS = {
   chart: '<path d="M4 20h16"/><path d="M7 16v-5M12 16V7M17 16v-8"/>',
   mix: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6"/>',
   rot: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3L19.5 9"/><path d="M19.5 4v5h-5"/>',
+  zoom: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M10.5 7.5v6M7.5 10.5h6"/>',
   lex: '<path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h10.5M9 8h6M9 11h4"/>',
   bm: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/>',
   bmf: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z" fill="currentColor"/>',
@@ -249,6 +256,18 @@ const donemById = id => donemler().find(d => d.id === id) || donemler()[0];
 const donemOf = g => { const k = g && kurulById(g); return donemById(k && k.dn || "d1"); };
 const kurulLabel = k => k.no ? "Kurul " + k.no : k.name;
 // Üstteki yol: Tıp › Dönem I › Kurul II › Biyokimya (her parça dokunulabilir)
+// "Ders · Başlık"; başlık zaten ders adıyla başlıyorsa ders adı tekrar yazılmaz
+const ct = (c, t) => (t || "").toLocaleLowerCase("tr").startsWith((c || "").toLocaleLowerCase("tr")) ? t : c + " · " + t;
+// Dar ekranda yol sığmazsa baştaki parçalar gizlenir (yarım kesik "m I" görünmesin); en az son iki parça kalır
+function fitCrumbs() {
+  $$(".bar .crumb").forEach(n => {
+    const as = $$("a", n).filter(a => getComputedStyle(a).display !== "none");
+    for (let i = 0; i < as.length - 2 && n.scrollWidth > n.clientWidth + 1; i++) {
+      as[i].style.display = "none"; const sp = as[i].nextElementSibling; if (sp && sp.classList.contains("sep")) sp.style.display = "none";
+    }
+    n.scrollLeft = n.scrollWidth;
+  });
+}
 function crumbs(P) { return P.map(([l, h], i) => h ? '<a href="' + h + '"' + (i === 0 && l === "Tıp" ? ' class="root"' : "") + ">" + esc(l) + "</a>" : "<span>" + esc(l) + "</span>").join('<i class="sep">›</i>'); }
 function crumbFor(g, c, upTo) {
   const P = [["Tıp", "#/lib"]];
@@ -607,7 +626,7 @@ async function route() {
   const [a, b, c] = parts;
   const m = main();
   m.scrollTop = 0;
-  requestAnimationFrame(() => $$(".bar .crumb").forEach(n => { n.scrollLeft = n.scrollWidth; }));
+  requestAnimationFrame(fitCrumbs);
   try {
     if (!a) return viewHome();
     if (a === "lib") return !b ? viewLib(q) : !c ? viewKurul(b) : viewCourse(b, c);
@@ -770,7 +789,8 @@ function viewHome() {
 }
 // Güncellemeden sonra ana sayfada bir kez görünen kısa not (cihaz başına)
 function updCard() {
-  const news = CHANGES.filter(c => vcmp(c.v, LS.get("ml.seenv", "1.0")) > 0);
+  const seen = LS.get("ml.seenv", null);
+  const news = seen == null ? CHANGES.slice(0, 1) : CHANGES.filter(c => vcmp(c.v, seen) > 0);   // ilk kez açan cihaz yalnız son sürümü görür
   if (!news.length) return "";
   return '<div class="card upd" id="updc"><div class="uh"><span class="k">Yeni sürüm</span><b>MedLock ' + VERSION + '</b><button class="ibtn" id="updx" aria-label="Kapat">' + icon("close") + "</button></div>"
     + news.map(c => '<div class="uv">' + (news.length > 1 ? "<small>" + c.v + "</small>" : "") + "<ul>" + c.l.map(x => "<li>" + esc(x) + "</li>").join("") + "</ul></div>").join("")
@@ -982,7 +1002,7 @@ function viewDoc(id, page, q) {
   const back = "#/lib/" + it.g + "/" + slug(it.c);
   main().innerHTML = '<div class="fill">' + bar({
     title: it.t, solid: 1, back, crumb: crumbFor(it.g, it.c),
-    actions: (S.cat.lat && (S.cat.lat.ids || []).includes(it.id) ? '<button class="ibtn" id="latb" title="Bu sayfadaki Latince terimler">' + icon("lex") + "</button>" : "") + '<button class="ibtn" id="rotb" title="Sayfayı döndür">' + icon("rot") + '</button><button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
+    actions: (S.cat.lat && (S.cat.lat.ids || []).includes(it.id) ? '<button class="ibtn" id="latb" title="Bu sayfadaki Latince terimler">' + icon("lex") + "</button>" : "") + '<button class="ibtn" id="zmb" title="Yakınlaştır">' + icon("zoom") + '</button><button class="ibtn" id="rotb" title="Sayfayı döndür">' + icon("rot") + '</button><button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
   }) + '<div class="doc" id="doc" tabindex="-1"></div></div>';
   const rel = S.cat.items.filter(t => t.k === "test" && (t.dk || []).some(d => d[0] === it.id));
   const foot = rel.length ? '<div class="doc-foot"><b>Bu ' + (it.k === "slayt" ? "slayttan" : "dosyadan") + " soru olan testler</b><div class=\"row-btns\">"
@@ -1008,6 +1028,13 @@ function viewDoc(id, page, q) {
     if (!terms.length) return toast((it.k === "slayt" ? "Bu slaytta" : "Bu sayfada") + " Latince terim bulunamadı");
     latSheet((it.k === "slayt" ? "Slayt " : "Sayfa ") + pg + " · Latince terimler", terms.map(t => latDecodeHTML(D, t)).join(""));
   };
+  // Yakınlaştırma: 1× → 1,6× → 2,2× (A4 sayfalar telefonda okunsun diye); sayfaya çift dokunmak da aynı işi yapar
+  const ZL = [1, 1.6, 2.2];
+  const zoomTo = z => { const d = $("#doc"), p = V.page; S.zoom = z; d.style.setProperty("--z", z); d.classList.toggle("zoomed", z > 1); V.goto(p); toast(z > 1 ? "Yakınlaştırma " + String(z).replace(".", ",") + "×" : "Normal boyut"); };
+  const zoomNext = () => zoomTo(ZL[(ZL.indexOf(S.zoom || 1) + 1) % ZL.length]);
+  S.zoom = 1;
+  $("#zmb").onclick = zoomNext;
+  $("#doc").addEventListener("dblclick", e => { if (e.target.closest(".pg")) zoomNext(); });
   $("#rotb").onclick = () => {
     const rk = it.x + "/" + V.page, R = Object.assign({}, PS.get("rot", {}));
     R[rk] = { a: (((R[rk] || {}).a || 0) + 90) % 360, at: Date.now() };
@@ -1333,7 +1360,7 @@ function resultsHTML() {
   if (!rows.length) return "";
   return '<h2 class="sec">Test sonuçların</h2><div class="card">' + rows.map(([id, r]) => {
     const it = S.byId[id], pc = r.n ? Math.round(100 * r.ok / r.n) : 0;
-    return '<a class="crow" href="#/t/' + id + '"><i class="cdot" style="background:' + ccol(it.c) + '"></i><div class="txt"><b>' + esc(it.c) + " · " + esc(it.t) + '</b><div class="muted small">'
+    return '<a class="crow" href="#/t/' + id + '"><i class="cdot" style="background:' + ccol(it.c) + '"></i><div class="txt"><b>' + esc(ct(it.c, it.t)) + '</b><div class="muted small">'
       + (r.fin ? "Bitti" : "Devam ediyor") + " · " + fdate(isoDay(new Date(r.at))) + '</div></div><span class="n">' + (r.fin ? r.ok + "/" + r.n + " · %" + pc : r.done + "/" + r.n) + "</span></a>";
   }).join("") + "</div>";
 }
@@ -1389,7 +1416,7 @@ async function viewSession(q) {
     const qq = blob.data.find(x => x.id === qid);
     if (!qq) { pos++; return draw(); }
     const L = ["A", "B", "C", "D", "E"];
-    box.innerHTML = head + '<div class="card qcard"><div class="crumb"><i class="cdot" style="background:' + ccol(it.c) + '"></i>' + esc(it.c) + " · " + esc(it.t) + " · " + esc(qq.t) + (s[cur.k] && s[cur.k].w > 1 ? " · " + s[cur.k].w + ". kez" : "") + "</div>"
+    box.innerHTML = head + '<div class="card qcard"><div class="crumb"><i class="cdot" style="background:' + ccol(it.c) + '"></i>' + esc(ct(it.c, it.t)) + " · " + esc(qq.t) + (s[cur.k] && s[cur.k].w > 1 ? " · " + s[cur.k].w + ". kez" : "") + "</div>"
       + qHTML(qq) + '<ul class="opts">' + qq.o.map((o, i) => '<li><button class="opt" data-i="' + i + '"><span class="bub">' + L[i] + "</span><span>" + o + "</span></button></li>").join("") + '</ul><div id="fbx"></div></div>';
     $$(".opt", box).forEach(b => b.onclick = () => {
       const i = +b.dataset.i, ok = i === qq.a;
@@ -1475,7 +1502,7 @@ function viewProgress() {
     + (W.length ? '<div class="row-btns" style="margin-bottom:10px"><a class="btn flame" href="#/karma?w=1">' + icon("mix") + "Zayıf " + W.length + " konudan karma deneme</a></div>" : "")
     + (courseBlocks || '<div class="card empty">Henüz test yok.</div>')
     + '<h2 class="sec">Deneme geçmişi</h2>' + (H.length ? '<div class="card">' + H.slice(0, 40).map(h => {
-      return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(h.c) + " · " + esc(h.t) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">' + h.ok + "/" + h.n + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
+      return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(ct(h.c, h.t)) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">' + h.ok + "/" + h.n + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
     }).join("") + "</div>" : '<div class="card empty">Bitirdiğin denemeler burada listelenir.</div>')
     + (ks.length ? '<h2 class="sec">Kurul sınavı ile karşılaştır</h2><p class="note" style="margin-top:-4px">Kurul sınavından aldığın puanı (100 üzerinden) yaz; denemelerdeki başarı yüzdenle yan yana görürsün. Denemeler seni doğru ölçüyor mu, buradan anlarsın.</p><div class="card">'
       + ks.map(k => {
@@ -1964,7 +1991,7 @@ function viewSearch(q0) {
     I.qs.forEach(o => { const sc = score(o.f); if (sc > 0) qh.push([sc, o]); });
     ph.sort((a, b) => b[0] - a[0]); qh.sort((a, b) => b[0] - a[0]);
     const pr = ph.slice(0, 60).map(([, o]) => { const it = S.byId[o.id]; return '<a class="hit" href="#/d/' + o.id + "/" + o.p + "?h=" + o.p + '"><div class="h"><i class="cdot" style="background:' + ccol(it.c) + '"></i>' + esc(it.t) + '<span class="pg-n">' + (it.k === "slayt" ? "slayt " : "s. ") + o.p + '</span></div><div class="s">' + snippet(o, Q) + "</div></a>"; }).join("");
-    const qr = qh.slice(0, 40).map(([, o]) => { const it = S.byId[o.id]; return '<div class="hit" data-qi="' + esc(o.id) + '" data-qq="' + esc(o.qid) + '"><div class="h"><i class="cdot" style="background:' + ccol(it.c) + '"></i>' + esc(it.c) + " · " + esc(it.t) + '</div><div class="s">' + snippet(o, Q) + "</div></div>"; }).join("");
+    const qr = qh.slice(0, 40).map(([, o]) => { const it = S.byId[o.id]; return '<div class="hit" data-qi="' + esc(o.id) + '" data-qq="' + esc(o.qid) + '"><div class="h"><i class="cdot" style="background:' + ccol(it.c) + '"></i>' + esc(ct(it.c, it.t)) + '</div><div class="s">' + snippet(o, Q) + "</div></div>"; }).join("");
     out.innerHTML = (pr ? '<h2 class="sec">Slayt ve notlar · ' + ph.length + '</h2><div class="card list">' + pr + "</div>" : "")
       + (qr ? '<h2 class="sec">Sorular ve kartlar · ' + qh.length + '</h2><div class="card list">' + qr + "</div>" : "")
       + (!pr && !qr ? '<div class="card empty">“' + esc(qv) + "” için sonuç yok." + (Q.P.length ? " Tırnağı kaldırırsan kelimeler ayrı ayrı da aranır." : "") + "</div>" : "");
@@ -1976,7 +2003,7 @@ function viewSearch(q0) {
     const it = S.byId[h.dataset.qi], blob = await loadTest(it);
     if (it.k === "kart") { const c = blob.cards[+h.dataset.qq]; sheet('<p class="muted small">' + esc(it.c) + " · " + esc(c[0]) + '</p><h3 style="font-family:var(--f-ui);font-size:18px">' + c[1] + '</h3><div class="fb ok"><p>' + c[2] + '</p></div><div class="row-btns" style="margin-top:14px"><a class="btn" href="#/c/' + it.id + '" data-close>Kartlara git</a><button class="btn" data-close>Kapat</button></div>'); return; }
     const qq = blob.data.find(x => x.id === h.dataset.qq), L = ["A", "B", "C", "D", "E"];
-    const sh = sheet('<p class="muted small">' + esc(it.c) + " · " + esc(it.t) + " · " + esc(qq.t) + '</p><div class="qcard" style="padding:0">' + qHTML(qq) + '<ul class="opts">' + qq.o.map((o, i) => '<li><div class="opt' + (i === qq.a ? " ok" : " dim") + '"><span class="bub">' + L[i] + "</span><span>" + o + "</span></div></li>").join("")
+    const sh = sheet('<p class="muted small">' + esc(ct(it.c, it.t)) + " · " + esc(qq.t) + '</p><div class="qcard" style="padding:0">' + qHTML(qq) + '<ul class="opts">' + qq.o.map((o, i) => '<li><div class="opt' + (i === qq.a ? " ok" : " dim") + '"><span class="bub">' + L[i] + "</span><span>" + o + "</span></div></li>").join("")
       + '</ul><div class="fb"><p>' + qq.e + '</p><div class="src">Kaynak: ' + esc(qq.s) + "</div></div>" + slideBtn(blob, qq.id) + '</div><div class="row-btns" style="margin-top:14px"><a class="btn" href="#/t/' + it.id + '" data-close>Teste git</a><button class="btn" data-close>Kapat</button><button class="ml-rep" id="srq">⚑ Hata bildir</button></div>');
     $("#srq", sh).onclick = () => { sh.close(); reportSheet({ tid: it.id, qid: qq.id, t: it.t, c: it.c, no: blob.data.findIndex(x => x.id === qq.id) + 1, q: strip(qq.q) }); };
   });

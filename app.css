@@ -493,3 +493,4 @@ b.mp{font-size:14px;padding:2px 8px}
 .exam .ex-k{font:600 10.5px var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
 .exam .ex-t{display:grid;gap:3px;min-width:0}
 .exam .row-btns{margin-top:6px}
+.doc.zoomed .pg,.doc.zoomed .pg.portrait{width:calc(100% * var(--z,1));max-width:none;margin-left:0}
