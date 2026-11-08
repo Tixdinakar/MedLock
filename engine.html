@@ -573,7 +573,7 @@ function resultHTML(){
   if(courses.length > 1){
     split = '<div class="panel"><h2>Derslere göre</h2><div class="split">' + courses.map(c => {
       const s = stats(r, r.ids.filter(id => byId[id].c === c));
-      return '<div class="srow"><span class="lbl">' + esc(COURSES[c].short) + '</span>' + stackHTML(s) + '<span class="num">' + s.ok + 'D · ' + s.bad + 'Y · ' + s.empty + 'B · net ' + num(s.net) + '</span></div>';
+      return '<div class="srow"><span class="lbl">' + esc(COURSES[c].short) + '</span>' + stackHTML(s) + '<span class="num">' + s.ok + 'D · ' + s.bad + 'Y · ' + s.empty + 'B</span></div>';
     }).join("") + '</div></div>';
   }
   const groups = {}, order = [];
@@ -593,7 +593,7 @@ function resultHTML(){
     + (r.timeUp ? '<div class="timeup">Süre doldu; deneme kendiliğinden bitirildi.</div>' : '')
     + '<div class="panel score"><div><div class="big">' + st.ok + '<small> / ' + st.total + '</small></div><div class="runlabel">' + esc(r.label) + ' · ' + MODE_NAME[r.mode] + ' · ' + fmtTime(r.elapsed) + (r.mode === "timed" ? " / " + fmtTime(r.limit) : "") + '</div></div>'
     + '<div class="kv"><div class="o"><b>' + st.ok + '</b><span>Doğru</span></div><div class="x"><b>' + st.bad + '</b><span>Yanlış</span></div><div><b>' + st.empty + '</b><span>Boş</span></div>'
-    + '<div class="n"><b>' + num(st.net) + '</b><span>Net (4 yanlış 1 doğruyu götürür)</span></div><div><b>' + pct(st.ok, st.total) + '</b><span>Başarı</span></div></div></div>'
+    + '<div class="n"><b>' + pct(st.ok, st.total) + '</b><span>Başarı</span></div></div></div>'
     + '<div class="actions"><button class="btn primary" type="button" data-act="review" data-k="' + (wrong.length ? wrong[0].k : 0) + '" data-only="1"' + (wrong.length ? "" : " disabled") + '>Sadece yanlış ve boşları incele</button>'
     + '<button class="btn" type="button" data-act="retry"' + (wrong.length ? "" : " disabled") + '>Yanlış ve boşları yeniden çöz (' + wrong.length + ')</button>'
     + '<button class="btn" type="button" data-act="review" data-k="0" data-only="0">Bütün cevapları incele</button>'

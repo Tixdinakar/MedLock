@@ -58,6 +58,10 @@ body.has-gobar{padding-bottom:84px}
 .ml-rep:hover{color:var(--bad,#b00)}
 </style>"""
 PATCHES = [
+    # Buğra'nın sınavlarında net yok (yanlış doğruyu götürmez): sonuçta net gösterilmez
+    ("'B · net ' + num(s.net) + '</span></div>'", "'B</span></div>'"),
+    ("+ '<div class=\"n\"><b>' + num(st.net) + '</b><span>Net (4 yanlış 1 doğruyu götürür)</span></div><div><b>' + pct(st.ok, st.total) + '</b><span>Başarı</span></div></div></div>'",
+     "+ '<div class=\"n\"><b>' + pct(st.ok, st.total) + '</b><span>Başarı</span></div></div></div>'"),
     # MedLock içinde mi? (başlık gizleme vb. için)
     ("<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();</script>",
      "<script>window.ML=(function(){try{return parent.MLBridge(window)}catch(e){return null}})();if(window.ML)document.documentElement.classList.add(\"ml\");</script>\n" + ML_CSS),
@@ -130,8 +134,8 @@ def build(test_html):
 if __name__ == "__main__":
     if sys.argv[1:] == ["--apply"]:
         p = os.path.join(REPO, "engine.html")
-        s = open(p, encoding="utf8").read()
-        open(p, "w", encoding="utf8").write(apply_patches(s))
+        s = apply_patches(open(p, encoding="utf8").read())  # önce yamala: yama tutmazsa dosya boşalmasın
+        open(p, "w", encoding="utf8").write(s)
         print("engine.html yamalandı")
     else:
         build(sys.argv[1])

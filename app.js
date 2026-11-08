@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.1.6";
+const VERSION = "1.1.7";
 const CHANGES = [
+  { v: "1.1.7", d: "2026-11-08", l: [
+    "Net kaldırıldı (sınavlarda yanlış doğruyu götürmüyor): sonuçlarda doğru sayısı ve yüzde var",
+    "İlerleme › Kurul sınavı ile karşılaştır: artık kuruldan aldığın puanı (100 üzerinden) yazıyorsun",
+  ] },
   { v: "1.1.6", d: "2026-11-08", l: [
     "Ana sayfada yaklaşan sınav uyarısı: kaç gün kaldığı, özete, denemeye ve derse tek dokunuş (ilki Kanser ve Kök Hücre vizesi, 13 Kasım Cuma)",
     "Kanser ve Kök Hücre denemesinde açıklamalardaki kaynak satırı iki kez yazıyordu; düzeldi",
@@ -41,7 +45,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "599d63da47";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "215f768297";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -636,7 +640,6 @@ const notFound = () => { main().innerHTML = bar({ title: "Bulunamadı", back: "#
 /* ---------- item rows ---------- */
 function kindBox(k) { const K = KIND[k] || KIND.not; return '<span class="kind" style="--kc:' + K.c + '" title="' + K.l + '">' + icon(K.ic) + "</span>"; }
 function itemHref(it) { return it.k === "test" ? "#/t/" + it.id : it.k === "kart" ? "#/c/" + it.id : it.k === "video" ? "#/v/" + it.id : "#/d/" + it.id + "/1"; }
-const netOf = r => { const bad = (r.done || 0) - (r.ok || 0); return Math.round((r.ok - bad / 4) * 100) / 100; };
 const fnum = x => String(x).replace(".", ",");
 function itemMeta(it, opts) {
   const m = [];
@@ -649,7 +652,7 @@ function itemMeta(it, opts) {
   if (it.u) m.push('<span class="up">Yükleyen: ' + esc(it.u) + "</span>");
   if (it.k === "test") {
     const r = testRes()[it.id];
-    if (r && r.fin) m.push('<span class="sc">Son: ' + r.ok + "/" + r.n + " · net " + fnum(netOf(r)) + "</span>");
+    if (r && r.fin) m.push('<span class="sc">Son: ' + r.ok + "/" + r.n + " doğru · %" + Math.round(100 * r.ok / r.n) + "</span>");
     else if (r && r.done) m.push('<span class="ip">Devam ediyor · ' + r.done + "/" + r.n + "</span>");
   }
   return m.join("");
@@ -684,7 +687,7 @@ function viewCikmis(q) {
   const card = r => {
     const tests = r.tests.map(it => {
       const x = R[it.id];
-      const st = x && x.fin ? "Son: " + x.ok + "/" + x.n + " · net " + fnum(netOf(x)) + " · %" + Math.round(100 * x.ok / x.n)
+      const st = x && x.fin ? "Son: " + x.ok + "/" + x.n + " doğru · %" + Math.round(100 * x.ok / x.n)
         : x && x.done ? "Devam ediyor · " + x.done + "/" + x.n : "Henüz çözmedin";
       const pc = x ? Math.round(100 * (x.fin ? x.ok : x.done) / x.n) : 0;
       return '<a class="cxa" href="#/t/' + it.id + '">' + kindBox("test") + '<span class="tx"><b>Çöz · ' + it.n + ' soru</b><small class="' + (x && x.fin ? "sc" : x && x.done ? "ip" : "") + '">' + st + '</small><span class="pbar"><i class="' + (x && x.fin ? "ok" : "") + '" style="width:' + pc + '%"></i></span></span></a>';
@@ -1472,15 +1475,14 @@ function viewProgress() {
     + (W.length ? '<div class="row-btns" style="margin-bottom:10px"><a class="btn flame" href="#/karma?w=1">' + icon("mix") + "Zayıf " + W.length + " konudan karma deneme</a></div>" : "")
     + (courseBlocks || '<div class="card empty">Henüz test yok.</div>')
     + '<h2 class="sec">Deneme geçmişi</h2>' + (H.length ? '<div class="card">' + H.slice(0, 40).map(h => {
-      const net = h.ok - h.bad / 4;
-      return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(h.c) + " · " + esc(h.t) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">net ' + fnum(Math.round(net * 100) / 100) + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
+      return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(h.c) + " · " + esc(h.t) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">' + h.ok + "/" + h.n + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
     }).join("") + "</div>" : '<div class="card empty">Bitirdiğin denemeler burada listelenir.</div>')
-    + (ks.length ? '<h2 class="sec">Kurul sınavı ile karşılaştır</h2><p class="note" style="margin-top:-4px">Kurul sınavından sonra gerçek netini ve soru sayısını gir; denemelerdeki başarınla yan yana görürsün.</p><div class="card">'
+    + (ks.length ? '<h2 class="sec">Kurul sınavı ile karşılaştır</h2><p class="note" style="margin-top:-4px">Kurul sınavından aldığın puanı (100 üzerinden) yaz; denemelerdeki başarı yüzdenle yan yana görürsün. Denemeler seni doğru ölçüyor mu, buradan anlarsın.</p><div class="card">'
       + ks.map(k => {
         const hs = H.filter(h => h.g === k.id), avg = hs.length ? Math.round(100 * hs.reduce((a, h) => a + h.ok / h.n, 0) / hs.length) : null, r = real[k.id] || {};
-        const rp = r.net && r.n ? Math.round(100 * r.net / r.n) : null;
-        return '<div class="crow realrow"><div class="txt"><b>Kurul ' + k.no + '</b><div class="muted small">Denemelerde ' + (avg == null ? "henüz sonuç yok" : "%" + avg + " (" + hs.length + " deneme)") + (rp != null ? " · kurulda %" + rp : "") + "</div></div>"
-          + '<input class="realin" type="number" step="0.25" inputmode="decimal" placeholder="Net" data-rk="' + k.id + '" data-rf="net" value="' + (r.net ?? "") + '"><input class="realin" type="number" inputmode="numeric" placeholder="Soru" data-rk="' + k.id + '" data-rf="n" value="' + (r.n ?? "") + '"></div>';
+        const rp = r.p != null ? Math.round(r.p) : r.net != null && r.n ? Math.round(100 * r.net / r.n) : null;
+        return '<div class="crow realrow"><div class="txt"><b>Kurul ' + k.no + '</b><div class="muted small">Denemelerde ' + (avg == null ? "henüz sonuç yok" : "%" + avg + " (" + hs.length + " deneme)") + (rp != null ? " · kurulda " + rp + " puan" : "") + "</div></div>"
+          + '<input class="realin" type="number" min="0" max="100" step="0.5" inputmode="decimal" placeholder="Puan" data-rk="' + k.id + '" data-rf="p" value="' + (r.p ?? "") + '"></div>';
       }).join("") + "</div>" : "")
     + "</div>";
   $$("[data-rk]").forEach(inp => inp.onchange = () => {
