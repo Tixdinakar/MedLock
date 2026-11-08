@@ -42,7 +42,8 @@ img{display:block;max-width:100%}
 .gate .links a{color:#aab3d1;text-decoration:underline;text-underline-offset:3px}
 
 /* ---------- shell ---------- */
-.shell{height:100vh;height:100dvh;display:grid;grid-template-rows:1fr auto}
+/* ekrana sabit: tarayıcı çubuğu açılıp kapansa da alt çubuk hep görünür alanın dibinde (100vh/100dvh bazı tabletlerde ekrandan uzun kalıyordu) */
+.shell{position:fixed;inset:0;display:grid;grid-template-rows:1fr auto}
 .side{display:none}
 .main{position:relative;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0}
 .tabs{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:var(--sab)}
