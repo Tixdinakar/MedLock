@@ -31,7 +31,7 @@ python3 tools/medlock.py cat | head                        # şifre doğru mu
 ```
 
 ## İçerik ekleme
-Kurul tarihleri: k1 07.09–23.10.2026, k2 26.10–25.12.2026, k3 28.12.2026–15.03.2027, k4 16.03–14.05.2027. Sınav biçimi: her kurul sınavı ve final 100 soru, 100 dakika; yanlış doğruyu götürmez. Kurul sınavı kurulun son günü (K1 23.10, K2 25.12.2026; K3/K4 için aynı varsayım). Final tarihleri henüz belli değil. Dosya adındaki `_YYMMDD_HHMMSS` tarih olarak alınır.
+Kurul tarihleri: k1 07.09–23.10.2026, k2 26.10–25.12.2026, k3 28.12.2026–15.03.2027, k4 16.03–14.05.2027. Sınav biçimi: her kurul sınavı ve final 100 soru, 100 dakika; yanlış doğruyu götürmez. Kurul sınavı kurulun son günü (K1 23.10, K2 25.12.2026; K3/K4 için aynı varsayım). Akademik takvim 2026–27: final (yıl sonu sınavı) 24.05.2027, bütünleme 31.05.2027; yarıyıl tatili 04–08.01.2027. Final dönemi uygulamada 15–31.05.2027. Dosya adındaki `_YYMMDD_HHMMSS` tarih olarak alınır.
 Drive klasörü "Ders Slaytları ve Notlar": Kurul › Ders düzeninde. Hoca sırası: 1) PDF'teki isim 2) bilinen ders–hoca eşleşmesi 3) Drive'daki slayttaki isim.
 
 ```
@@ -46,7 +46,7 @@ python3 tools/medlock.py set <id> t="Yeni başlık"      # düzeltme
 python3 tools/medlock.py rm <id>
 python3 tools/medlock.py test-dump <id> x.json        # testi düzelt (x.json scratchpad'de; commit etme) …
 python3 tools/medlock.py test-load <id> x.json        # … ve geri yaz (refs + arama dizini yenilenir)
-python3 tools/medlock.py final 2027-05-24 2027-06-18  # final sınavı tarihleri belli olunca (şimdilik tahmini 15.05–15.07.2027)
+python3 tools/medlock.py final 2027-05-15 2027-05-31  # final dönemi (K4 bitişi → bütünleme); final sınavı 24.05.2027
 python3 tools/medlock.py sinav 2026-11-13 "Kanser ve Kök Hücre" --t Vize   # ana sayfada 3 hafta önceden sınav uyarısı (--rm siler)
 python3 tools/medlock.py check && git add -A && git commit && git push
 ```
