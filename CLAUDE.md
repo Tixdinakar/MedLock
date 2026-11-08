@@ -14,7 +14,7 @@ Site: https://tixdinakar.github.io/MedLock/ (GitHub Pages, `main` dalının kök
 ## Yapı
 - `k.json`: veri anahtarı (DEK), şifreden türetilen anahtarla sarılı (PBKDF2-SHA256 600k + AES-GCM). Şifre değişince sadece bu dosya değişir (`passwd`).
 - `d/c`: katalog (gzip JSON, şifreli). Öğeler: id, k (slayt|not|ozet|cikmis|soru|test|kart|video), g (k1..k4|ortak), c (ders), h (hoca), t (başlık), d (tarih), n (sayfa/soru), x (blob klasörü; videoda yok), v (sürüm), src (drive:<fileId>), dq (tarih tahmini), u (yükleyen), dur (video süresi), cx (çıkmıştan test), kn (not/özet/video → bağlı slayt destesi id'si ya da listesi; ders sayfası konuya göre gruplar), tp (testin konu sayıları), dk (testin destelere göre soru sayıları; `refs` yazar).
-  `kurullar[].saat`: {ders: ders saati} (`saat` komutu, d/plan'dan; kurul provasında dersler arası dağılım). `ta`: {ders: {eski konu adı: yeni}} (`konu-ad`). `sinavlar`: [{d, c, t, w}] (w = uyarının kaç gün önceden çıkacağı; seçmeliler 5).
+  `kurullar[].saat`: {ders: ders saati} (`saat` komutu, d/plan'dan; kurul provasında dersler arası dağılım). `ta`: {ders: {eski konu adı: yeni}} (`konu-ad`). `sinavlar`: [{d, c, t, w}] (w = uyarının kaç gün önceden çıkacağı; ortak dersler ve seçmeliler 5).
   `donemler`: [{id: d1, no, name, yil, final: {start, end, est}}]; kurullar ve `ortak` `dn` ile döneme bağlı. Kurul id'leri bütün yıllarda tekil: Dönem I `k1..k4`, Dönem II gelince `d2-k1..` ve `d2-ortak` (yeni dönemi `DONEMLER`/`KURULLAR`'a ekle).
   `skip`: bilerek eklenmeyen Drive dosyaları. `todo`: eklenmesi bekleyen Drive dosyaları (çoğu 10 MB'tan büyük olduğu için connector indiremedi; sahibinden ek olarak istenir).
 - `d/<x>/<n>`: sayfa görselleri (WebP), `d/<x>/t`: sayfa metinleri; `d/<x>` (dosya): test ya da kart verisi; `d/s`: arama dizini.
@@ -48,7 +48,7 @@ python3 tools/medlock.py rm <id>
 python3 tools/medlock.py test-dump <id> x.json        # testi düzelt (x.json scratchpad'de; commit etme) …
 python3 tools/medlock.py test-load <id> x.json        # … ve geri yaz (refs + arama dizini yenilenir)
 python3 tools/medlock.py final 2027-05-15 2027-05-31  # final dönemi (K4 bitişi → bütünleme); final sınavı 24.05.2027
-python3 tools/medlock.py sinav 2026-11-13 "Kanser ve Kök Hücre" --t Vize --gun 5   # ana sayfada sınav uyarısı; --gun kaç gün önceden (seçmeliler 5, yoksa 21), --rm siler
+python3 tools/medlock.py sinav 2026-11-13 "Kanser ve Kök Hücre" --t Vize --gun 5   # ana sayfada sınav uyarısı; --gun kaç gün önceden (ortak dersler ve seçmeliler 5; kurul sınavı 14, dönem finali 21), --rm siler
 python3 tools/medlock.py konu [--force]               # not/özet → slayt destesi bağı (kn); add-doc kendisi de tahmin eder
 python3 tools/medlock.py saat                         # kurul provası için ders saatleri (kurullar[].saat, d/plan'dan)
 python3 tools/medlock.py konu-ad Biyokimya "Tepkime tipleri" "Tepkime Kategorileri"   # aynı konunun iki adı (argümansız: liste)

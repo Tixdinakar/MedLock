@@ -7,7 +7,7 @@ const NAME = "MedLock";
 const VERSION = "1.2.1";
 const CHANGES = [
   { v: "1.2.1", d: "2026-11-08", l: [
-    "Seçmeli derslerin sınav uyarısı ana sayfada 5 gün önceden çıkar (önceden 3 hafta)",
+    "Seçmeli ve ortak derslerin (ATA, Türk Dili) sınav uyarısı ana sayfada 5 gün önceden çıkar (önceden 3 hafta)",
     "Ekoloji vizesi (27 Kasım) ve ATA 151 · Türk Dili finali (30 Aralık) eklendi",
   ] },
   { v: "1.2", d: "2026-11-08", l: [
@@ -70,7 +70,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "5a0dcaa7de";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "896e683c21";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
