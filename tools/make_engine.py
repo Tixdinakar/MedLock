@@ -58,6 +58,9 @@ body.has-gobar{padding-bottom:84px}
 .ml-rep:hover{color:var(--bad,#b00)}
 </style>"""
 PATCHES = [
+    # yatay tablet ve PC: soru sütunu geniş, yazı büyük (tabletin genişliği boşa gitmesin)
+    ("/* --- ortak motor eklemeleri --- */",
+     "/* --- ortak motor eklemeleri --- */\n@media (min-width:1000px){html .quiz{max-width:1000px}html .stem{font-size:21px;max-width:none}html .roman{font-size:19px;max-width:none}html .opt{font-size:18.5px;padding:12px 14px;grid-template-columns:34px minmax(0,1fr)}html .bub{width:34px;height:34px}html .passage{font-size:18px}html .fb{font-size:16.5px;max-width:none}html .fb h4{font-size:16.5px}html .qnum{font-size:42px}html .topic,html .count{font-size:14.5px}}"),
     # Buğra'nın sınavlarında net yok (yanlış doğruyu götürmez): sonuçta net gösterilmez
     ("'B · net ' + num(s.net) + '</span></div>'", "'B</span></div>'"),
     ("+ '<div class=\"n\"><b>' + num(st.net) + '</b><span>Net (4 yanlış 1 doğruyu götürür)</span></div><div><b>' + pct(st.ok, st.total) + '</b><span>Başarı</span></div></div></div>'",

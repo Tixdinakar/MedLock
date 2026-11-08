@@ -281,6 +281,7 @@ table.topics tr.weak td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 @media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 /* --- ortak motor eklemeleri --- */
+@media (min-width:1000px){html .quiz{max-width:1000px}html .stem{font-size:21px;max-width:none}html .roman{font-size:19px;max-width:none}html .opt{font-size:18.5px;padding:12px 14px;grid-template-columns:34px minmax(0,1fr)}html .bub{width:34px;height:34px}html .passage{font-size:18px}html .fb{font-size:16.5px;max-width:none}html .fb h4{font-size:16.5px}html .qnum{font-size:42px}html .topic,html .count{font-size:14.5px}}
 /* optik form: her ekranda düğmeyle açılan yüzen panel; kapalıyken yalnızca küçük bir düğme */
 .quiz{grid-template-columns:minmax(0,1fr);max-width:780px;margin:0 auto;padding-bottom:84px}
 .sheet{position:fixed;top:auto;left:auto;right:max(16px, env(safe-area-inset-right, 0px));bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:30;width:auto;max-width:calc(100vw - 32px);border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.22)}

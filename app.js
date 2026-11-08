@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.1.8";
+const VERSION = "1.1.9";
 const CHANGES = [
+  { v: "1.1.9", d: "2026-11-08", l: [
+    "Yatay tablette ve bilgisayarda test ekranı genişledi, soru ve şıklar büyüdü",
+  ] },
   { v: "1.1.8", d: "2026-11-08", l: [
     "Slayt ve notlarda yakınlaştırma: büyüteç düğmesi ya da sayfaya çift dokunma (1× → 1,6× → 2,2×); özetler telefonda okunur",
     "Telefonda üstteki yol sığmayınca yarım kesilmiyor, baştaki parça gizleniyor",
@@ -51,7 +54,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "7224e7eff9";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "2e7f932ffa";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
