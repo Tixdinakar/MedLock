@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.2";
+const VERSION = "1.2.1";
 const CHANGES = [
+  { v: "1.2.1", d: "2026-11-08", l: [
+    "Seçmeli derslerin sınav uyarısı ana sayfada 5 gün önceden çıkar (önceden 3 hafta)",
+    "Ekoloji vizesi (27 Kasım) ve ATA 151 · Türk Dili finali (30 Aralık) eklendi",
+  ] },
   { v: "1.2", d: "2026-11-08", l: [
     "Ana sayfada “Bugün” kartı: yaklaşan sınav, bekleyen tekrar, yarım kalan bütün testlerin ve okumaların, sıradaki ders",
     "Alttaki çubukta “Diğer”: İlerleme, Saat, Düello, Karma, Çıkmışlar, Latince ve Ayarlar buradan açılır",
@@ -66,7 +70,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "2d9e2005c5";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "5a0dcaa7de";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -858,9 +862,9 @@ function viewCikmis(q) {
 }
 
 /* ---------- views: home ---------- */
-// Yaklaşan sınav uyarısı (katalogda "sinavlar": [{d, c, t}]; medlock.py sinav ile eklenir), 3 hafta önceden; Bugün kartının ilk satırı
+// Yaklaşan sınav uyarısı (katalogda "sinavlar": [{d, c, t, w}]; medlock.py sinav ile eklenir), w gün (yoksa 21) önceden; Bugün kartının ilk satırı
 function examRows() {
-  const t = today(), L = (S.cat.sinavlar || []).filter(x => x.d >= t && dayDiff(t, x.d) <= 21);
+  const t = today(), L = (S.cat.sinavlar || []).filter(x => x.d >= t && dayDiff(t, x.d) <= (x.w || 21));   // w: kaç gün önceden (seçmeliler 5)
   S.cat.kurullar.forEach(k => { if (k.end && k.end >= t && dayDiff(t, k.end) <= 14 && S.cat.items.some(i => i.g === k.id)) L.push({ d: k.end, c: "Kurul " + k.no, t: "sınavı", g: k.id }); });
   return L.sort((a, b) => a.d.localeCompare(b.d)).map(x => {
     const n = dayDiff(t, x.d), its = x.g ? [] : S.cat.items.filter(i => i.c === x.c), g = x.g || (its[0] && its[0].g);

@@ -1078,10 +1078,11 @@ def main():
     fn.add_argument("start")
     fn.add_argument("end")
     fn.add_argument("--dn", default="d1")
-    sn = sp.add_parser("sinav", help="yaklaşan sınav uyarısı: tarih ve ders (ana sayfada 3 hafta önceden çıkar)")
+    sn = sp.add_parser("sinav", help="yaklaşan sınav uyarısı: tarih ve ders (ana sayfada --gun kadar önceden çıkar, varsayılan 21)")
     sn.add_argument("date", help="YYYY-AA-GG")
     sn.add_argument("course")
     sn.add_argument("--t", default="Vize", help="Vize, Final, Kurul sınavı...")
+    sn.add_argument("--gun", type=int, help="uyarı kaç gün önceden çıksın (seçmeliler 5; yoksa 21)")
     sn.add_argument("--rm", action="store_true", help="bu sınavı sil")
     vd = sp.add_parser("add-video", help="Drive'daki videoyu kataloğa bağla (video Drive'da kalır)")
     vd.add_argument("--folder", required=True)
@@ -1259,7 +1260,7 @@ def main():
     elif a.cmd == "sinav":
         L = [x for x in V.cat.get("sinavlar", []) if not (x["d"] == a.date and x["c"] == a.course)]
         if not a.rm:
-            L.append({"d": a.date, "c": a.course, "t": a.t})
+            L.append({"d": a.date, "c": a.course, "t": a.t, **({"w": a.gun} if a.gun else {})})
         V.cat["sinavlar"] = sorted(L, key=lambda x: x["d"])
         print("sınavlar:", ", ".join(f'{x["d"]} {x["c"]} {x["t"]}' for x in V.cat["sinavlar"]) or "yok")
     elif a.cmd == "add-drive":
