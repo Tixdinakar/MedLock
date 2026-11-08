@@ -31,7 +31,7 @@ python3 tools/medlock.py cat | head                        # şifre doğru mu
 ```
 
 ## İçerik ekleme
-Kurul tarihleri: k1 07.09–23.10.2026, k2 26.10–25.12.2026, k3 28.12.2026–15.03.2027, k4 16.03–14.05.2027. Dosya adındaki `_YYMMDD_HHMMSS` tarih olarak alınır.
+Kurul tarihleri: k1 07.09–23.10.2026, k2 26.10–25.12.2026, k3 28.12.2026–15.03.2027, k4 16.03–14.05.2027. Sınav biçimi: her kurul sınavı ve final 100 soru, 100 dakika; yanlış doğruyu götürmez. Kurul sınavı kurulun son günü (K1 23.10, K2 25.12.2026; K3/K4 için aynı varsayım). Final tarihleri henüz belli değil. Dosya adındaki `_YYMMDD_HHMMSS` tarih olarak alınır.
 Drive klasörü "Ders Slaytları ve Notlar": Kurul › Ders düzeninde. Hoca sırası: 1) PDF'teki isim 2) bilinen ders–hoca eşleşmesi 3) Drive'daki slayttaki isim.
 
 ```
