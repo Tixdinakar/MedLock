@@ -69,7 +69,7 @@ Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tari
 ## Drive denetimi
 1. Drive'da "Ders Slaytları ve Notlar" klasörünü ve alt klasörlerini (K1/Biyokimya, K2/BiyokimyaSes...) dosya id'leri ve boyutlarıyla listele.
 2. `python3 tools/medlock.py known` çıktısında olmayan id'ler yenidir. "Diğer" klasörü ve Claude'un ürettiği özet kopyaları `skip`.
-   Ses kaydı dökümleri ("[Ders] Ses Kayıtları" / "...Ses" klasörleri) MedLock'a **eklenmez** (Buğra dersi kendisi dinliyor; dökümler sadece Claude'un not ve konu anlatımı hazırlarken Drive'dan okuduğu kaynaktır). `add-drive` ve `todo` bunları kendiliğinden `skip`'e yazar. Ses dosyalarının (mp3/m4a) kendisi de eklenmez.
+   Ses kaydı dökümleri ("[Ders] Ses Kayıtları" / "...Ses" klasörleri) MedLock'a **eklenmez** (Buğra dersi kendisi dinliyor; dökümler sadece Claude'un not ve konu anlatımı hazırlarken Drive'dan okuduğu kaynaktır). `add-drive` ve `todo` bunları kendiliğinden `skip`'e yazar; yeni döküm gelince önce vurguları çıkar (adım 6). Ses dosyalarının (mp3/m4a) kendisi de eklenmez.
    Videolar (mp4/mov/m4v/webm, Kurul › Ders klasörlerinde): indirme, `add-video` ile bağla (boyut sınırı yok).
 3. 10 MB altındaysa Drive connector'ının `download_file_content` aracıyla indir (sonuç JSON: `content` base64), çöz, PDF'e yaz:
    `python3 tools/medlock.py add-drive dosya.pdf --folder K2/Biyokimya --fid <id> --name "<Drive'daki ad>"`
@@ -77,7 +77,8 @@ Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tari
 4. 10 MB üstündeyse `todo <id> --folder ... --name ... --kb ...` ile kaydet ve sahibinden ek olarak iste.
    Taranmış PDF'te yan duran sayfa varsa `fix-rot <id> --dry`, sayfaları gözle doğrula, `--pages` ile düzelt.
 5. Kategori denetimi: Drive listesini `[{"id", "name", "folder": "K2/Biyokimya"}]` olarak scratchpad'e yaz, `python3 tools/medlock.py drive-check liste.json`; Drive'da başka kurul/ders klasörüne taşınmış dosyaları gösterir, doğruysa `--fix`.
-6. `check`, commit, push. Ne eklendiğini, tahmin edilen hocaları ve yükleyenleri kısaca bildir.
+6. Yeni ses kaydı dökümü (`known`'da olmayan; PDF ya da `mimeType contains 'text/'` ile bulunan `.txt`, klasörü fark etmez): indir, baştan sona oku ve "Ses kaydı vurguları" bölümüne göre hocanın vurguladığı yerleri `vurgu` ile ilgili desteye yaz. Dökümün slayt destesi henüz MedLock'ta yoksa vurgu ekleme, dökümü `skip`'e de yazma (deste gelince sonraki denetimde işlenir). İşleyince (vurgu bulunmasa da) `skip drive:<id>` ve o bölümdeki İşlenenler/Vurgu bulunamayan listesine ekle. Döküm MedLock'a içerik olarak eklenmez.
+7. `check`, commit, push. Ne eklendiğini, tahmin edilen hocaları, yükleyenleri ve eklenen vurguları (ders · deste · sayfa) kısaca bildir.
 
 Taranmış (metinsiz) sayfalar Türkçe OCR'dan geçer (tesseract `tur`); arama ve soru–slayt eşleşmesi bunlarda da çalışır.
 
