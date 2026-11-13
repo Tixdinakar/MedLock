@@ -4,8 +4,13 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.3.4";
+const VERSION = "1.4";
 const CHANGES = [
+  { v: "1.4", d: "2026-11-13", l: [
+    "Çalışma süresi kendiliğinden sayılıyor: slayt, not, özet, test ve tekrar açıkken geçen süre derse eklenir (Saat açık değilse). Uzun süre dokunmazsan sayım durur",
+    "Saat açık unutulursa: 45 dakika dokunulmayınca sayım durur, uygulamaya dönünce “Bu sürede çalıştın mı?” diye sorar",
+    "Süreyi düzelt: Saat ekranında Bugün’ün yanındaki “Düzelt”e ya da haftanın bir gününe dokun, derslere gerçek dakikayı yaz; Düello’ya da öyle geçer",
+  ] },
   { v: "1.3.4", d: "2026-11-13", l: [
     "Profil seçme ekranındayken geri tuşuna basınca ya da eşitleme bitince çıkan hata düzeldi",
     "Telefonda slayt düğmeleri başlığın altında kendi satırında; uzun başlıklar artık kesilmiyor",
@@ -98,7 +103,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "fb05f2a7ab";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "85acc466fd";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -422,6 +427,16 @@ function tname(c, t) {
 }
 // Çalışma süresi (Saat): tm[gün][cihaz][ders] = saniye
 const tmDay = (tm, d) => { let s = 0; Object.values((tm || {})[d] || {}).forEach(m => Object.values(m || {}).forEach(x => { s += x || 0; })); return s; };
+// Elle düzeltme (Saat › Düzelt): tx[gün] = {at, m: {ders: düşülecek saniye}}; ham süre cihazlar arasında yalnız büyür (max),
+// düzeltme gün başına en yenisi kazanır. Gösterilen süre = ham − düzeltme.
+function tmRaw(prof, d) { const o = new Map(); Object.values(((prof && prof.tm) || {})[d] || {}).forEach(m => Object.entries(m || {}).forEach(([c, x]) => o.set(c, (o.get(c) || 0) + (x || 0)))); return o; }
+function tmC(prof, d) {
+  const o = tmRaw(prof, d), x = ((((prof && prof.tx) || {})[d]) || {}).m || {};
+  Object.entries(x).forEach(([c, v]) => o.set(c, Math.max(0, (o.get(c) || 0) - (v || 0))));
+  o.forEach((v, c) => { if (v < 1) o.delete(c); });
+  return o;
+}
+const tmTot = (prof, d) => { let s = 0; tmC(prof, d).forEach(v => { s += v; }); return s; };
 function tmAdd(course, sec) {
   if (!(sec >= 1) || !P) return;
   const tm = Object.assign({}, PS.get("tm", {})), d = today();
@@ -430,8 +445,8 @@ function tmAdd(course, sec) {
   PS.set("tm", tm);
 }
 // Seri: en az 1 soru çözülen ya da Saat'le 15 dk çalışılan her gün 1 artar; haftada (Pzt–Paz) 1 gün ara serbest
-const STREAK_TXT = "Seri, en az 1 soru çözdüğün ya da Saat’le 15 dakika çalıştığın her gün 1 artar. Haftada 1 gün ara verirsen bozulmaz.";
-const dayActive = (prof, d) => dayN((prof && prof.days) || {}, d) > 0 || tmDay(prof && prof.tm, d) >= 900;
+const STREAK_TXT = "Seri, en az 1 soru çözdüğün ya da 15 dakika çalıştığın her gün 1 artar. Haftada 1 gün ara verirsen bozulmaz.";
+const dayActive = (prof, d) => dayN((prof && prof.days) || {}, d) > 0 || tmTot(prof, d) >= 900;
 function streakOf(act) {
   const t = today(), used = new Set();
   let n = 0, d = act(t) ? t : addDays(t, -1);
@@ -491,7 +506,7 @@ function mergeP(a, b) {
   const o = Object.assign({}, a);
   o.name = (b.at > a.at ? b.name : a.name) || a.name || b.name;
   o.srs = mergeMap(a.srs, b.srs, "u");
-  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
+  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
   const newer = (x, y) => !x ? y : !y ? x : (y.at || 0) > (x.at || 0) ? y : x;
   o.mix = newer(a.mix, b.mix); o.dz = newer(a.dz, b.dz);
   o.tm = {};                                       // çalışma süresi: gün › cihaz › ders, her cihazın en büyük değeri
@@ -968,7 +983,7 @@ function viewHome() {
   const byC = new Map(); due.forEach(key => { const it = srsKeyItem(key); if (it) byC.set(it.c, (byC.get(it.c) || 0) + 1); });
   const bms = bmLoad().filter(b => S.byId[b.id]);
   const started = t >= k.start, lastWeek = started && left >= 0 && left <= 7;
-  const days = PS.get("days", {}), sk = myStreak(), nToday = dayN(days, t), tmT = tmDay(PS.get("tm", {}), t);
+  const days = PS.get("days", {}), sk = myStreak(), nToday = dayN(days, t), tmT = tmTot(P, t);
   const hasCx = cxAny(), cont = contList(), nx = started && nextUnread(k), prep = kurulPrep(k.id);
   const todayCard = '<div class="card today"><div class="th">' + icon("today") + "<b>Bugün</b>"
     + '<span class="sk' + (dayActive(P, t) ? " on" : "") + '" title="' + esc(STREAK_TXT) + '">' + icon("flame") + sk + " gün</span>"
@@ -1368,6 +1383,7 @@ function viewDoc(id, page, q) {
     },
   });
   setLast("doc", { id: it.id, p: page }); rdSet(it.id, page);
+  trkSet(it.c); S.cleanup.push(() => trkSet(""));
   fsBind();
   $("#dlb").onclick = () => docDownload(it, $("#dlb"));
   $$("[data-hvp]").forEach(b => b.onclick = () => V.goto(+b.dataset.hvp, true));
@@ -1482,6 +1498,7 @@ window.MLBridge = function (win) {
   const C = S.cur;
   if (!C) return null;
   win.addEventListener("error", e => logErr(e.error || e.message, "test"));
+  try { actListen(win.document); } catch (e) {}
   win.addEventListener("click", e => {
     const fz = e.target.closest && e.target.closest("[data-mlfz],[data-mlfs],[data-mlfsave],[data-mlfedit]");
     if (fz) { e.preventDefault(); return fbClick(C, fz); }
@@ -1659,6 +1676,7 @@ async function viewTest(id) {
   try { if (saved) localStorage.setItem(ekey, JSON.stringify(saved.s)); else localStorage.removeItem(ekey); } catch (e) {}
   S.cur = Object.assign({ it, blob, byQ, ekey }, extra);
   S.cleanup.push(() => { S.cur = null; });
+  trkSet(it.c || "Karma"); S.cleanup.push(() => trkSet(""));
   const fr = document.createElement("iframe");
   fr.title = it.t;
   fr.srcdoc = tpl.replace("/*ML_DATA*/", () => "const CFG = " + jsLit(Object.assign({}, blob.cfg, { key: ekey, perQuestion: 1 })) + ";\nconst DATA = " + jsLit(blob.data));
@@ -1817,6 +1835,7 @@ async function viewCards(id) {
 /* ---------- review (Leitner) ---------- */
 function viewReview() {
   setNav("tekrar");
+  trkSet("Tekrar"); S.cleanup.push(() => trkSet(""));
   const s = srsLoad(), t = today(), keys = Object.keys(s), X = upcomingExams(EXW), X7 = upcomingExams(7);
   const back = k => finalBack(s[k]) || !!examBackKey(k, s[k], X);
   const active = keys.filter(k => (!s[k].m || back(k)) && srsKeyItem(k));
@@ -2030,7 +2049,7 @@ function viewProgress() {
   const sel = S.pk || (S.pk = kurulDefault()), gs = sel === "all" ? null : new Set([sel]);
   const arr = []; for (let i = 13; i >= 0; i--) { const x = addDays(t, -i); arr.push([x, dayN(days, x)]); }
   const max = Math.max(10, ...arr.map(x => x[1]));
-  let wkQ = 0, wkT = 0; for (let x = weekStart(t); x <= t; x = addDays(x, 1)) { wkQ += dayN(days, x); wkT += tmDay(tm, x); }
+  let wkQ = 0, wkT = 0; for (let x = weekStart(t); x <= t; x = addDays(x, 1)) { wkQ += dayN(days, x); wkT += tmTot(P, x); }
   const ft = firstTry(7);
   const T = topicTotals(gs), M = mastery(gs);
   const courseBlocks = Array.from(T.entries()).sort((a, b) => (M.get(b[0]) || new Map()).size - (M.get(a[0]) || new Map()).size).map(([c, tm2]) => {
@@ -2679,9 +2698,12 @@ async function wake(on) {
   } catch (e) { wakeL = null; }
 }
 const buzz = () => { try { navigator.vibrate && navigator.vibrate([280, 140, 280]); } catch (e) {} };
+// Saat açık unutulursa: son dokunuştan 45 dk sonrası kendiliğinden sayılmaz; dönünce "çalıştın mı?" diye sorulur (clkIdle)
+const IDLE_C = 45 * 60e3;
+const elAt = (c, ts) => c.acc + (c.run ? Math.max(0, ts - c.t0) / 1000 : 0);
 function clkFlush(c) {                           // çalışma süresinin yazılmamış kısmını derse ekle
   if (c.phase !== "work") return;
-  const d = Math.floor(clkEl(c) - (c.fl || 0));
+  const d = Math.floor(Math.min(clkEl(c), elAt(c, LA + IDLE_C)) - (c.fl || 0));
   if (d >= 1) { tmAdd(c.course || "Genel", d); c.fl = (c.fl || 0) + d; }
 }
 function clkStartPhase(c, phase, len, at) { c.phase = phase; c.len = len; c.acc = 0; c.fl = 0; c.t0 = at || Date.now(); c.run = true; }
@@ -2691,7 +2713,9 @@ function clkAdvance(c) {
   for (let i = 0; i < 50 && c.run && c.len > 0 && clkEl(c) >= c.len; i++) {
     const T = TECH[c.tech] || TECH.sw, end = c.t0 + (c.len - c.acc) * 1000;
     if (c.phase === "work") {
-      const d = Math.floor(c.len - (c.fl || 0)); if (d >= 1) tmAdd(c.course || "Genel", d);
+      const lim = Math.min(c.len, elAt(c, LA + IDLE_C)), d = Math.floor(lim - (c.fl || 0));
+      if (d >= 1) tmAdd(c.course || "Genel", d);
+      c.pend = (c.pend || 0) + Math.max(0, c.len - Math.max(lim, c.fl || 0));   // dokunulmadan geçen, sayılmayan kısım
       c.cyc = (c.cyc || 0) + 1;
       const lb = T.lb && c.cyc % 4 === 0;
       clkStartPhase(c, "break", (lb ? T.lb : T.b || 5) * 60, end);
@@ -2709,7 +2733,7 @@ function clkAction(a) {
     if (c.phase === "idle") { c.cyc = 0; clkStartPhase(c, "work", T.w ? T.w * 60 : 0); }
     else if (!c.run) { c.t0 = Date.now(); c.run = true; }
   } else if (a === "pause") { if (c.run) { clkFlush(c); c.acc = clkEl(c); c.run = false; } }
-  else if (a === "stop") { clkFlush(c); const w = c.phase === "work" ? clkEl(c) : 0; Object.assign(c, { run: false, phase: "idle", acc: 0, t0: 0, len: 0, cyc: 0, fl: 0 }); if (w >= 60) toast("Kaydedildi: " + fmtDur(w) + " · " + (c.course || "Genel")); }
+  else if (a === "stop") { clkFlush(c); const w = c.phase === "work" ? clkEl(c) : 0; Object.assign(c, { run: false, phase: "idle", acc: 0, t0: 0, len: 0, cyc: 0, fl: 0, pend: 0, pg: 0 }); if (w >= 60) toast("Kaydedildi: " + fmtDur(w) + " · " + (c.course || "Genel")); }
   else if (a === "break" && c.phase === "work") { clkFlush(c); const w = clkEl(c); c.cyc = (c.cyc || 0) + 1; clkStartPhase(c, "break", Math.min(30, Math.max(3, Math.round(w / 60 / 5))) * 60); }
   else if (a === "skip" && c.phase === "break") { clkStartPhase(c, "work", T.w ? T.w * 60 : 0); }
   clkSet(c); clockTick(true);
@@ -2737,7 +2761,78 @@ function clockTick(force) {
   if (c.phase !== "idle" && !clkI) clkI = setInterval(() => clockTick(), 1000);
   if (c.phase === "idle" && clkI) { clearInterval(clkI); clkI = 0; }
 }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { clockTick(true); if (parseHash().parts[0] === "saat" && clkGet().run) wake(true); } });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") { if (P) actNow(); clockTick(true); if (parseHash().parts[0] === "saat" && clkGet().run) wake(true); }
+  else trkFlush();
+});
+// Saat uzun süre dokunulmadan açık kaldıysa: sayılmayan süreyi bir kenara ayır ve sor
+function clkIdle(now) {
+  const c = clkGet();
+  if (c.phase === "idle") return;
+  if (now - LA > IDLE_C) {
+    if (c.run) clkAdvance(c);
+    clkFlush(c);
+    if (c.phase === "work") { c.pend = (c.pend || 0) + Math.max(0, clkEl(c) - (c.fl || 0)); c.fl = clkEl(c); }
+    if (!c.pg) c.pg = LA;
+    if (!((c.pend || 0) >= 60)) { c.pend = 0; c.pg = 0; }
+    clkSet(c);
+  }
+  if ((c.pend || 0) >= 60) idleSheet(c);
+}
+function idleSheet(c) {
+  if ($(".idlesh")) return;
+  const pend = c.pend, last = new Date(c.pg || Date.now()), gap = (Date.now() - last) / 1000;
+  const bg = sheet('<div class="idlesh"><h3>Saat açık kalmış</h3><p>' + fmtDur(gap) + " boyunca uygulamaya dokunmadın (son dokunuş " + (dayDiff(isoDay(last), today()) ? fdate(isoDay(last)) + " " : "") + last.toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" }) + ").</p>"
+    + '<p class="muted small">Bunun ' + fmtDur(pend) + "’lik çalışma kısmı henüz sayılmadı (" + esc(c.course || "Genel") + "). Bu sürede çalıştın mı?</p>"
+    + '<div class="row-btns"><button class="btn primary" id="idy">Evet, say</button><button class="btn" id="idn">Hayır, Saat’i durdur</button></div></div>');
+  const done = yes => {
+    const x = clkGet();
+    if (yes) { tmAdd(x.course || "Genel", x.pend || 0); toast("Eklendi: " + fmtDur(x.pend || 0)); x.pend = 0; x.pg = 0; clkSet(x); }
+    else { x.pend = 0; x.pg = 0; clkSet(x); clkAction("stop"); toast("Saat durduruldu; dokunmadığın süre sayılmadı"); }
+    bg.close(); clockTick(true);
+  };
+  $("#idy", bg).onclick = () => done(true);
+  $("#idn", bg).onclick = () => done(false);
+}
+// Süre düzeltme (Saat ekranında Bugün › Düzelt ya da haftanın bir gününe dokun)
+function tmFixSheet(d) {
+  const raw = tmRaw(P, d), cur = tmC(P, d), live = d === today() && clkGet().phase !== "idle";
+  const L = Array.from(new Set(Array.from(raw.keys()).concat(clockCourses()))).filter(c => raw.has(c) || cur.has(c) || clockCourses().includes(c));
+  const bg = sheet("<h3>Süreyi düzelt · " + fdate(d, true) + '</h3><p class="muted small">Derslere o gün gerçekten çalıştığın dakikayı yaz. Diğer cihazlarına da böyle geçer.' + (live ? " Açık olan Saat kaydedince durdurulur." : "") + "</p>"
+    + '<div class="tfix">' + L.map(c => '<label class="crow"><i class="cdot" style="background:' + ccol(c) + '"></i><span class="txt"><b>' + esc(c) + '</b></span><input class="realin" type="number" min="0" max="1440" step="1" inputmode="numeric" data-c="' + esc(c) + '" value="' + Math.round((cur.get(c) || 0) / 60) + '"> dk</label>').join("") + "</div>"
+    + '<div class="row-btns"><button class="btn primary" id="tfs">Kaydet</button><button class="btn" data-close>Vazgeç</button></div>');
+  $("#tfs", bg).onclick = () => {
+    if (live) clkAction("stop");
+    const R = tmRaw(P, d), m = {};
+    $$("input[data-c]", bg).forEach(i => { const v = parseInt(i.value, 10); if (!(v >= 0)) return; const c = i.dataset.c; m[c] = (R.get(c) || 0) - v * 60; });
+    const TX = Object.assign({}, PS.get("tx", {})); TX[d] = { at: Date.now(), m }; PS.set("tx", TX);
+    bg.close(); toast("Kaydedildi: " + fmtDur(tmTot(P, d)));
+    if (parseHash().parts[0] === "saat") viewClock();
+  };
+}
+
+/* ---------- çalışma süresi kendiliğinden: slayt, not, özet, test ve tekrar açıkken ----------
+   İki dokunuş (kaydırma, tıklama, tuş) arası en çok 5 dk sayılır; Saat çalışıyorsa çift sayılmasın diye sayılmaz. */
+const GAP_T = 5 * 60e3;
+let LA = +LS.get("ml.la", 0) || Date.now(), laSaved = 0;
+const TRK = { c: "", t: 0, acc: 0 };
+function trkFlush() { const a = Math.floor(TRK.acc); if (a >= 1 && TRK.c) { tmAdd(TRK.c, a); TRK.acc -= a; } }
+function trkSet(c) { trkFlush(); TRK.c = c || ""; TRK.t = Date.now(); TRK.acc = 0; }
+function actNow() {
+  const now = Date.now();
+  if (!P) return;
+  clkIdle(now);
+  if (TRK.c && document.visibilityState === "visible") {
+    const c = clkGet();
+    if (!(c.run && c.phase !== "idle")) TRK.acc += Math.min(now - TRK.t, GAP_T) / 1000;
+    TRK.t = now;
+    if (TRK.acc >= 60) trkFlush();
+  }
+  LA = now;
+  if (now - laSaved > 20000) { laSaved = now; LS.set("ml.la", now); }
+}
+window.addEventListener("pagehide", () => { trkFlush(); if (P) saveProfile(); });
+function actListen(doc) { ["pointerdown", "keydown", "wheel", "touchstart"].forEach(e => doc.addEventListener(e, actNow, { passive: true, capture: true })); doc.addEventListener("scroll", actNow, { passive: true, capture: true }); }
 function clockCourses() {
   const k = currentKurul(), L = Array.from(new Set(S.cat.items.filter(i => i.g === k.id || SPECIAL[i.g]).map(i => i.c)));
   return L.concat(["Genel"]);
@@ -2757,17 +2852,16 @@ function drawClock(c) {
   $$("[data-ca]").forEach(b => b.onclick = () => { clkAction(b.dataset.ca); const c2 = clkGet(); wake(c2.run); });
   $$("[data-tech]").forEach(b => { b.disabled = c.phase !== "idle"; });
   const cs = $("#ccourse"); if (cs) cs.disabled = c.phase !== "idle" && c.run;
-  const sm = $("#csum"), k = String(tmDay(PS.get("tm", {}), today()));
+  const sm = $("#csum"), k = String(tmTot(P, today())) + JSON.stringify(PS.get("tx", {})[today()] || 0);
   if (sm && sm.dataset.k !== k) { sm.dataset.k = k; sm.innerHTML = clockSum(); }
 }
 // Bugün ve bu hafta (Saat ekranının altı; süre yazıldıkça yenilenir)
 function clockSum() {
-  const tm = PS.get("tm", {}), t = today();
-  const byC = new Map(); Object.values(tm[t] || {}).forEach(m => Object.entries(m || {}).forEach(([k, s]) => byC.set(k, (byC.get(k) || 0) + s)));
-  const wk = []; for (let x = weekStart(t), i = 0; i < 7; i++, x = addDays(x, 1)) wk.push([x, tmDay(tm, x)]);
+  const t = today(), byC = tmC(P, t);
+  const wk = []; for (let x = weekStart(t), i = 0; i < 7; i++, x = addDays(x, 1)) wk.push([x, tmTot(P, x)]);
   const max = Math.max(3600, ...wk.map(x => x[1]));
-  return '<h2 class="sec">Bugün · ' + fmtDur(tmDay(tm, t)) + "</h2>" + (byC.size ? '<div class="card">' + Array.from(byC.entries()).sort((a, b) => b[1] - a[1]).map(([k, s]) => '<div class="crow"><i class="cdot" style="background:' + ccol(k) + '"></i><div class="txt"><b>' + esc(k) + '</b></div><span class="n">' + fmtDur(s) + "</span></div>").join("") + "</div>" : '<div class="card empty">Bugün Saat’le çalışma kaydı yok.</div>')
-    + '<h2 class="sec">Bu hafta · ' + fmtDur(wk.reduce((a, x) => a + x[1], 0)) + '</h2><div class="card bars">' + wk.map(([x, s]) => '<div class="bcol" title="' + fdate(x) + ": " + fmtDur(s) + '"><span class="bn">' + (s >= 60 ? Math.round(s / 60) : "") + '</span><i style="height:' + Math.round(100 * s / max) + '%"></i><span class="bd">' + ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"][dayDiff(weekStart(t), x)] + "</span></div>").join("") + "</div>";
+  return '<h2 class="sec sec-a">Bugün · ' + fmtDur(tmTot(P, t)) + '<button type="button" class="lnk" data-tfix="' + t + '">Düzelt</button></h2>' + (byC.size ? '<div class="card">' + Array.from(byC.entries()).sort((a, b) => b[1] - a[1]).map(([k, s]) => '<div class="crow"><i class="cdot" style="background:' + ccol(k) + '"></i><div class="txt"><b>' + esc(k) + '</b></div><span class="n">' + fmtDur(s) + "</span></div>").join("") + "</div>" : '<div class="card empty">Bugün çalışma kaydı yok.</div>')
+    + '<h2 class="sec">Bu hafta · ' + fmtDur(wk.reduce((a, x) => a + x[1], 0)) + '</h2><div class="card bars">' + wk.map(([x, s]) => '<div class="bcol" role="button" tabindex="0" data-tfix="' + x + '" title="' + fdate(x) + ": " + fmtDur(s) + '"><span class="bn">' + (s >= 60 ? Math.round(s / 60) : "") + '</span><i style="height:' + Math.round(100 * s / max) + '%"></i><span class="bd">' + ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"][dayDiff(weekStart(t), x)] + "</span></div>").join("") + "</div>";
 }
 function viewClock() {
   setNav("saat");
@@ -2782,6 +2876,7 @@ function viewClock() {
     + '<div id="csum">' + clockSum() + "</div>"
     + '<p class="note">Sütunlardaki sayılar dakika. ' + STREAK_TXT + '</p><div class="row-btns"><a class="btn" href="#/duello">' + icon("duel") + "Düello</a></div></div>";
   $$("[data-tech]").forEach(b => b.onclick = () => { const x = clkGet(); if (x.phase !== "idle") return; x.tech = b.dataset.tech; clkSet(x); viewClock(); });
+  $("#csum").onclick = e => { const b = e.target.closest("[data-tfix]"); if (b) tmFixSheet(b.dataset.tfix); };
   $("#ccourse").onchange = e => { const x = clkGet(); clkFlush(x); x.course = e.target.value; x.fl = Math.floor(clkEl(x)); clkSet(x); };
   clockTick(true);
   if (c.run) wake(true);
@@ -2790,7 +2885,7 @@ function viewClock() {
 
 /* ---------- Düello: senkrondaki diğer profille yan yana (aynı senkron anahtarı) ---------- */
 function weekSum(prof, f) { let a = 0; for (let x = weekStart(today()); x <= today(); x = addDays(x, 1)) a += f(prof, x); return a; }
-const qOf = (prof, d) => dayN((prof && prof.days) || {}, d), tOf = (prof, d) => tmDay(prof && prof.tm, d);
+const qOf = (prof, d) => dayN((prof && prof.days) || {}, d), tOf = (prof, d) => tmTot(prof, d);
 function duelSyncBtn() {
   const b = $("#dsyn"); if (!b) return;
   b.onclick = async () => {
@@ -2832,7 +2927,7 @@ function viewDuel() {
     + '<h2 class="sec">Ortak</h2><div class="card set"><div class="row"><div class="txt"><b>' + icon("flame") + " Ortak seri · " + joint + " gün</b><span>İkiniz de çalıştığınız her gün 1 artar; haftada 1 gün ara serbest.</span></div></div>"
     + '<div class="row"><div class="txt"><b>Haftalık ortak hedef · ' + wq + " / " + goal + ' soru</b><div class="prog" style="margin-top:6px"><i style="width:' + Math.min(100, Math.round(100 * wq / goal)) + '%"></i></div><span>Pazartesi sıfırlanır. İkinizin bu hafta çözdüğü sorular toplanır.</span></div>'
     + '<button class="btn" id="dgoal">Değiştir</button></div></div>'
-    + '<p class="note">Süre Saat’le tutulur (Saat ekranında ders seçip başlat); sorular testler ve tekrardan sayılır. Son eşitleme ' + (SY.last ? new Date(SY.last).toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" }) : "–") + '.</p>'
+    + '<p class="note">Süre Saat’ten ve slayt, özet, test başında geçen süreden sayılır; sorular testler ve tekrardan. Son eşitleme ' + (SY.last ? new Date(SY.last).toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" }) : "–") + '.</p>'
     + '<div class="row-btns"><button class="btn" id="dsyn">' + icon("rep") + 'Eşitle</button><a class="btn" href="#/saat">' + icon("clock") + "Saat</a></div></div>";
   duelSyncBtn();
   $("#dgoal").onclick = () => {
@@ -3111,7 +3206,9 @@ async function start() {
   if (location.hash === "#/kurulum" && S.cat) location.hash = "#/ayarlar";
   if (history.state && history.state.ov) { ovSkip = 1; history.go(-history.state.ov); }   // yenilemeden kalan katman kaydı
   navDepth();
+  actListen(document);
   route();
+  setTimeout(actNow, 500);   // açılışta: Saat dokunulmadan açık kaldıysa sor
   // ağ işleri ekranı bekletmez: senkron ve sürüm denetimi arka planda (senkron değişiklik getirirse ekran yenilenir)
   if (syncOn()) syncNow();
   setTimeout(() => checkUpdate(false), 300);

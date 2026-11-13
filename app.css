@@ -648,3 +648,10 @@ div.hvr{cursor:default;margin-bottom:6px}
 .hlnav .ibtn:hover,.hlnav .ibtn:focus-visible{background:rgba(255,255,255,.14)}
 .hlnav [data-hn="1"] svg{transform:rotate(180deg)}
 .shell.fs .hlnav{top:58px}
+/* 1.4: süre düzeltme */
+h2.sec-a .lnk{background:none;border:0;padding:6px 0;margin:-6px 0;color:var(--accent);font:inherit;font-size:13.5px;text-transform:none;letter-spacing:0;cursor:pointer}
+.bcol[data-tfix]{cursor:pointer}
+.tfix{display:grid;gap:2px;margin:10px 0 14px}
+.tfix .crow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:15px}
+.tfix .crow .txt{flex:1;min-width:0}
+.tfix .realin{width:84px;text-align:right}
