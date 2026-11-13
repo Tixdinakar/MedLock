@@ -4,8 +4,14 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.3.2";
+const VERSION = "1.3.3";
 const CHANGES = [
+  { v: "1.3.3", d: "2026-11-13", l: [
+    "Ana sayfada kurul kartı ile Karma, Çıkmışlar ve Latince kutuları hep en üstte",
+    "Slayt ve notlarda üstte “Cihaza indir” düğmesi: belge PDF olarak İndirilenler klasörüne iner",
+    "Tam ekran düğmesi slaytta üst çubuğa, yakınlaştırmanın yanına taşındı",
+    "Düello’da Eşitle’ye basınca uygulamanın donması düzeldi; internet takılırsa 20 saniyede vazgeçip söyler",
+  ] },
   { v: "1.3.2", d: "2026-11-08", l: [
     "Testte işlem alanı: kalemle yaz, parmakla sayfayı kaydır; silgi, geri al, temizle. Hesaplı sorularda kendiliğinden açık, diğerlerinde “İşlem alanı”na dokun",
     "Sonuçtaki “Bakman gereken slaytlar”: bir numaraya dokununca o destenin bütün işaretli sayfaları vurgulu açılır; üstteki ‹ › ile aralarında geçersin",
@@ -88,7 +94,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "ee84906f34";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "62ded6499d";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -507,8 +513,15 @@ const syncToken = () => LS.get("ml.st", "");
 // Tarayıcının İngilizce ağ hatası yerine Türkçe
 const netMsg = m => /failed to fetch|networkerror|load failed|network request failed/i.test(m || "") ? "Bağlantı kurulamadı; internet açıkken yeniden dene." : m;
 const syncOn = () => !!syncToken();
+// Ağ takılırsa senkron sonsuza dek beklemesin (eskiden "Eşitle" donup kalıyordu)
+async function fetchT(u, o, ms) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms || 20000);
+  try { return await fetch(u, Object.assign({}, o, { signal: ac.signal })); }
+  catch (e) { throw ac.signal.aborted ? new Error("Bağlantı zaman aşımına uğradı; internet açıkken yeniden dene.") : e; }
+  finally { clearTimeout(t); }
+}
 async function gh(method, path, body) {
-  const r = await fetch("https://api.github.com" + path, {
+  const r = await fetchT("https://api.github.com" + path, {
     method, cache: "no-store", body: body ? JSON.stringify(body) : undefined,
     headers: { Authorization: "Bearer " + syncToken(), Accept: "application/vnd.github+json" },
   });
@@ -543,16 +556,21 @@ async function remoteAll() {
   for (const [name, f] of Object.entries(g.files || {})) {
     const m = name.match(/^p-(.+)\.txt$/); if (!m) continue;
     let c = f.content;
-    if (f.truncated) c = await (await fetch(f.raw_url, { cache: "no-store" })).text();
+    if (f.truncated) c = await (await fetchT(f.raw_url, { cache: "no-store" })).text();
     try { out[m[1]] = await decJSON(c); } catch (e) {}
   }
   return out;
 }
 let syncT = 0;
 function syncSoon() { if (!syncOn()) return; clearTimeout(syncT); syncT = setTimeout(() => syncNow(), 5000); }
-async function syncNow(opts) {
-  if (!syncOn() || !P) return false;
-  if (SY.busy) { SY.again = true; return false; }
+// Senkron sürerken yeniden çağrılırsa aynı işi bekler (eskiden hemen dönüyordu; Düello bunu sonsuz döngüye sokup uygulamayı donduruyordu)
+function syncNow(opts) {
+  if (!syncOn() || !P) return Promise.resolve(false);
+  if (SY.p) { SY.again = true; return SY.p; }
+  SY.p = syncRun(opts).finally(() => { SY.p = null; });
+  return SY.p;
+}
+async function syncRun(opts) {
   SY.busy = true;
   let changedLocal = false;
   try {
@@ -969,12 +987,13 @@ function viewHome() {
       + (lastWeek ? '<a class="btn" href="#/karma?w=1&g=' + k.id + '">' + icon("mix") + "Zayıf konulardan</a>" : "")
       + "</div></div>";
   main().innerHTML = bar({ title: NAME, crumb: fdate(t, true) + (P && P.name ? " · " + esc(P.name) : ""), actions: '<a class="ibtn" href="#/ayarlar" aria-label="Ayarlar">' + icon("set") + "</a>" })
-    + '<div class="page">' + (welcomeCard() || updCard()) + scoreCard() + todayCard + hero
+    + '<div class="page">' + hero   // kurul kartı ve kutular hep en üstte (Buğra'nın isteği)
     + '<div class="grid tiles4" style="margin-top:12px">'
     + '<a class="card tile" href="#/karma"><span class="big">' + icon("mix") + '</span><span class="txt"><b>Karma deneme</b><span class="muted small">Kurul provası ya da seçtiğin konulardan</span></span>' + icon("chev", "chev") + "</a>"
     + (hasCx ? '<a class="card tile" href="#/cikmis"><span class="big">' + icon("star") + '</span><span class="txt"><b>Çıkmışlar</b><span class="muted small">' + cxCount() + " ders · çöz ya da orijinalini aç</span></span>" + icon("chev", "chev") + "</a>" : "")
     + (S.cat.lex || S.cat.lat ? '<a class="card tile" href="#/sozluk"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Anatomi Latincesi</b><span class="muted small">' + (S.cat.lat ? "Terim çözücü, " + S.cat.lat.n + " kelime, alıştırma" : "Latince ve Yunanca kökler") + "</span></span>" + icon("chev", "chev") + "</a>" : "")
     + "</div>"
+    + (welcomeCard() || updCard()) + scoreCard() + todayCard
     + syncHint() + installCard()
     + (bms.length ? '<h2 class="sec">İşaretli sayfalar' + (bms.length > 4 ? ' · <a href="#/isaretler" style="color:var(--accent)">tümü (' + bms.length + ")</a>" : "") + '</h2><div class="card list">' + bms.slice(0, 4).map(bmRow).join("") + "</div>" : "")
     + '<h2 class="sec sec-a">Son eklenenler<a href="#/yeni">Tümü ' + icon("chev") + '</a></h2><div class="card list">' + S.cat.items.slice(0, 5).map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>"
@@ -1268,6 +1287,48 @@ function mountDoc(el, it, page, opts) {
   };
   return { goto, reload, destroy() { io.disconnect(); el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); }, get page() { return curP; } };
 }
+/* ---------- cihaza indir: sayfa görsellerinden PDF (cihazda yapılır, internete bir şey gitmez) ---------- */
+async function docPDF(it, prog) {
+  const E = new TextEncoder(), parts = [], off = [];
+  let len = 0;
+  const put = x => { const u = typeof x === "string" ? E.encode(x) : x; parts.push(u); len += u.length; };
+  put("%PDF-1.4\n"); put(new Uint8Array([37, 226, 227, 207, 211, 10]));
+  const R = PS.get("rot", {}), kids = [];
+  for (let p = 1; p <= it.n; p++) {
+    prog && prog(p);
+    const bmp = await createImageBitmap(new Blob([await fetchBlob("d/" + it.x + "/" + p, it.v)], { type: "image/webp" }));
+    const a = (R[it.x + "/" + p] || {}).a || 0, side = a % 180 !== 0;
+    const c = document.createElement("canvas"); c.width = side ? bmp.height : bmp.width; c.height = side ? bmp.width : bmp.height;
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+    g.translate(c.width / 2, c.height / 2); g.rotate(a * Math.PI / 180); g.drawImage(bmp, -bmp.width / 2, -bmp.height / 2); bmp.close && bmp.close();
+    const jb = new Uint8Array(await (await new Promise(r => c.toBlob(r, "image/jpeg", 0.86))).arrayBuffer());
+    const pw = c.width >= c.height ? 842 : 595, ph = Math.round(pw * c.height / c.width * 100) / 100;
+    const n = 3 + (p - 1) * 3, cs = "q " + pw + " 0 0 " + ph + " 0 0 cm /I Do Q";
+    off[n] = len; put(n + " 0 obj\n<< /Type /XObject /Subtype /Image /Width " + c.width + " /Height " + c.height + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + jb.length + " >>\nstream\n"); put(jb); put("\nendstream\nendobj\n");
+    off[n + 1] = len; put((n + 1) + " 0 obj\n<< /Length " + cs.length + " >>\nstream\n" + cs + "\nendstream\nendobj\n");
+    off[n + 2] = len; put((n + 2) + " 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pw + " " + ph + "] /Resources << /XObject << /I " + n + " 0 R >> >> /Contents " + (n + 1) + " 0 R >>\nendobj\n");
+    kids.push((n + 2) + " 0 R");
+  }
+  off[1] = len; put("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+  off[2] = len; put("2 0 obj\n<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + kids.length + " >>\nendobj\n");
+  const N = off.length, x = len;
+  put("xref\n0 " + N + "\n0000000000 65535 f \n" + off.slice(1).map(o => String(o).padStart(10, "0") + " 00000 n \n").join(""));
+  put("trailer\n<< /Size " + N + " /Root 1 0 R >>\nstartxref\n" + x + "\n%%EOF\n");
+  return new Blob(parts, { type: "application/pdf" });
+}
+async function docDownload(it, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const blob = await docPDF(it, p => toast("PDF hazırlanıyor · " + p + " / " + it.n, null, null, 60000));
+    const name = (it.t || "MedLock").replace(/[\\/:*?"<>|]+/g, " ").trim() + ".pdf";
+    const u = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 120000);
+    toast("İndirildi: " + name + " (İndirilenler klasörü)");
+  } catch (e) { logErr(e, "pdf"); toast("PDF hazırlanamadı" + (navigator.onLine ? "" : ": internet yok, sayfalar önbellekte değil")); }
+  btn.disabled = false;
+}
 function viewDoc(id, page, q) {
   const it = S.byId[id];
   if (!it || it.k === "test" || it.k === "kart") return notFound();
@@ -1276,8 +1337,8 @@ function viewDoc(id, page, q) {
   const back = "#/lib/" + it.g + "/" + slug(it.c);
   main().innerHTML = '<div class="fill">' + bar({
     title: it.t, solid: 1, back, crumb: crumbFor(it.g, it.c),
-    actions: (S.cat.lat && (S.cat.lat.ids || []).includes(it.id) ? '<button class="ibtn" id="latb" title="Bu sayfadaki Latince terimler">' + icon("lex") + "</button>" : "") + '<button class="ibtn" id="zmb" title="Yakınlaştır">' + icon("zoom") + '</button><button class="ibtn" id="rotb" title="Sayfayı döndür">' + icon("rot") + '</button><button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
-  }) + '<div class="doc" id="doc" tabindex="-1"></div><button class="fsdoc" id="fsb" type="button" title="Tam ekran" aria-label="Tam ekran">' + icon("full") + "</button></div>";
+    actions: (S.cat.lat && (S.cat.lat.ids || []).includes(it.id) ? '<button class="ibtn" id="latb" title="Bu sayfadaki Latince terimler">' + icon("lex") + "</button>" : "") + '<button class="ibtn" id="fsb" title="Tam ekran" aria-label="Tam ekran">' + icon("full") + '</button><button class="ibtn" id="zmb" title="Yakınlaştır">' + icon("zoom") + '</button><button class="ibtn" id="rotb" title="Sayfayı döndür">' + icon("rot") + '</button><button class="ibtn" id="bmb" title="Bu sayfayı işaretle">' + icon(bmHas(it.id, page) ? "bmf" : "bm") + '</button><button class="ibtn" id="dlb" title="Cihaza indir (PDF)" aria-label="Cihaza indir">' + icon("dl") + '</button><button class="pgc" id="pgc">' + page + " / " + it.n + "</button>",
+  }) + '<div class="doc" id="doc" tabindex="-1"></div></div>';
   const rel = S.cat.items.filter(t => t.k === "test" && (t.dk || []).some(d => d[0] === it.id));
   const first = !PS.get("rd", {})[it.id], nq = deckQn(it.id), canRead = it.k !== "cikmis" && it.k !== "soru";
   const hvL = hvList(it);
@@ -1303,6 +1364,7 @@ function viewDoc(id, page, q) {
   });
   setLast("doc", { id: it.id, p: page }); rdSet(it.id, page);
   fsBind();
+  $("#dlb").onclick = () => docDownload(it, $("#dlb"));
   $$("[data-hvp]").forEach(b => b.onclick = () => V.goto(+b.dataset.hvp, true));
   S.cleanup.push(() => { clearTimeout(saveT); V.destroy(); });
   // Okudum işareti ve deste testi (sayfaların sonunda)
@@ -2724,15 +2786,27 @@ function viewClock() {
 /* ---------- Düello: senkrondaki diğer profille yan yana (aynı senkron anahtarı) ---------- */
 function weekSum(prof, f) { let a = 0; for (let x = weekStart(today()); x <= today(); x = addDays(x, 1)) a += f(prof, x); return a; }
 const qOf = (prof, d) => dayN((prof && prof.days) || {}, d), tOf = (prof, d) => tmDay(prof && prof.tm, d);
+function duelSyncBtn() {
+  const b = $("#dsyn"); if (!b) return;
+  b.onclick = async () => {
+    b.disabled = true; b.textContent = "Eşitleniyor…";
+    await syncNow({ quiet: true });
+    if (parseHash().parts[0] !== "duello") return;   // bu arada başka ekrana geçildiyse o ekranı bozma
+    viewDuel();
+    toast(SY.err ? "Eşitlenemedi: " + SY.err : "Eşitlendi");
+  };
+}
 function viewDuel() {
   setNav("duello");
   const t = today(), O = SY.others || [];
   const head = bar({ title: "Düello", crumb: "Bugün kim ne kadar çalıştı" }) + '<div class="page narrow">';
   if (!syncOn()) { main().innerHTML = head + '<div class="card empty">Düello için senkron gerekli: ikiniz de aynı senkron anahtarını kendi cihazınızda girin, profilleriniz yan yana görünür.<div class="row-btns" style="justify-content:center;margin-top:12px"><a class="btn primary" href="#/ayarlar">Ayarlar</a></div></div></div>'; return; }
   if (!O.length) {
-    main().innerHTML = head + '<div class="card empty">' + (SY.last ? "Senkronda başka profil yok. Arkadaşın aynı anahtarla senkronu açınca burada görünür." : "Senkron bekleniyor…") + '<div class="row-btns" style="justify-content:center;margin-top:12px"><button class="btn" id="dsyn">Eşitle</button></div></div></div>';
-    $("#dsyn").onclick = async () => { await syncNow({ quiet: true }); viewDuel(); };
-    if (!SY.last) syncNow({ quiet: true }).then(() => { if (parseHash().parts[0] === "duello") viewDuel(); });
+    const wait = !SY.last && !SY.err;
+    main().innerHTML = head + '<div class="card empty">' + (SY.last ? "Senkronda başka profil yok. Arkadaşın aynı anahtarla senkronu açınca burada görünür." : SY.err ? "Eşitlenemedi: " + esc(SY.err) : "Senkron bekleniyor…") + '<div class="row-btns" style="justify-content:center;margin-top:12px"><button class="btn" id="dsyn">Eşitle</button></div></div></div>';
+    duelSyncBtn();
+    // ilk açılışta bir kez eşitle (sonuç ne olursa olsun yeniden denemez; denemek için Eşitle)
+    if (wait && !SY.dt) { SY.dt = 1; syncNow({ quiet: true }).then(() => { if (parseHash().parts[0] === "duello") viewDuel(); }); }
     return;
   }
   // ortak hedef: kim en son değiştirdiyse onunki
@@ -2755,7 +2829,7 @@ function viewDuel() {
     + '<button class="btn" id="dgoal">Değiştir</button></div></div>'
     + '<p class="note">Süre Saat’le tutulur (Saat ekranında ders seçip başlat); sorular testler ve tekrardan sayılır. Son eşitleme ' + (SY.last ? new Date(SY.last).toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" }) : "–") + '.</p>'
     + '<div class="row-btns"><button class="btn" id="dsyn">' + icon("rep") + 'Eşitle</button><a class="btn" href="#/saat">' + icon("clock") + "Saat</a></div></div>";
-  $("#dsyn").onclick = async () => { $("#dsyn").disabled = true; await syncNow({ quiet: true }); viewDuel(); };
+  duelSyncBtn();
   $("#dgoal").onclick = () => {
     const bg = sheet('<h3>Haftalık ortak hedef</h3><p class="muted small">İkinizin bir haftada birlikte çözeceği soru sayısı</p><div class="row-btns"><input id="gv" class="realin" type="number" min="10" max="5000" step="10" inputmode="numeric" value="' + goal + '"><button class="btn primary" id="gs">Kaydet</button><button class="btn" data-close>Vazgeç</button></div>');
     $("#gs", bg).onclick = () => { const v = parseInt($("#gv", bg).value, 10); if (!(v >= 10)) return; PS.set("dz", { goal: v, at: Date.now() }); bg.close(); viewDuel(); };
