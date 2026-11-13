@@ -93,6 +93,7 @@ Drive'da ses kaydı dökümü (Ders › "[Ders] Ses Kayıtları", içinde "Konu�
 ## Hata bildirimleri
 Sorularda "Hata bildir" düğmesi var; bildirimler profilde (`rep`) birikir, Buğra Ayarlar › Hata bildirimleri › Kopyala ile metni sohbete yapıştırır (test id, soru id ve sırası, neden, not, uygulama hataları). Düzeltme: normal testte `test-dump` → düzelt → `test-load`; çıkmış testinde `build_cx.py --dump/--src`. Cevap anahtarı değiştiyse açıklamada belirt.
 Test sonunda "Test yorumu" paneli (zorluk Kolay/Uygun/Zor, hazır seçenekler, not) da `rep`e `k:"fb"`, `qid:"fb:<run>"` olarak yazılır; kopyalanan metinde "Test yorumu" diye çıkar. Yorumlara göre testi düzelt ya da sonraki testlerde dikkate al.
+Gelen yorumlar: Kanser ve Kök Hücre vize denemesi ve ön testi "Fazla ayrıntıcı" (13 Kas; vize aynı gün olduğu için test yeniden yazılmadı). Seçmeli ve ortak derslerin testlerinde ana kavramı, ilkeyi ve karşılaştırmayı sor; tek slaytta geçen sayı, ad, oran gibi ayrıntı sorularını az tut.
 
 ## Tekrar, sınav öncesi ve final dönemi
 Aralıklar 1, 3, 7, 14, 30 gün; yanlışta kutu bir basamak geri iner (sıfırlanmaz), soru ertesi gün gelir. "Tahmin ettim" (testte ve tekrarda doğru cevaptan sonra): yarın yeniden sorulur, aralık uzamaz. Yaklaşan sınavın (7 gün içinde; kurul sonu ya da `sinavlar`) soruları önce gelir; sınavdan önceki 3 gün (`EXW`) o sınavın öğrenilmiş soruları bir kez daha sorulur (son tur, `xr`). Şıklar her seferinde karışır ("hepsi", "I ve II" gibi şıkka dayanan sorular hariç, `NOSHUF`).

@@ -99,6 +99,9 @@ img{display:block;max-width:100%}
   .bar.has-crumb .acts{grid-area:ac}
   .bar.has-crumb h1{grid-area:ti;white-space:normal;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;font-size:18px;line-height:1.22;padding:2px 2px 0}
   .bar.has-crumb .acts .ibtn{width:36px;height:36px}
+  /* slayt görünümü gibi çok düğmeli çubukta düğmeler başlığın altında kendi satırında; başlık tam genişlik */
+  .bar.has-crumb:has(.acts > .ibtn:nth-of-type(4)){grid-template-areas:"bk cr cr" "ti ti ti" "ac ac ac"}
+  .bar.has-crumb:has(.acts > .ibtn:nth-of-type(4)) .acts{justify-content:flex-end;margin-top:2px}
 }
 .ibtn{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:10px;border:0;background:none;cursor:pointer;color:var(--ink);flex:none}
 .ibtn:hover{background:var(--surface-2)}

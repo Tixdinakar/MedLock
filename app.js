@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.3.3";
+const VERSION = "1.3.4";
 const CHANGES = [
+  { v: "1.3.4", d: "2026-11-13", l: [
+    "Profil seçme ekranındayken geri tuşuna basınca ya da eşitleme bitince çıkan hata düzeldi",
+  ] },
   { v: "1.3.3", d: "2026-11-13", l: [
     "Ana sayfada kurul kartı ile Karma, Çıkmışlar ve Latince kutuları hep en üstte",
     "Slayt ve notlarda üstte “Cihaza indir” düğmesi: belge PDF olarak İndirilenler klasörüne iner",
@@ -94,7 +97,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "62ded6499d";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "cb539f133d";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -794,6 +797,7 @@ async function route() {
   const { parts, q } = parseHash();
   const [a, b, c] = parts;
   const m = main();
+  if (!m) return;   // profil seçim ekranı açıkken (kabuk henüz yok) geri tuşu ya da senkron ekranı çizmeye kalkmasın
   m.scrollTop = 0;
   requestAnimationFrame(fitCrumbs);
   const tt = $("#toast"); if (tt && Date.now() - toastAt > 600) tt.classList.remove("show");   // önceki ekranın bildirimi yeni ekranda kalmasın
