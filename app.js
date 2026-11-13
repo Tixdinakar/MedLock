@@ -8,6 +8,7 @@ const VERSION = "1.3.4";
 const CHANGES = [
   { v: "1.3.4", d: "2026-11-13", l: [
     "Profil seçme ekranındayken geri tuşuna basınca ya da eşitleme bitince çıkan hata düzeldi",
+    "Telefonda slayt düğmeleri başlığın altında kendi satırında; uzun başlıklar artık kesilmiyor",
   ] },
   { v: "1.3.3", d: "2026-11-13", l: [
     "Ana sayfada kurul kartı ile Karma, Çıkmışlar ve Latince kutuları hep en üstte",
@@ -97,7 +98,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "cb539f133d";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "fb05f2a7ab";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
