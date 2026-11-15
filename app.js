@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.5.1";
+const VERSION = "1.5.2";
 const CHANGES = [
+  { v: "1.5.2", d: "2026-11-15", l: [
+    "Tekrar sayfasında artık kart tekrarı da görünüyor; soru tekrarından ayrı kendi sayacı ve “Kart tekrarına başla” düğmesi var",
+  ] },
   { v: "1.5.1", d: "2026-11-15", l: [
     "Ders sayfasında “çıkmışta N soru” ve “hoca N yer vurguladı” etiketlerine dokununca hangi slaytlar olduğu listelenir; dokunduğun sayfa açılır, hepsi işaretli gelir",
   ] },
@@ -113,7 +116,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "b005bdeead";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "fbefbc1ef4";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -2098,15 +2101,25 @@ function viewReview() {
     + '<div class="stat3"><div class="card"><b style="color:var(--flame)">' + due.length + '</b><span>bugün</span></div><div class="card"><b>' + tomorrow + '</b><span>yarın</span></div><div class="card"><b>' + week + "</b><span>bu hafta</span></div></div>"
     + '<div class="row-btns" style="margin:14px 0 4px">' + (due.length ? '<a class="btn flame" href="#/tekrar?s=1">' + icon("rep") + "Tekrara başla (" + due.length + ")</a>" : "")
     + (active.length ? '<a class="btn' + (due.length ? "" : " primary") + '" href="#/tekrar?s=1&all=1">Hepsini çalış (' + active.length + ")</a>" : "") + "</div>"
+    + cardRevBlock()
     + (byC.size ? '<h2 class="sec">Derslere göre</h2><div class="card">' + Array.from(byC.entries()).sort((a, b) => b[1].due - a[1].due || b[1].all - a[1].all).map(([c, o]) =>
       '<div class="crow"><i class="cdot" style="background:' + ccol(c) + '"></i><div class="txt"><b>' + esc(c) + '</b></div><span class="n">' + o.due + " / " + o.all + '</span><a class="btn" href="#/tekrar?s=1&c=' + encodeURIComponent(c) + (o.due ? "" : "&all=1") + '">Çalış</a></div>').join("") + "</div>" : "")
     + resultsHTML()
     + '<h2 class="sec">Nasıl çalışır</h2><p class="note">Testte yanlış yaptığın her soru buraya düşer ve ertesi gün sorulur. Doğru bildikçe aralık uzar: 1, 3, 7, 14, 30 gün. 30 günlük aralıktan sonra da doğru bilirsen soru öğrenildi sayılır'
     + (learned ? " (şimdiye kadar " + learned + ")" : "") + ". Yanlış yaparsan aralık bir basamak geri iner, soru ertesi gün yine gelir. Doğru ama tahminle bildiğin soruda “Tahmin ettim”e dokun; o da listeye girer. "
-    + "Yaklaşan sınavın soruları önce gelir; sınavdan önceki " + EXW + " gün o sınavın öğrendiğin soruları bir kez daha sorulur. Şıkların yeri her seferinde karışır (“hepsi”, “I ve II” gibi şıklı sorular hariç). Kartlarda “Bilemedim” dediklerin de buraya gelir."
+    + "Yaklaşan sınavın soruları önce gelir; sınavdan önceki " + EXW + " gün o sınavın öğrendiğin soruları bir kez daha sorulur. Şıkların yeri her seferinde karışır (“hepsi”, “I ve II” gibi şıklı sorular hariç). Kart tekrarı ayrı tutulur; aşağıdaki Kartlar bölümünden ya da Kartlar sayfasından çalışılır."
     + (finalInfo() ? " Final döneminde (" + fdate(finalInfo().start) + " – " + fdate(finalInfo().end, true) + ") öğrenilmiş sorular bir kez daha gelir." : "") + "</p>"
     + (active.length ? "" : '<div class="card empty" style="margin-top:14px">Listen boş. Bir test çöz; yanlışların burada birikir.</div>')
     + "</div>";
+}
+// Tekrar sayfasında kart tekrarı: soru tekrarından bağımsız, yalnız özeti ve kısayolu
+function cardRevBlock() {
+  const s = csLoad(), t = today(), dn = cardsDueKeys().length;
+  const tom = Object.values(s).filter(e => !e.x && e.due === addDays(t, 1)).length, all = Object.keys(s).length;
+  return '<h2 class="sec sec-a">Kartlar<a href="#/kartlar">Kartlar sayfası' + icon("chev") + '</a></h2><div class="card ksum"><div><b>'
+    + (dn ? dn + " kart tekrar bekliyor" : "Bugün tekrar bekleyen kart yok") + '</b><div class="muted small">'
+    + (all ? [tom ? "Yarın " + tom + " kart" : "", all + " kart takipte"].filter(Boolean).join(" · ") : "Kart çalıştıkça tekrarları burada görünür") + "</div></div>"
+    + (dn ? '<a class="btn primary" href="#/kartlar/calis?due=1">' + icon("cards") + "Kart tekrarına başla</a>" : '<a class="btn" href="#/kartlar">' + icon("cards") + "Deste seç</a>") + "</div>";
 }
 function resultsHTML() {
   const R = testRes();
