@@ -1114,6 +1114,9 @@ def main():
     sk = sp.add_parser("skip")
     sk.add_argument("src")
     sp.add_parser("known")
+    dn = sp.add_parser("dersnot", help="kurul dışı ders not ağırlıkları (vize/final yüzdesi, geçme notu)")
+    dn.add_argument("ders"); dn.add_argument("--vize", type=int, default=40); dn.add_argument("--final", type=int, default=60)
+    dn.add_argument("--gec", type=int, default=50); dn.add_argument("--rm", action="store_true")
     ac = sp.add_parser("add-cards", help="slayt destesinden hazır kart destesi: JSON [{t, f, b, p, z?}] (Kartlar sekmesi)")
     ac.add_argument("file"); ac.add_argument("--deck", required=True, help="kaynak slayt destesinin id'si")
     ac.add_argument("--title")
@@ -1202,6 +1205,13 @@ def main():
         build_index(V)
     elif a.cmd == "skip":
         V.cat.setdefault("skip", []).append(a.src.replace("drive:", ""))
+    elif a.cmd == "dersnot":
+        D = V.cat.setdefault("dersnot", {})
+        if a.rm: D.pop(a.ders, None)
+        else:
+            assert a.vize + a.final == 100, "vize + final 100 olmalı"
+            D[a.ders] = {"vize": a.vize, "final": a.final, "gec": a.gec}
+        print("dersnot:", D)
     elif a.cmd == "add-cards":
         d = V.item(a.deck) or sys.exit("deste yok: " + a.deck)
         cards = json.load(open(a.file, encoding="utf-8"))
