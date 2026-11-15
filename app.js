@@ -4,8 +4,15 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.4";
+const VERSION = "1.5";
 const CHANGES = [
+  { v: "1.5", d: "2026-11-15", l: [
+    "Yeni: Kartlar (Diğer menüsünde). Kurul 2'nin bütün slayt destelerinden hazır kartlar: 19 deste, 273 kart",
+    "Üç çalışma biçimi: çevir ve kendini puanla, yazarak cevapla, boşluk doldur; arada istediğin an geçebilirsin",
+    "Arka yüzde kısa cevap, kartın geldiği slayta giden düğme ve hoca o yeri derste vurguladıysa işaret",
+    "Kendi destelerini yaz: deste açarken gizli (yalnız sen) ya da açık (Efe de görür) seç; sonra değiştirebilirsin",
+    "Kart tekrarı soru tekrarından ayrı: Bilemedim yarın, Zorlandım kısa, Bildim uzun aralıkla yeniden gelir",
+  ] },
   { v: "1.4", d: "2026-11-13", l: [
     "Çalışma süresi kendiliğinden sayılıyor: slayt, not, özet, test ve tekrar açıkken geçen süre derse eklenir (Saat açık değilse). Uzun süre dokunmazsan sayım durur",
     "Saat açık unutulursa: 45 dakika dokunulmayınca sayım durur, uygulamaya dönünce “Bu sürede çalıştın mı?” diye sorar",
@@ -103,7 +110,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "85acc466fd";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "1aaf0019e4";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -127,6 +134,9 @@ const ICONS = {
   back: '<path d="m15 5-7 7 7 7"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   chev: '<path d="m9 6 6 6-6 6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   slide: '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/>',
   test: '<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="m8 9 1.6 1.6L12.5 7.7M8 15.5h8M14.5 10H16"/>',
   note: '<path d="M6 3.5h8.5L19 8v12.5H6z"/><path d="M14 3.5V8h5M9 12h7M9 15.5h7"/>',
@@ -506,7 +516,8 @@ function mergeP(a, b) {
   const o = Object.assign({}, a);
   o.name = (b.at > a.at ? b.name : a.name) || a.name || b.name;
   o.srs = mergeMap(a.srs, b.srs, "u");
-  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
+  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx", "cd"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
+  o.cs = mergeMap(a.cs, b.cs, "u");
   const newer = (x, y) => !x ? y : !y ? x : (y.at || 0) > (x.at || 0) ? y : x;
   o.mix = newer(a.mix, b.mix); o.dz = newer(a.dz, b.dz);
   o.tm = {};                                       // çalışma süresi: gün › cihaz › ders, her cihazın en büyük değeri
@@ -595,6 +606,9 @@ async function syncRun(opts) {
   try {
     const all = await remoteAll(), remote = all[P.id];
     SY.others = Object.values(all).filter(x => x && x.id && x.id !== P.id);   // düello: aynı senkrondaki diğer profiller
+    // arkadaşın açık kart desteleri (yalnız açık olanlar cihazda tutulur; çevrimdışı da görünür)
+    const oc = {}; SY.others.forEach(o => { const cd = {}; Object.entries(o.cd || {}).forEach(([k, d]) => { if (d && d.vis === "acik" && !d.del) cd[k] = d; }); if (Object.keys(cd).length) oc[o.id] = { name: o.name || o.id, cd }; });
+    LS.set("ml.ocd", oc);
     const before = JSON.stringify(P);
     const merged = mergeP(P, remote);
     changedLocal = JSON.stringify(merged) !== before;
@@ -635,6 +649,7 @@ function shell() {
     + kl.map(k => '<a class="sub" data-nav="k:' + k.id + '" href="#/lib/' + k.id + '">Kurul ' + k.no + '</a>').join("")
     + specialGs().map(g => '<a class="sub" data-nav="k:' + g + '" href="#/lib/' + g + '">' + "Ortak dersler" + "</a>").join("")
     + '<a data-nav="tekrar" href="#/tekrar">' + icon("rep") + 'Tekrar<span class="badge" data-badge hidden></span></a>'
+    + '<a data-nav="kartlar" href="#/kartlar">' + icon("cards") + 'Kartlar<span class="badge" data-cbadge hidden></span></a>'
     + '<a data-nav="ilerleme" href="#/ilerleme">' + icon("chart") + 'İlerleme</a>'
     + '<a data-nav="saat" href="#/saat">' + icon("clock") + 'Saat</a>'
     + '<a data-nav="duello" href="#/duello">' + icon("duel") + 'Düello</a>'
@@ -658,9 +673,11 @@ function shell() {
   clockTick();
 }
 // Alttaki "Diğer": yukarı doğru açılan menü (telefonun geri tuşu kapatır)
-const MOREKEYS = ["ilerleme", "saat", "duello", "karma", "cikmis", "sozluk", "isaretler", "ayarlar"];
+const MOREKEYS = ["kartlar", "ilerleme", "saat", "duello", "karma", "cikmis", "sozluk", "isaretler", "ayarlar"];
 function moreItems() {
-  return [["ilerleme", "#/ilerleme", "chart", "İlerleme", "Seri, konu hakimiyeti, deneme geçmişi"],
+  const cn = cardsDueKeys().length;
+  return [["kartlar", "#/kartlar", "cards", "Kartlar", cn ? cn + " kart tekrar bekliyor" : "Çevir, yaz ya da boşluk doldur"],
+    ["ilerleme", "#/ilerleme", "chart", "İlerleme", "Seri, konu hakimiyeti, deneme geçmişi"],
     ["saat", "#/saat", "clock", "Saat", "Kronometre ve çalışma turu"],
     ["duello", "#/duello", "duel", "Düello", "Bugün kim ne kadar çalıştı"],
     ["karma", "#/karma", "mix", "Karma deneme", "Kurul provası ya da seçtiğin konulardan"],
@@ -688,6 +705,7 @@ const stampIso = v => v ? v.slice(0, 4) + "-" + v.slice(4, 6) + "-" + v.slice(6,
 function updateBadge() {
   const n = srsDue().length;
   $$("[data-badge]").forEach(b => { b.hidden = !n; b.textContent = n > 99 ? "99+" : n; });
+  cardBadge();
 }
 function setNav(key, immersive) {
   $$("[data-nav]").forEach(a => {
@@ -744,6 +762,7 @@ function navKey(h) {
   const [p, q] = String(h || "#/").replace(/^#/, "").split("?"), a = p.split("/").filter(Boolean);
   if (a[0] === "d") return "/d/" + a[1];
   if (a[0] === "tekrar" && /(^|&)s=/.test(q || "")) return h;
+  if (a[0] === "kartlar" && (a[1] === "calis" || a[1] === "yeni")) return h;   // farklı destelerin çalışma ekranları ayrı kayıt
   return "/" + a.join("/");
 }
 function findUp(href) {                                          // geride, yığında aynı ekran var mı
@@ -838,6 +857,7 @@ async function route() {
     if (a === "kurulum") return viewInstall(true);
     if (a === "saat") return viewClock();
     if (a === "duello") return viewDuel();
+    if (a === "kartlar") return viewKartlar(parts, q);
     viewHome();
   } catch (err) { showError(err); }
 }
@@ -1796,38 +1816,229 @@ function logErr(err, where) {
 window.addEventListener("error", e => logErr(e.error || e.message, "js"));
 window.addEventListener("unhandledrejection", e => logErr(e.reason, "promise"));
 
-/* ---------- cards ---------- */
-async function viewCards(id) {
-  const it = S.byId[id];
-  if (!it || it.k !== "kart") return notFound();
-  setNav("lib", true);
-  main().innerHTML = '<div class="fill">' + bar({ title: it.t, solid: 1, back: "#/lib/" + it.g + "/" + slug(it.c), crumb: crumbFor(it.g, it.c) })
-    + '<div class="doc" style="padding:16px"><div class="page narrow" id="cv"><div class="loading"><div class="spin"></div></div></div></div></div>';
-  const { cards } = await loadTest(it);
-  const topics = Array.from(new Set(cards.map(c => c[0])));
-  const st = { t: "", order: cards.map((_, i) => i), i: 0, back: false, shuffle: false };
-  const listOf = () => st.order.filter(i => !st.t || cards[i][0] === st.t);
+/* ---------- Kartlar (1.5) ----------
+   Desteler: hazır (katalogda k:"kart", Claude slayttan hazırlar), benim (profilde cd, gizli/açık), arkadaşın açık desteleri (senkrondan, ml.ocd).
+   Kart tekrarı soru tekrarından ayrı: profilde cs {anahtar: {b, due, u, n}}; aralıklar soru tekrarıyla aynı. */
+const CIV = [1, 3, 7, 14, 30];
+const csLoad = () => Object.assign({}, PS.get("cs", {}));
+const csSave = s => PS.set("cs", s);
+const cdLoad = () => Object.assign({}, PS.get("cd", {}));
+const cdSave = d => PS.set("cd", d);
+const rich = s => esc(s || "").replace(/&lt;(\/?)(b|i|sub|sup|br)&gt;/g, "<$1$2>").replace(/\n/g, "<br>");
+const cardNorm = (c, i) => Array.isArray(c) ? { t: c[0], f: c[1], b: c[2], i } : Object.assign({ i }, c);
+function ocdLoad() { return LS.get("ml.ocd", {}) || {}; }
+// bütün desteler: {key, kind: h|u|o, t, c, g, owner, n, item, vis}
+function cardDecks() {
+  const L = [];
+  S.cat.items.filter(it => it.k === "kart").forEach(it => L.push({ key: "h:" + it.id, kind: "h", t: it.t, c: it.c, g: it.g, n: it.n, item: it }));
+  Object.values(cdLoad()).filter(d => d && !d.del).forEach(d => L.push({ key: "u:" + d.id, kind: "u", t: d.n, c: d.c, n: Object.values(d.cards || {}).filter(x => !x.del).length, vis: d.vis, deck: d }));
+  Object.entries(ocdLoad()).forEach(([pid, o]) => Object.values(o.cd || {}).filter(d => d && !d.del && d.vis === "acik").forEach(d => L.push({ key: "o:" + pid + ":" + d.id, kind: "o", owner: o.name || pid, t: d.n, c: d.c, n: Object.values(d.cards || {}).filter(x => !x.del).length, deck: d })));
+  return L;
+}
+const deckByKey = k => cardDecks().find(d => d.key === k);
+// destenin kartları: {key, t, f, b, z, s (slayt destesi id), p, c}
+async function deckCards(D) {
+  if (D.kind === "h") {
+    const blob = await loadTest(D.item), dk = [].concat(D.item.kn || [])[0] || "";
+    return (blob.cards || []).map(cardNorm).map(c => Object.assign(c, { key: D.item.id + "|" + c.i, c: D.c, s: c.s || dk, dk: D.key }));
+  }
+  const pre = D.kind === "u" ? "u|" + D.deck.id + "|" : "o|" + D.key.split(":")[1] + "|" + D.deck.id + "|";
+  return Object.entries(D.deck.cards || {}).filter(([, x]) => x && !x.del).sort((a, b) => (a[1].o || 0) - (b[1].o || 0)).map(([id, x]) => ({ key: pre + id, id, t: D.t, f: x.f, b: x.b, c: D.c, dk: D.key }));
+}
+function cardsDueKeys() { const s = csLoad(), t = today(); return Object.keys(s).filter(k => !s[k].x && s[k].due <= t); }
+function cardBadge() { const n = cardsDueKeys().length; $$("[data-cbadge]").forEach(b => { b.hidden = !n; b.textContent = n > 99 ? "99+" : n; }); }
+function cardGrade(c, g) {          // g: 0 bilemedim, 1 zorlandım, 2 bildim
+  const s = csLoad(), e = s[c.key] || { b: -1, n: 0 };
+  let b = e.b;
+  if (g === 0) b = Math.max(0, b - 1); else if (g === 2) b = Math.min(CIV.length - 1, b + 1); else b = Math.max(0, b);
+  const days = g === 0 ? 1 : g === 1 ? Math.max(1, Math.round(CIV[b] / 2)) : CIV[b];
+  s[c.key] = { b, due: addDays(today(), days), u: Date.now(), n: (e.n || 0) + 1, dk: c.dk };
+  csSave(s); cardBadge();
+}
+const cardFold = s => fold(String(s || "").replace(/<[^>]+>/g, " ").replace(/['’]/g, "").toLocaleLowerCase("tr")).replace(/[^a-z0-9]+/g, " ").trim();
+function clozeOf(c) {           // [[...]] işaretli yer; yoksa arka yüzün en uzun kelimesi
+  const src = c.z || c.b || "";
+  let m = /\[\[(.+?)\]\]/.exec(src);
+  if (m) return { txt: src.replace(/\[\[(.+?)\]\]/, "§"), ans: m[1], rest: src.replace(/\[\[(.+?)\]\]/g, "$1") };
+  const plain = String(src).replace(/<[^>]+>/g, " ");
+  const w = plain.split(/[\s,.;:()\/]+/).filter(x => x.length >= 4).sort((a, b) => b.length - a.length)[0];
+  if (!w) return null;
+  return { txt: plain.replace(w, "§"), ans: w, rest: plain };
+}
+function cardSim(a, b) {
+  const A = cardFold(a).split(" ").filter(Boolean), B = cardFold(b).split(" ").filter(Boolean);
+  if (!A.length || !B.length) return 0;
+  if (A.join(" ") === B.join(" ")) return 1;
+  const sw = new Set(["ve", "ile", "bir", "bu", "da", "de", "olarak", "icin", "olan", "en", "veya"]);
+  const A2 = A.filter(x => !sw.has(x)), B2 = B.filter(x => !sw.has(x)), sb = new Set(B2.map(x => x.slice(0, 5)));
+  if (!A2.length || !B2.length) return 0;
+  const hit = A2.filter(x => sb.has(x.slice(0, 5))).length;
+  return Math.min(hit / A2.length, hit / Math.min(B2.length, Math.max(A2.length, 2)));
+}
+const CMODES = [["cevir", "Çevir"], ["yaz", "Yazarak"], ["bosluk", "Boşluk doldur"]];
+
+function viewCards(id) { replaceHash("#/kartlar/deste/h:" + id); route(); }
+
+function viewKartlar(parts, q) {
+  if (parts[1] === "deste") return viewDeck(decodeURIComponent(parts[2] || ""));
+  if (parts[1] === "calis") return cardStudy(q);
+  if (parts[1] === "yeni") return deckEdit(null);
+  setNav("kartlar");
+  const D = cardDecks(), s = csLoad(), t = today(), due = cardsDueKeys();
+  const tom = Object.values(s).filter(e => e.due === addDays(t, 1)).length;
+  const row = d => {
+    const keys = Object.keys(s).filter(k => s[k].dk === d.key), dn = keys.filter(k => s[k].due <= t).length, seen = keys.length;
+    return '<a class="it" href="#/kartlar/deste/' + encodeURIComponent(d.key) + '">' + kindBox("kart") + '<div class="txt"><div class="t">' + esc(d.t) + '</div><div class="m"><span><i class="cdot" style="background:' + ccol(d.c) + '"></i>' + esc(d.c) + "</span><span>" + d.n + " kart</span>"
+      + (seen ? "<span>" + seen + " çalışıldı</span>" : "") + (d.kind === "u" ? "<span>" + (d.vis === "acik" ? "Açık" : "Gizli") + "</span>" : "") + (d.kind === "o" ? "<span>" + esc(d.owner) + "</span>" : "") + "</div></div>"
+      + (dn ? '<span class="kdue">' + dn + "</span>" : "") + icon("chev", "chev") + "</a>";
+  };
+  const hz = D.filter(d => d.kind === "h"), byG = new Map();
+  hz.forEach(d => { const k = d.g + "|" + d.c; if (!byG.has(k)) byG.set(k, []); byG.get(k).push(d); });
+  const kl = S.cat.kurullar || [];
+  const gName = g => { const k = kl.find(x => x.id === g); return k ? "Kurul " + k.no : "Ortak dersler"; };
+  const groups = Array.from(byG.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  const mine = D.filter(d => d.kind === "u"), oth = D.filter(d => d.kind === "o");
+  main().innerHTML = bar({ title: "Kartlar", crumb: "Çevir, yaz ya da boşluk doldur" }) + '<div class="page narrow">'
+    + '<div class="card ksum"><div><b>' + (due.length ? due.length + " kart tekrar bekliyor" : "Bugün tekrar bekleyen kart yok") + '</b><div class="muted small">' + (tom ? "Yarın " + tom + " kart" : "Yeni kart çalışmak için bir deste seç") + "</div></div>"
+    + (due.length ? '<a class="btn primary" href="#/kartlar/calis?due=1">' + icon("rep") + "Tekrara başla</a>" : "") + "</div>"
+    + '<h2 class="sec sec-a">Benim destelerim<a href="#/kartlar/yeni">' + icon("plus") + "Yeni deste</a></h2>"
+    + (mine.length ? '<div class="card list">' + mine.map(row).join("") + "</div>" : '<div class="card empty">Kendi kartlarını yazmak için “Yeni deste”ye dokun. Desteyi gizli (yalnız sen) ya da açık (Efe de görür) yapabilirsin.</div>')
+    + (oth.length ? '<h2 class="sec">Arkadaşının açık desteleri</h2><div class="card list">' + oth.map(row).join("") + "</div>" : "")
+    + groups.map(([k, L]) => '<h2 class="sec">' + esc(gName(L[0].g)) + " · " + esc(L[0].c) + '</h2><div class="card list">' + L.sort((a, b) => a.t.localeCompare(b.t, "tr")).map(row).join("") + "</div>").join("")
+    + '<p class="note">Hazır kartlar slayttan hazırlandı; arka yüzdeki “Slayta git” kartın geldiği sayfayı açar. Kart tekrarı soru tekrarından ayrıdır.</p></div>';
+}
+
+async function viewDeck(key) {
+  const D = deckByKey(key);
+  if (!D) return notFound();
+  setNav("kartlar");
+  main().innerHTML = bar({ title: D.t, back: "#/kartlar", crumb: crumbs([["Kartlar", "#/kartlar"], [D.c, ""]]), actions: D.kind === "u" ? '<button class="ibtn" id="dedit" title="Desteyi düzenle">' + icon("edit") + "</button>" : "" }) + '<div class="page narrow"><div class="loading"><div class="spin"></div></div></div>';
+  const C = await deckCards(D);
+  if (parseHash().parts[2] !== encodeURIComponent(key) && decodeURIComponent(parseHash().parts[2] || "") !== key) return;
+  const s = csLoad(), t = today(), dn = C.filter(c => s[c.key] && s[c.key].due <= t).length, nw = C.filter(c => !s[c.key]).length;
+  const topics = Array.from(new Set(C.map(c => c.t).filter(Boolean)));
+  const src = D.kind === "h" ? S.byId[[].concat(D.item.kn || [])[0]] : null;
+  const ek = "#/kartlar/calis?d=" + encodeURIComponent(key);
+  $(".page").innerHTML = '<div class="card ksum"><div><b>' + C.length + " kart</b>"
+    + '<div class="muted small">' + [dn ? dn + " tekrar bekliyor" : "", nw ? nw + " yeni" : "", C.length - nw - dn > 0 ? (C.length - nw - dn) + " ileri tarihli" : ""].filter(Boolean).join(" · ") + "</div>"
+    + (D.kind === "o" ? '<div class="muted small">' + esc(D.owner) + "’in destesi</div>" : D.kind === "u" ? '<div class="muted small">' + (D.vis === "acik" ? "Açık: Efe de görür" : "Gizli: yalnız sen görürsün") + "</div>" : src ? '<div class="muted small">Kaynak: <a href="#/d/' + src.id + '/1">' + esc(src.t) + "</a></div>" : "") + "</div></div>"
+    + (C.length ? '<div class="row-btns" style="margin:12px 0"><a class="btn primary" href="' + ek + '">' + icon("cards") + "Çalış" + (dn + Math.min(nw, 20) ? " · " + (dn + Math.min(nw, 20)) : "") + '</a><a class="btn" href="' + ek + '&all=1">Hepsini sırayla</a><a class="btn" href="' + ek + '&all=1&mix=1">Karışık</a></div>' : "")
+    + (topics.length > 1 ? '<h2 class="sec">Konular</h2><div class="chips">' + topics.map(tp => '<a class="chip" href="' + ek + "&all=1&t=" + encodeURIComponent(tp) + '">' + esc(tp) + '<span class="n">' + C.filter(c => c.t === tp).length + "</span></a>").join("") + "</div>" : "")
+    + '<h2 class="sec">Kartlar</h2>' + (C.length ? '<div class="card list kl">' + C.map(c => '<div class="krow"><div class="kf">' + rich(c.f) + '</div><div class="kb muted">' + rich(String(c.b || "").replace(/\[\[|\]\]/g, "")) + "</div></div>").join("") + "</div>" : '<div class="card empty">Bu destede kart yok.' + (D.kind === "u" ? " Sağ üstten düzenleyip kart ekle." : "") + "</div>")
+    + "</div>";
+  const de = $("#dedit"); if (de) de.onclick = () => navTo("#/kartlar/yeni?id=" + encodeURIComponent(D.deck.id));
+}
+
+function deckEdit() {
+  const q = parseHash().q, id = q.get("id");
+  setNav("kartlar");
+  const all = cdLoad(), d0 = id && all[id] ? JSON.parse(JSON.stringify(all[id])) : { id: "d" + Date.now().toString(36), n: "", c: "", vis: "gizli", cards: {} };
+  const courses = Array.from(new Set(S.cat.items.filter(i => i.g === currentKurul().id || SPECIAL[i.g]).map(i => i.c))).sort((a, b) => a.localeCompare(b, "tr"));
+  if (d0.c && !courses.includes(d0.c)) courses.unshift(d0.c);
+  const back = id ? "#/kartlar/deste/" + encodeURIComponent("u:" + id) : "#/kartlar";
+  const save = (msg) => { d0.at = Date.now(); const A = cdLoad(); A[d0.id] = d0; cdSave(A); if (msg) toast(msg); };
+  const list = () => Object.entries(d0.cards).filter(([, x]) => !x.del).sort((a, b) => (a[1].o || 0) - (b[1].o || 0));
   const draw = () => {
-    const L = listOf(); if (st.i >= L.length) st.i = 0;
-    const ci = L[st.i], c = cards[ci];
-    $("#cv").innerHTML = '<div class="chips" style="margin-bottom:10px"><button class="chip' + (!st.t ? " on" : "") + '" data-t="">Tümü<span class="n">' + cards.length + "</span></button>"
-      + topics.map(t => '<button class="chip' + (st.t === t ? " on" : "") + '" data-t="' + esc(t) + '">' + esc(t) + '<span class="n">' + cards.filter(x => x[0] === t).length + "</span></button>").join("") + "</div>"
-      + '<div class="qprog"><span>' + (st.i + 1) + " / " + L.length + '</span><div class="prog"><i style="width:' + Math.round(100 * (st.i + 1) / L.length) + '%;background:var(--accent)"></i></div><button class="ibtn" id="shf" title="Karıştır" style="' + (st.shuffle ? "color:var(--accent)" : "") + '">' + icon("shuffle") + "</button></div>"
-      + '<div class="card flash' + (st.back ? " back" : "") + '" id="fl"><div><div class="side-l">' + esc(c[0]) + (st.back ? " · cevap" : "") + (c[3] ? " · ★" : "") + '</div><div class="fx" style="margin-top:10px">' + (st.back ? c[2] : c[1]) + "</div>"
-      + (st.back ? "" : '<div class="muted small" style="margin-top:14px">Cevabı görmek için dokun</div>') + "</div></div>"
-      + '<div class="qnav">' + (st.back ? '<button class="btn" id="no">Bilemedim</button><button class="btn primary" id="yes">Bildim</button>' : '<button class="btn" id="prev">← Önceki</button><button class="btn primary" id="flip">Çevir</button>') + "</div>";
-    $("#fl").onclick = () => { st.back = !st.back; draw(); };
-    const fl = $("#flip"); if (fl) fl.onclick = () => { st.back = true; draw(); };
-    const pv = $("#prev"); if (pv) pv.onclick = () => { st.i = (st.i - 1 + L.length) % L.length; st.back = false; draw(); };
-    const nx = () => { st.i = (st.i + 1) % L.length; st.back = false; draw(); };
-    const y = $("#yes"); if (y) y.onclick = nx;
-    const n = $("#no"); if (n) n.onclick = () => {
-      const s = srsLoad(), key = it.id + "|" + ci, e = s[key];
-      s[key] = { b: 0, due: addDays(today(), 1), w: (e ? e.w : 0) + 1, t: Date.now(), u: Date.now() }; srsSave(s); updateBadge();
-      toast("Tekrar listesine eklendi"); nx();
+    main().innerHTML = bar({ title: id ? "Desteyi düzenle" : "Yeni deste", back }) + '<div class="page narrow">'
+      + '<div class="card form"><label>Deste adı<input id="dn" maxlength="80" value="' + esc(d0.n) + '" placeholder="ör. Transkripsiyon terimleri"></label>'
+      + '<label>Ders<select id="dc"><option value="">Seç</option>' + courses.map(c => "<option" + (c === d0.c ? " selected" : "") + ">" + esc(c) + "</option>").join("") + '<option value="Genel"' + (d0.c === "Genel" ? " selected" : "") + ">Genel</option></select></label>"
+      + '<div class="lbl">Kimler görsün?</div><div class="seg" id="dv"><button type="button" data-v="gizli" class="' + (d0.vis !== "acik" ? "on" : "") + '">' + icon("lock") + "Gizli<small>Yalnız sen</small></button>"
+      + '<button type="button" data-v="acik" class="' + (d0.vis === "acik" ? "on" : "") + '">' + icon("duel") + "Açık<small>Efe de görür ve çalışır</small></button></div></div>"
+      + '<h2 class="sec">Kartlar · ' + list().length + "</h2>"
+      + '<div class="card form" id="kadd"><label>Ön yüz (soru)<textarea id="kf" rows="2" placeholder="ör. Prokaryotlarda transkripsiyonu başlatan alt birim?"></textarea></label>'
+      + '<label>Arka yüz (cevap)<textarea id="kb" rows="2" placeholder="ör. [[Sigma]] faktörü — boşluk doldurmada gizlenecek yeri [[ ]] içine yazabilirsin"></textarea></label>'
+      + '<div class="row-btns"><button class="btn primary" id="ka">' + icon("plus") + 'Kartı ekle</button><button class="btn" id="kx" hidden>Vazgeç</button></div></div>'
+      + (list().length ? '<div class="card list kl">' + list().map(([k, x]) => '<div class="krow"><div class="kf">' + rich(x.f) + '</div><div class="kb muted">' + rich(x.b) + '</div><div class="kact"><button class="lnk" data-ke="' + k + '">Düzenle</button><button class="lnk dng" data-kd="' + k + '">Sil</button></div></div>').join("") + "</div>" : "")
+      + '<div class="row-btns" style="margin-top:16px"><button class="btn primary" id="dsv">Kaydet</button>' + (id ? '<button class="btn dng" id="ddel">Desteyi sil</button>' : "") + "</div></div>";
+    let editing = null;
+    $$("#dv button").forEach(b => b.onclick = () => { d0.vis = b.dataset.v; $$("#dv button").forEach(x => x.classList.toggle("on", x === b)); });
+    const meta = () => { d0.n = $("#dn").value.trim(); d0.c = $("#dc").value; };
+    $("#ka").onclick = () => {
+      meta();
+      const f = $("#kf").value.trim(), b = $("#kb").value.trim();
+      if (!f || !b) return toast("Ön ve arka yüzü doldur");
+      if (!d0.n || !d0.c) return toast("Önce deste adını ve dersi yaz");
+      const k = editing || "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      d0.cards[k] = { f, b, at: Date.now(), o: editing ? d0.cards[k].o : Date.now() };
+      save(editing ? "Kart güncellendi" : "Kart eklendi"); draw(); $("#kf").focus();
     };
-    $("#shf").onclick = () => { st.shuffle = !st.shuffle; st.order = st.shuffle ? st.order.slice().sort(() => Math.random() - .5) : cards.map((_, i) => i); st.i = 0; st.back = false; draw(); };
-    $$("[data-t]", $("#cv")).forEach(b => b.onclick = () => { st.t = b.dataset.t; st.i = 0; st.back = false; draw(); });
+    $("#kx").onclick = () => draw();
+    $$("[data-ke]").forEach(b => b.onclick = () => { const x = d0.cards[b.dataset.ke]; editing = b.dataset.ke; $("#kf").value = x.f; $("#kb").value = x.b; $("#ka").innerHTML = icon("check") + "Kaydet"; $("#kx").hidden = false; $("#kadd").scrollIntoView({ block: "center" }); });
+    $$("[data-kd]").forEach(b => b.onclick = () => { d0.cards[b.dataset.kd] = Object.assign({}, d0.cards[b.dataset.kd], { del: 1, at: Date.now() }); save("Kart silindi"); draw(); });
+    $("#dsv").onclick = () => { meta(); if (!d0.n || !d0.c) return toast("Deste adını ve dersi yaz"); save("Deste kaydedildi"); navTo("#/kartlar/deste/" + encodeURIComponent("u:" + d0.id)); };
+    const dd = $("#ddel"); if (dd) dd.onclick = () => {
+      const bg = sheet('<h3>Desteyi sil?</h3><p class="muted small">“' + esc(d0.n) + '” ve kartları silinir' + (d0.vis === "acik" ? "; Efe de artık göremez" : "") + '.</p><div class="row-btns"><button class="btn dng" id="dy">Sil</button><button class="btn" data-close>Vazgeç</button></div>');
+      $("#dy", bg).onclick = () => { d0.del = 1; save("Deste silindi"); bg.close(); navTo("#/kartlar"); };
+    };
+  };
+  draw();
+}
+
+async function cardStudy(q) {
+  setNav("kartlar");
+  const s0 = csLoad(), t = today();
+  let C = [], title = "Kart tekrarı", back = "#/kartlar";
+  if (q.get("due")) {
+    const due = cardsDueKeys(), dks = new Set(due.map(k => s0[k].dk).filter(Boolean));
+    for (const D of cardDecks().filter(d => dks.has(d.key))) C = C.concat((await deckCards(D)).filter(c => due.includes(c.key)));
+    const X = upcomingExams(7);
+    const pri = c => { const D = deckByKey(c.dk); return X.some(x => x.has(D && D.item ? D.item : { c: c.c, g: currentKurul().id })) ? 0 : 1; };
+    C.sort((a, b) => pri(a) - pri(b) || (s0[a.key].due < s0[b.key].due ? -1 : 1));
+  } else {
+    const D = deckByKey(q.get("d") || "");
+    if (!D) return notFound();
+    title = D.t; back = "#/kartlar/deste/" + encodeURIComponent(D.key);
+    C = await deckCards(D);
+    if (q.get("t")) C = C.filter(c => c.t === q.get("t"));
+    if (!q.get("all")) C = C.filter(c => s0[c.key] && s0[c.key].due <= t).concat(C.filter(c => !s0[c.key]).slice(0, 20));
+    if (q.get("mix")) C = C.sort(() => Math.random() - .5);
+  }
+  const st = { i: 0, back: false, typed: "", mode: LS.get("ml.cmode", "cevir"), n: [0, 0, 0], again: new Set() };
+  main().innerHTML = '<div class="fill">' + bar({ title, solid: 1, back, crumb: crumbs([["Kartlar", "#/kartlar"], [q.get("due") ? "Tekrar" : "Çalış", ""]]) }) + '<div class="doc" style="padding:16px"><div class="page narrow" id="cv"></div></div></div>';
+  const cv = $("#cv");
+  if (!C.length) { cv.innerHTML = '<div class="card empty">Şu an çalışılacak kart yok.<div class="row-btns" style="justify-content:center;margin-top:12px"><a class="btn" href="' + back + '">Geri dön</a></div></div>'; return; }
+  let curC = "";
+  S.cleanup.push(() => trkSet(""));
+  const slideBtn = c => { const it = c.s && S.byId[c.s]; return it ? '<a class="btn" href="#/d/' + it.id + "/" + (c.p || 1) + (c.p ? "?h=" + c.p : "") + '">' + icon("slide") + "Slayta git" + (c.p ? " · " + c.p : "") + "</a>" : ""; };
+  const hvB = c => { const it = c.s && S.byId[c.s]; if (!it || !c.p) return ""; const L = hvList(it, c.p); return L.length ? '<div class="hvb" style="margin:10px auto 0">' + icon("star") + (L.some(h => h.q) ? "Hoca: soru olarak geldi" : "Hoca derste vurguladı") + "</div>" : ""; };
+  const done = () => {
+    cv.innerHTML = '<div class="card empty"><h3 style="margin-bottom:6px">Bitti</h3>' + (st.n[0] + st.n[1] + st.n[2]) + " kart · Bildim " + st.n[2] + " · Zorlandım " + st.n[1] + " · Bilemedim " + st.n[0]
+      + '<div class="muted small" style="margin-top:6px">Bilemediklerin yarın yeniden gelir.</div><div class="row-btns" style="justify-content:center;margin-top:14px"><a class="btn primary" href="' + back + '">Tamam</a></div></div>';
+    cardBadge();
+  };
+  const draw = () => {
+    if (st.i >= C.length) return done();
+    const c = C[st.i], cl = st.mode === "bosluk" ? clozeOf(c) : null;
+    if (c.c !== curC) { curC = c.c; trkSet(c.c); }
+    const front = st.mode === "bosluk" && cl ? '<div class="muted small" style="margin-bottom:8px">' + rich(c.f) + "</div>" + esc(cl.txt).replace("§", '<span class="gap">' + (st.back ? esc(cl.ans) : "_____") + "</span>") : rich(c.f);
+    const ask = !st.back && (st.mode === "yaz" || (st.mode === "bosluk" && cl));
+    let res = "";
+    if (st.back && st.typed !== "" && (st.mode === "yaz" || (st.mode === "bosluk" && cl))) {
+      const ans = st.mode === "yaz" ? c.b : cl.ans, sim = cardSim(st.typed, ans);
+      res = '<div class="kres ' + (sim >= .8 ? "ok" : sim >= .4 ? "mid" : "no") + '"><span>Senin cevabın</span><b>' + esc(st.typed) + "</b><small>" + (sim >= .8 ? "Doğru görünüyor" : sim >= .4 ? "Kısmen tutuyor" : "Tutmuyor") + " · kararı sen ver</small></div>";
+    }
+    cv.innerHTML = '<div class="chips cmode">' + CMODES.map(([k, l]) => '<button class="chip' + (st.mode === k ? " on" : "") + '" data-m="' + k + '">' + l + "</button>").join("") + "</div>"
+      + '<div class="qprog"><span>' + (st.i + 1) + " / " + C.length + '</span><div class="prog"><i style="width:' + Math.round(100 * st.i / C.length) + '%;background:var(--accent)"></i></div></div>'
+      + '<div class="card flash' + (st.back ? " back" : "") + '" id="fl"><div><div class="side-l">' + esc(c.t || c.c) + (st.back ? " · cevap" : "") + "</div>"
+      + '<div class="fx" style="margin-top:10px">' + front + "</div>"
+      + (st.back ? (st.mode === "bosluk" && cl ? "" : '<div class="kans">' + rich(String(c.b).replace(/\[\[|\]\]/g, "")) + "</div>") + res + hvB(c) : "")
+      + (!st.back && st.mode === "cevir" ? '<div class="muted small" style="margin-top:14px">Cevabı görmek için dokun</div>' : "") + "</div></div>"
+      + (ask ? '<div class="kin"><input id="kt" autocomplete="off" placeholder="' + (st.mode === "yaz" ? "Cevabını yaz" : "Boşluğa geleni yaz") + '"><button class="btn primary" id="kc">Kontrol</button></div><div class="qnav"><button class="btn" id="kskip">Bilmiyorum, göster</button></div>' : "")
+      + (st.back ? '<div class="qnav kgr"><button class="btn" data-g="0">Bilemedim</button><button class="btn" data-g="1">Zorlandım</button><button class="btn primary" data-g="2">Bildim</button></div><div class="row-btns" style="justify-content:center;margin-top:10px">' + slideBtn(c) + "</div>"
+        : st.mode === "cevir" || !ask ? '<div class="qnav"><button class="btn primary" id="flip">Çevir</button></div>' : "");
+    const flip = () => { st.back = true; draw(); };
+    $("#fl").onclick = e => { if (e.target.closest("a,button")) return; if (!st.back && !ask) flip(); };
+    const fb = $("#flip"); if (fb) fb.onclick = flip;
+    const kt = $("#kt");
+    if (kt) { kt.focus(); const go = () => { st.typed = kt.value.trim(); flip(); }; $("#kc").onclick = go; kt.onkeydown = e => { if (e.key === "Enter") go(); }; $("#kskip").onclick = () => { st.typed = ""; flip(); }; }
+    $$("[data-g]", cv).forEach(b => b.onclick = () => {
+      const g = +b.dataset.g;
+      if (!st.again.has(c.key) || g) cardGrade(c, g);
+      st.n[g]++;
+      if (g === 0 && !st.again.has(c.key)) { st.again.add(c.key); C.push(c); }
+      st.i++; st.back = false; st.typed = ""; draw();
+    });
+    $$("[data-m]", cv).forEach(b => b.onclick = () => { st.mode = b.dataset.m; LS.set("ml.cmode", st.mode); st.back = false; st.typed = ""; draw(); });
   };
   draw();
 }

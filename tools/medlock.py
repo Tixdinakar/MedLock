@@ -1114,6 +1114,9 @@ def main():
     sk = sp.add_parser("skip")
     sk.add_argument("src")
     sp.add_parser("known")
+    ac = sp.add_parser("add-cards", help="slayt destesinden hazır kart destesi: JSON [{t, f, b, p, z?}] (Kartlar sekmesi)")
+    ac.add_argument("file"); ac.add_argument("--deck", required=True, help="kaynak slayt destesinin id'si")
+    ac.add_argument("--title")
     kn = sp.add_parser("konu", help="not/özet/video → slayt destesi bağları (ders sayfasında konuya göre gruplama)")
     kn.add_argument("--force", action="store_true", help="elle verilenler dahil hepsini yeniden hesapla")
     sp.add_parser("saat", help="kurul provası için ders saatleri (d/plan'dan)")
@@ -1199,6 +1202,17 @@ def main():
         build_index(V)
     elif a.cmd == "skip":
         V.cat.setdefault("skip", []).append(a.src.replace("drive:", ""))
+    elif a.cmd == "add-cards":
+        d = V.item(a.deck) or sys.exit("deste yok: " + a.deck)
+        cards = json.load(open(a.file, encoding="utf-8"))
+        for c in cards:
+            assert c.get("f") and c.get("b"), c
+            if c.get("p") and not (1 <= int(c["p"]) <= d["n"]):
+                sys.exit("sayfa dışı: %s %s" % (c["p"], c["f"]))
+        it = add_cards(V, cards, id=d["id"] + "-kart", title=a.title or d["t"], kurul=d["g"], course=d["c"],
+                       hoca=d.get("h"), date=d.get("d"))
+        it["kn"] = [d["id"]]
+        print("kart destesi", it["id"], it["n"], "kart")
     elif a.cmd == "known":
         print("\n".join(known_sources(V)))
         return

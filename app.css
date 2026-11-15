@@ -655,3 +655,35 @@ h2.sec-a .lnk{background:none;border:0;padding:6px 0;margin:-6px 0;color:var(--a
 .tfix .crow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:15px}
 .tfix .crow .txt{flex:1;min-width:0}
 .tfix .realin{width:84px;text-align:right}
+/* 1.5: Kartlar */
+.ksum{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px}
+.ksum b{font-size:16px}
+.kdue{flex:none;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--flame,#f08a3c);color:#fff;font:700 12px/22px var(--f-mono);text-align:center}
+.krow{padding:11px 14px;border-top:1px solid var(--line)}
+.krow:first-child{border-top:0}
+.krow .kf{font-weight:600;line-height:1.35}
+.krow .kb{font-size:14px;margin-top:3px;line-height:1.4}
+.kact{display:flex;gap:16px;margin-top:6px}
+.lnk{background:none;border:0;padding:4px 0;color:var(--accent);font:600 13.5px var(--f-ui);cursor:pointer}
+.lnk.dng,.btn.dng{color:#d64545}
+.card.form{display:grid;gap:12px;padding:14px 16px}
+.card.form label,.card.form .lbl{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+.card.form input,.card.form textarea,.card.form select,.kin input{font:400 15.5px var(--f-ui);padding:10px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box;resize:vertical}
+.card.form .seg{margin:0}
+.seg button{flex:1;display:grid;justify-items:center;gap:2px;padding:8px;border:0;border-radius:8px;background:none;color:var(--muted);font:600 14px var(--f-ui);cursor:pointer}
+.seg button .ic{width:18px;height:18px}
+.seg button small{font-weight:400;font-size:11.5px}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.cmode{margin-bottom:10px}
+.flash .kans{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line-2);font-size:16.5px;line-height:1.45}
+.flash .gap{display:inline-block;min-width:70px;border-bottom:2px solid var(--accent);color:var(--accent);font-weight:700;padding:0 4px}
+.kin{display:flex;gap:8px;margin-top:12px}
+.kin input{flex:1}
+.kres{margin-top:12px;padding:10px 12px;border-radius:10px;display:grid;gap:2px;text-align:left;font-size:14px}
+.kres span{font-size:12px;color:var(--muted)}
+.kres small{color:var(--muted)}
+.kres.ok{background:color-mix(in srgb,#2e9d5b 14%,transparent)}
+.kres.mid{background:color-mix(in srgb,#e0a12a 16%,transparent)}
+.kres.no{background:color-mix(in srgb,#d64545 13%,transparent)}
+.kgr{justify-content:stretch}
+.kgr .btn{flex:1;justify-content:center}
