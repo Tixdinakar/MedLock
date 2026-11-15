@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.5";
+const VERSION = "1.5.1";
 const CHANGES = [
+  { v: "1.5.1", d: "2026-11-15", l: [
+    "Ders sayfasında “çıkmışta N soru” ve “hoca N yer vurguladı” etiketlerine dokununca hangi slaytlar olduğu listelenir; dokunduğun sayfa açılır, hepsi işaretli gelir",
+  ] },
   { v: "1.5", d: "2026-11-15", l: [
     "Yeni: Kartlar (Diğer menüsünde). Kurul 2'nin bütün slayt destelerinden hazır kartlar: 19 deste, 273 kart",
     "Üç çalışma biçimi: çevir ve kendini puanla, yazarak cevapla, boşluk doldur; arada istediğin an geçebilirsin",
@@ -110,7 +113,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "1aaf0019e4";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "b005bdeead";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1186,7 +1189,7 @@ function viewCourse(g, cs) {
       rows = groups.sort((a, b) => (b.d.d || "").localeCompare(a.d.d || "")).map(G => {
         const n = deckQn(G.d.id), cx = cxDeckN(G.d.id);
         const hv = (G.d.hv || []).length;
-        return grp(G.d.t, G.its, (cx ? '<span class="tag cx">' + icon("star") + "çıkmışta " + cx + " soru</span>" : "") + (hv ? '<span class="tag hv">' + icon("star") + "hoca " + hv + " yer vurguladı</span>" : "") + (n ? '<span class="tag">' + n + " soru</span>" : ""));
+        return grp(G.d.t, G.its, (cx ? '<button type="button" class="tag cx" data-cxs="' + G.d.id + '">' + icon("star") + "çıkmışta " + cx + " soru ›</button>" : "") + (hv ? '<button type="button" class="tag hv" data-hvs="' + G.d.id + '">' + icon("star") + "hoca " + hv + " yer vurguladı ›</button>" : "") + (n ? '<span class="tag">' + n + " soru</span>" : ""));
       }).join("")
         + grp("Birden çok konudan testler", multi) + grp(groups.length ? "Diğer notlar" : "Notlar ve dosyalar", loose) + grp("Çıkmışlar", cxs);
     } else {
@@ -1220,6 +1223,10 @@ function viewCourse(g, cs) {
     + '<div class="page"><div class="sbox csrch">' + icon("search") + '<input id="cq" type="search" placeholder="Bu derste ara: konu, başlık ya da slayttaki bir kelime" autocomplete="off" value="' + esc(F.q || "") + '"></div>'
     + '<div class="filters" id="flt"></div><div id="rows"></div><div id="chits"></div></div>';
   $("#flt").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (!b) return; F[b.dataset.f] = b.dataset.v; render(); });
+  $("#rows").addEventListener("click", e => {
+    const h = e.target.closest("[data-hvs]"), x = e.target.closest("[data-cxs]");
+    if (h) deckHvSheet(S.byId[h.dataset.hvs]); else if (x) deckCxSheet(S.byId[x.dataset.cxs]);
+  });
   $("#cq").addEventListener("input", e => { F.q = e.target.value; render(); clearTimeout(tq); tq = setTimeout(contentHits, 260); });
   render(); if (F.q) contentHits();
 }
@@ -1269,6 +1276,32 @@ function hvBadge(it, p) {
 function hvRows(it, L, jump) {
   return L.map(h => (jump ? '<button class="hvr" data-hvp="' + h.p + '">' : '<div class="hvr">')
     + '<b>' + (it.k === "slayt" ? "Slayt " : "Sayfa ") + h.p + (h.q ? ' <span class="tag cx">' + icon("star") + "soru olarak geldi</span>" : "") + "</b><span>" + esc(h.n) + '</span><small>Ses kaydı: ' + esc(h.s) + ", " + esc(h.t) + "</small>" + (jump ? "</button>" : "</div>")).join("");
+}
+// Ders sayfasındaki etiketler: hangi sayfalar? Her satır desteyi o sayfada açar, bütün sayfalar işaretli gelir.
+const pagesHref = (d, pages, p) => "#/d/" + d.id + "/" + (p || pages[0]) + "?h=" + Array.from(new Set(pages)).sort((a, b) => a - b).join(",");
+function deckHvSheet(d) {
+  if (!d) return;
+  const L = hvList(d), pages = L.map(h => h.p);
+  const bg = sheet("<h3>Hoca derste vurguladı · " + esc(d.t) + '</h3><p class="muted small">Dokununca slayt o sayfada açılır; işaretli sayfalar arasında üstteki şeritle gezersin.</p>'
+    + L.map(h => '<a class="hvr" href="' + pagesHref(d, pages, h.p) + '"><b>Slayt ' + h.p + (h.q ? ' <span class="tag cx">' + icon("star") + "soru olarak geldi</span>" : "") + "</b><span>" + esc(h.n) + "</span><small>Ses kaydı: " + esc(h.s) + ", " + esc(h.t) + "</small></a>").join("")
+    + '<div class="row-btns" style="margin-top:10px"><a class="btn primary" href="' + pagesHref(d, pages) + '">' + icon("slide") + "Hepsini slaytta gör</a><button class=\"btn\">Kapat</button></div>");
+  return bg;
+}
+async function deckCxSheet(d) {
+  if (!d) return;
+  const bg = sheet("<h3>Çıkmışta gelenler · " + esc(d.t) + '</h3><div id="cxl"><div class="loading"><div class="spin"></div></div></div>');
+  const T = S.cat.items.filter(t => t.k === "test" && t.cx && (t.dk || []).some(x => x[0] === d.id));
+  const rows = [], pages = [];
+  for (const t of T) {
+    const b = await loadTest(t);
+    b.data.forEach((q, i) => { const r = b.refs && b.refs[q.id]; if (r && r[0] === d.id) { rows.push({ t, i, q, r }); pages.push(...r[1]); } });
+  }
+  const box = $("#cxl", bg); if (!box) return;
+  box.innerHTML = '<p class="muted small">Bu konudan çıkmışta ' + rows.length + " soru gelmiş. Slayt numarasına dokununca o sayfa açılır; sorunun kendisi çıkmış testinde.</p>"
+    + rows.map(o => '<div class="hvr"><b>' + esc(o.t.t) + " · " + (o.i + 1) + ". soru</b><span>" + esc(strip(o.q.q).slice(0, 170)) + (strip(o.q.q).length > 170 ? "…" : "") + "</span>"
+      + '<small><a href="' + pagesHref(d, pages, o.r[1][0]) + '">' + icon("slide") + (o.r[2] ? "Tahmini slayt " : "Slayt ") + o.r[1].join(", ") + " ›</a></small></div>").join("")
+    + '<div class="row-btns" style="margin-top:10px">' + (pages.length ? '<a class="btn primary" href="' + pagesHref(d, pages) + '">' + icon("slide") + "Hepsini slaytta gör</a>" : "")
+    + T.map(t => '<a class="btn" href="#/t/' + t.id + '">' + icon("test") + "Çıkmışı çöz</a>").join("") + '<button class="btn">Kapat</button></div>';
 }
 function hvSheet(it, p) {
   sheet("<h3>Hoca derste vurguladı</h3>" + hvRows(it, hvList(it, p)) + '<p class="muted small">Ders kaydının yapay zekâ dökümünden; döküm birebir değil, slaytla karşılaştırılarak yazıldı.</p><div class="row-btns" style="margin-top:10px"><button class="btn" data-close>Kapat</button></div>');

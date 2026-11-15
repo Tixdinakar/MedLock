@@ -687,3 +687,9 @@ h2.sec-a .lnk{background:none;border:0;padding:6px 0;margin:-6px 0;color:var(--a
 .kres.no{background:color-mix(in srgb,#d64545 13%,transparent)}
 .kgr{justify-content:stretch}
 .kgr .btn{flex:1;justify-content:center}
+button.tag{cursor:pointer;line-height:inherit}
+button.tag.hv{background:var(--surface-2)}
+.hvr small a{color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.hvr small a .ic{width:14px;height:14px}
+a.hvr{color:inherit}
+.sheet .hvr+.hvr{margin-top:6px}
