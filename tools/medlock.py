@@ -1052,6 +1052,99 @@ def print_plan(V, only=None):
                 print(f"    {'✓' if hit else '·'} {k}" + (f"  ← {best['t']} ({best['g']})" if hit else ""))
 
 
+# --- Akademik takvim (Buğra her ay okulun aylık programını .xlsx olarak atar) ---
+TK_DEPT = [("BİYOİSTATİSTİK", "Biyoistatistik"), ("RUH SAĞLIĞI", "Davranış Bilimleri"), ("TIBBİ BİYOLOJİ", "Tıbbi Biyoloji ve Genetik"),
+           ("BİYOKİMYA", "Biyokimya"), ("BİYOFİZİK", "Biyofizik"), ("ANATOMİ", "Anatomi"), ("TIP TARİHİ", "Tıp Tarihi"),
+           ("HİSTOLOJİ", "Histoloji ve Embriyoloji"), ("FİZYOLOJİ", "Fizyoloji")]
+TK_SKIP = re.compile(r"serbest çalışma|öğle arası|ingilizce|seçmeli|kug|atatürk|türk dili|mükkam|toplantı|sınav", re.I)
+
+
+def takvim_ekle(V, path):
+    import openpyxl
+    ws = openpyxl.load_workbook(path, data_only=True).active
+    rows = list(ws.iter_rows(values_only=True))
+    hd = [str(x or "") for x in rows[0]]
+    ix = {k: hd.index(k) for k in ("egitici", "ders", "ders_tarihi", "ders_baslangic_saati", "ders_bitis_saati", "ders_tipi")}
+    out = []
+    for r in rows[1:]:
+        t = re.sub(r"\s*Grup:.*$", "", str(r[ix["ders"]] or "")).strip(" -")
+        t = re.sub(r"(\s*-\s*)+$", "", t).strip()
+        h = str(r[ix["egitici"]] or "")
+        d = str(r[ix["ders_tarihi"]] or "")[:10]
+        if not t or not d:
+            continue
+        c = next((n for k, n in TK_DEPT if k in h.upper()), None)
+        hoca = tr_title(re.sub(r"\s*\(.*$", "", h).strip()) if h else ""
+        lab = bool(re.search(r"\blab\b|laboratuvar|uygulama", t, re.I)) or (r[ix["ders_tipi"]] == "P")
+        e = dict(d=d, s=str(r[ix["ders_baslangic_saati"]] or ""), e=str(r[ix["ders_bitis_saati"]] or ""), t=t, h=hoca, c=c or "",
+                 chk=0 if (not c or TK_SKIP.search(t) or lab) else 1)
+        p = out[-1] if out else None
+        if p and p["d"] == d and p["t"] == t and p["h"] == hoca:
+            p["e"] = e["e"]; p["n"] = p.get("n", 1) + 1
+        else:
+            out.append(e)
+    lo, hi = min(x["d"] for x in out), max(x["d"] for x in out)
+    old = [x for x in V.cat.get("takvim", []) if not (lo <= x["d"] <= hi)]
+    V.cat["takvim"] = sorted(old + out, key=lambda x: (x["d"], x["s"]))
+    print(f"takvim: {lo} – {hi}, {len(out)} ders ({sum(x['chk'] for x in out)} tanesi slayt/ses için izleniyor)")
+    return out
+
+
+def _tk_stems(t):
+    drop = {"giris", "ve", "ile", "temel", "genel", "ders", "tibbi", "teori", "kuram"}
+    return {w[:5] for w in toks(t) if len(w) > 2 and w not in drop}
+
+
+def _tk_match(e, cands, es, strict=False):
+    """Takvimdeki dersi aday listesinde bulur: elle eşleme (takvim_es) önce, sonra kelime kökü örtüşmesi."""
+    if e["t"] in es:
+        v = es[e["t"]]
+        return v if v == "-" else next((c for c in cands if c.get("id") == v or c.get("name") == v), v)
+    kt = _tk_stems(e["t"])
+    best, bs = None, 0
+    for c in cands:
+        ct = _tk_stems(c.get("t") or clean_title(re.sub(r"(_original)?\.(txt|pdf)$", "", c.get("name", ""), flags=re.I)))
+        if not kt or not ct:
+            continue
+        ov, mn = len(kt & ct), min(len(kt), len(ct))
+        sc = ov / mn if (not strict or mn > 2 or ov == mn) else 0   # ses adları kısa: "Kültür ve Hastalık" tek ortak kelimeyle eşleşmesin
+        if sc > bs:
+            best, bs = c, sc
+    return best if bs >= 0.5 else None
+
+
+def takvim_kontrol(V, bugun=None, drive=None, gun=None):
+    """İşlenmiş (tarihi geçmiş) derslerin slaytı katalogda, ses kaydı dökümü Drive listesinde var mı."""
+    bugun = bugun or datetime.date.today().isoformat()
+    es = V.cat.get("takvim_es", {})
+    decks = [it for it in V.cat["items"] if it["k"] == "slayt"]
+    ses = [x for x in (drive or []) if re.search(r"ses", x.get("folder", ""), re.I) or x.get("name", "").endswith("_original.txt")]
+    lo = (datetime.date.fromisoformat(bugun) - datetime.timedelta(days=gun)).isoformat() if gun else "0000"
+    miss_s, miss_a, seen = [], [], set()
+    for e in V.cat.get("takvim", []):
+        if not e.get("chk") or not (lo <= e["d"] < bugun) or (e["t"], e["c"]) in seen:
+            continue
+        seen.add((e["t"], e["c"]))
+        m = _tk_match(e, [d for d in decks if d["c"] == e["c"]], es)
+        if m is None:
+            miss_s.append(e)
+        sc = [x for x in ses if norm(e["c"].split()[0]) in norm(x.get("folder", ""))] or ses
+        if drive is not None and _tk_match(e, sc, V.cat.get("takvim_ses", {}), strict=True) is None:
+            miss_a.append(e)
+    fmt = lambda e: f"  {e['d']} · {e['c']} · {e['t']} ({e['h']})"
+    print(f"Takvim denetimi ({bugun}'e kadar işlenen dersler)")
+    print(f"Slaytı olmayan: {len(miss_s)}"); [print(fmt(e)) for e in miss_s]
+    if drive is not None:
+        print(f"Ses kaydı dökümü olmayan: {len(miss_a)}"); [print(fmt(e)) for e in miss_a]
+    up = [e for e in V.cat.get("takvim", []) if e.get("chk") and bugun <= e["d"] <= (datetime.date.fromisoformat(bugun) + datetime.timedelta(days=7)).isoformat()]
+    if up:
+        print("Önümüzdeki 7 gün:"); [print(fmt(e)) for e in up]
+    son = max((x["d"] for x in V.cat.get("takvim", [])), default=None)
+    if son and son < (datetime.date.fromisoformat(bugun) + datetime.timedelta(days=5)).isoformat():
+        print(f"Takvim {son} tarihinde bitiyor: Buğra'dan yeni ayın programını iste.")
+    return miss_s, miss_a
+
+
 def known_sources(V):
     c = V.cat
     return sorted({it["src"][6:] for it in c["items"] if it.get("src", "").startswith("drive:")}
@@ -1115,6 +1208,12 @@ def main():
     sk = sp.add_parser("skip")
     sk.add_argument("src")
     sp.add_parser("known")
+    tk = sp.add_parser("takvim-ekle", help="okulun aylık akademik takvimi (.xlsx); aynı tarih aralığı yenilenir"); tk.add_argument("file")
+    tk = sp.add_parser("takvim", help="işlenen derslerin slayt/ses denetimi")
+    tk.add_argument("--drive", help="Drive listesi JSON [{id,name,folder}] (ses kontrolü için)")
+    tk.add_argument("--bugun"); tk.add_argument("--gun", type=int, help="yalnız son N gün")
+    tk = sp.add_parser("takvim-es", help="takvimdeki ders adını desteye elle eşle (hedef: deste id, '-' = slayt beklenmez, rm = sil)")
+    tk.add_argument("konu"); tk.add_argument("hedef"); tk.add_argument("--ses", action="store_true", help="ses dökümü eşlemesi (hedef: Drive adı ya da '-')")
     dn = sp.add_parser("dersnot", help="kurul dışı ders not ağırlıkları (vize/final yüzdesi, geçme notu)")
     dn.add_argument("ders"); dn.add_argument("--vize", type=int, default=40); dn.add_argument("--final", type=int, default=60)
     dn.add_argument("--gec", type=int, default=50); dn.add_argument("--rm", action="store_true")
@@ -1206,6 +1305,17 @@ def main():
         build_index(V)
     elif a.cmd == "skip":
         V.cat.setdefault("skip", []).append(a.src.replace("drive:", ""))
+    elif a.cmd == "takvim-ekle":
+        takvim_ekle(V, a.file)
+    elif a.cmd == "takvim":
+        drv = json.load(open(a.drive)) if a.drive else None
+        takvim_kontrol(V, a.bugun, drv, a.gun)
+    elif a.cmd == "takvim-es":
+        key = "takvim_ses" if a.ses else "takvim_es"
+        M = V.cat.setdefault(key, {})
+        if a.hedef == "rm": M.pop(a.konu, None)
+        else: M[a.konu] = a.hedef
+        print(key, M)
     elif a.cmd == "dersnot":
         D = V.cat.setdefault("dersnot", {})
         if a.rm: D.pop(a.ders, None)
