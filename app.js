@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.5.4";
+const VERSION = "1.5.5";
 const CHANGES = [
+  { v: "1.5.5", d: "2026-11-16", l: [
+    "Vizesi geçen Kanser ve Kök Hücre'nin soruları ve kartları tekrara gelmiyor; finaline iki hafta kala yeniden gelir, final geçince hiç gelmez",
+  ] },
   { v: "1.5.4", d: "2026-11-16", l: [
     "Ana sayfada puanı sorulan sınavı geçsen de puanını sonra İlerleme › Sınav puanların bölümünden yazabilirsin",
   ] },
@@ -123,7 +126,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "db035a7523";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "e760366603";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -409,9 +412,17 @@ const unitWord = it => it.k === "test" ? "soru" : it.k === "kart" ? "kart" : it.
 /* ---------- progress records ---------- */
 const srsLoad = () => Object.assign({}, PS.get("srs", {}));
 const srsSave = s => PS.set("srs", s);
+// Uyuyan dersler (katalogda "uyut", medlock.py uyut): soruları ve kartları yalnız o dersin sınavına UYW gün kala tekrara gelir; son sınav geçince hiç gelmez
+const UYW = 14;
+function asleep(it) {
+  const U = S.cat.uyut || [];
+  if (!it || !U.length || !U.some(c => cMatch(it.c, c))) return false;
+  const t = today();
+  return !(S.cat.sinavlar || []).some(x => cMatch(it.c, x.c) && x.d >= t && dayDiff(t, x.d) <= UYW);
+}
 function srsDue(all) {
   const s = srsLoad(), t = today(), X = upcomingExams(EXW);
-  return Object.keys(s).filter(k => finalBack(s[k]) || examBackKey(k, s[k], X) || (!s[k].m && (all || s[k].due <= t)));
+  return Object.keys(s).filter(k => !asleep(srsKeyItem(k)) && (finalBack(s[k]) || examBackKey(k, s[k], X) || (!s[k].m && (all || s[k].due <= t))));
 }
 function srsKeyItem(k) { const id = k.split("|")[0]; return id === "lex" ? (S.cat.lex ? LEXITEM : null) : id === "lat" ? (S.cat.lat ? LATITEM : null) : S.byId[id]; }
 const testRes = () => Object.assign({}, PS.get("tres", {}));
@@ -1899,7 +1910,7 @@ async function deckCards(D) {
   const pre = D.kind === "u" ? "u|" + D.deck.id + "|" : "o|" + D.key.split(":")[1] + "|" + D.deck.id + "|";
   return Object.entries(D.deck.cards || {}).filter(([, x]) => x && !x.del).sort((a, b) => (a[1].o || 0) - (b[1].o || 0)).map(([id, x]) => ({ key: pre + id, id, t: D.t, f: x.f, b: x.b, c: D.c, dk: D.key }));
 }
-function cardsDueKeys() { const s = csLoad(), t = today(); return Object.keys(s).filter(k => !s[k].x && s[k].due <= t); }
+function cardsDueKeys() { const s = csLoad(), t = today(); return Object.keys(s).filter(k => !s[k].x && s[k].due <= t && !asleep(S.byId[k.split("|")[0]])); }
 function cardBadge() { const n = cardsDueKeys().length; $$("[data-cbadge]").forEach(b => { b.hidden = !n; b.textContent = n > 99 ? "99+" : n; }); }
 function cardGrade(c, g) {          // g: 0 bilemedim, 1 zorlandım, 2 bildim
   const s = csLoad(), e = s[c.key] || { b: -1, n: 0 };

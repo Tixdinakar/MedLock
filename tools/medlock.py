@@ -1172,6 +1172,8 @@ def main():
     fn.add_argument("start")
     fn.add_argument("end")
     fn.add_argument("--dn", default="d1")
+    uy = sp.add_parser("uyut", help="dersin soru ve kartları tekrara yalnız sınavına 14 gün kala gelir (son sınav geçince hiç); argümansız liste")
+    uy.add_argument("course", nargs="?"); uy.add_argument("--rm", action="store_true")
     sn = sp.add_parser("sinav", help="yaklaşan sınav uyarısı: tarih ve ders (ana sayfada --gun kadar önceden çıkar, varsayılan 21)")
     sn.add_argument("date", help="YYYY-AA-GG")
     sn.add_argument("course")
@@ -1416,6 +1418,13 @@ def main():
         d = next((x for x in V.cat["donemler"] if x["id"] == a.dn), None) or sys.exit("dönem yok: " + a.dn)
         d["final"] = {"start": a.start, "end": a.end}
         print(d["name"], "final dönemi:", a.start, "–", a.end)
+    elif a.cmd == "uyut":
+        U = [c for c in V.cat.get("uyut", []) if c != a.course]
+        if a.course and not a.rm:
+            U.append(a.course)
+        if U: V.cat["uyut"] = U
+        else: V.cat.pop("uyut", None)
+        print("uyuyan dersler:", ", ".join(U) or "yok")
     elif a.cmd == "sinav":
         L = [x for x in V.cat.get("sinavlar", []) if not (x["d"] == a.date and x["c"] == a.course)]
         if not a.rm:
