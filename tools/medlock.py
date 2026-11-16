@@ -576,7 +576,8 @@ def build_index(V):
         elif it["k"] == "kart":
             b = V.get_json(f"d/{it['x']}")
             for i, c in enumerate(b["cards"]):
-                Q.append([it["id"], i, strip_html(c[1]) + " — " + strip_html(c[2])])
+                f, bk = (c.get("f"), c.get("b")) if isinstance(c, dict) else (c[1], c[2])
+                Q.append([it["id"], i, strip_html(f) + " — " + strip_html(bk)])
     V.put_json("d/s", {"d": D, "q": Q})
     build_lexicon(V)
     build_latin(V)
