@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.5.3";
+const VERSION = "1.5.4";
 const CHANGES = [
+  { v: "1.5.4", d: "2026-11-16", l: [
+    "Ana sayfada puanı sorulan sınavı geçsen de puanını sonra İlerleme › Sınav puanların bölümünden yazabilirsin",
+  ] },
   { v: "1.5.3", d: "2026-11-15", l: [
     "Kurul dışı derslerde (ATA, Türk Dili, Ekoloji, Kanser ve Kök Hücre) vize puanını yazınca, ortalama 50 için finalde en az kaç alman gerektiği yazar; final yaklaşınca ana sayfadaki sınav satırında da görünür",
     "ATA ve Türk Dili vizeleri için de puan sorulur",
@@ -120,7 +123,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "c42fd698af";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "db035a7523";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -2339,7 +2342,7 @@ function viewProgress() {
   }).join("");
   const H = PS.get("hist", []).slice().reverse().filter(h => !gs || gs.has(h.g));
   const W = weakTopics(gs), R = PS.get("real", {});
-  const scores = pastExams().filter(x => R[x.key] && R[x.key].p != null);
+  const scores = pastExams().filter(x => (R[x.key] && R[x.key].p != null) || dayDiff(x.d, today()) <= 120);
   main().innerHTML = bar({ title: "İlerleme", crumb: syncOn() ? "Bütün cihazlarındaki çalışman" : "Bu cihazdaki çalışman" }) + '<div class="page narrow">'
     + '<div class="stat4"><div class="card"><b>' + myStreak() + '</b><span>günlük seri</span></div><div class="card"><b>' + dayN(days, t) + '</b><span>bugün soru</span></div>'
     + '<div class="card"><b>' + (wkT ? fmtDur(wkT) : wkQ) + "</b><span>" + (wkT ? "bu hafta çalışma" : "bu hafta soru") + '</span></div><div class="card"><b>' + (ft.n ? "%" + Math.round(100 * ft.k / ft.n) : "–") + "</b><span>ilk denemede doğru · 7 gün</span></div></div>"
@@ -2351,7 +2354,7 @@ function viewProgress() {
     + (courseBlocks || '<div class="card empty">Bu seçimde henüz test yok.</div>')
     + (scores.length ? '<h2 class="sec">Sınav puanların</h2><div class="card">' + scores.map(x => {
       const hs = PS.get("hist", []).filter(h => x.g ? h.g === x.g : cMatch(h.c, x.c)), avg = hs.length ? Math.round(100 * hs.reduce((a, h) => a + h.ok / h.n, 0) / hs.length) : null;
-      return '<div class="crow"><div class="txt"><b>' + esc(x.label) + '</b><div class="muted small">' + fdate(x.d, true) + (avg != null ? " · denemelerde %" + avg + " (" + hs.length + ")" : "") + (x.c && /vize|ara/i.test(x.label) && needTxt(x.c) ? "<br>" + esc(needTxt(x.c)) : "") + '</div></div><span class="n">' + R[x.key].p + ' puan</span><button class="btn ghost" data-sx="' + esc(x.key) + '">Değiştir</button></div>';
+      return '<div class="crow"><div class="txt"><b>' + esc(x.label) + '</b><div class="muted small">' + fdate(x.d, true) + (avg != null ? " · denemelerde %" + avg + " (" + hs.length + ")" : "") + (x.c && /vize|ara/i.test(x.label) && needTxt(x.c) ? "<br>" + esc(needTxt(x.c)) : "") + '</div></div>' + (R[x.key] && R[x.key].p != null ? '<span class="n">' + R[x.key].p + ' puan</span><button class="btn ghost" data-sx="' + esc(x.key) + '">Değiştir</button>' : '<button class="btn" data-sx="' + esc(x.key) + '">Puanı yaz</button>') + '</div>';
     }).join("") + "</div>" : "")
     + '<h2 class="sec">Deneme geçmişi</h2>' + (H.length ? '<div class="card">' + H.slice(0, 40).map(h => {
       return '<div class="crow"><i class="cdot" style="background:' + ccol(h.c) + '"></i><div class="txt"><b>' + esc(ct(h.c, h.t)) + '</b><div class="muted small">' + fdate(isoDay(new Date(h.at)), true) + " · " + h.ok + "D " + h.bad + "Y " + (h.n - h.ok - h.bad) + 'B</div></div><span class="n">' + h.ok + "/" + h.n + " · %" + Math.round(100 * h.ok / h.n) + "</span></div>";
