@@ -693,3 +693,12 @@ button.tag.hv{background:var(--surface-2)}
 .hvr small a .ic{width:14px;height:14px}
 a.hvr{color:inherit}
 .sheet .hvr+.hvr{margin-top:6px}
+/* soru bankası (1.6) */
+.bank button.it{width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);font:inherit;color:inherit;cursor:pointer}
+.bank button.it:first-child{border-top:0}
+.bank button.it:hover{background:var(--surface-2)}
+.bank .pbar{max-width:260px}
+button.tag.bq{cursor:pointer;background:var(--surface-2)}
+.bks{padding:16px 16px 18px;overflow:auto}
+.bks .flabel{margin-top:12px}
+.bks .row-btns{margin-top:14px}

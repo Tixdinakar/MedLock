@@ -4,8 +4,13 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.5.5";
+const VERSION = "1.6";
 const CHANGES = [
+  { v: "1.6", d: "2026-11-19", l: [
+    "Ders sayfasının başında Soru bankası: aynı konunun ayrı testlere dağılmış bütün soruları tek yerde, konu konu",
+    "Konuya dokun: kaç soru, yeni sorular ya da yanlışların, çalışma ya da sınav biçimi seç ve başla; her konuda kaç soru çözdüğün görünür",
+    "Denemeler ve derleme “Hazır testler” başlığında toplu duruyor; konu başlığındaki “N soru” da soru bankasını açar",
+  ] },
   { v: "1.5.5", d: "2026-11-16", l: [
     "Vizesi geçen Kanser ve Kök Hücre'nin soruları ve kartları tekrara gelmiyor; finaline iki hafta kala yeniden gelir, final geçince hiç gelmez",
   ] },
@@ -126,7 +131,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "e760366603";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "df9ee26ddc";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1203,7 +1208,7 @@ function viewCourse(g, cs) {
   items.forEach(it => {
     if (it.k === "slayt") return;
     if (it.k === "cikmis" || (it.k === "test" && it.cx)) { cxs.push(it); return; }
-    if (it.k === "test") { const top = (it.dk || [])[0]; if (top && byDeck.has(top[0]) && top[1] >= 0.6 * (it.n || 1)) byDeck.get(top[0]).its.push(it); else multi.push(it); return; }
+    if (it.k === "test") { multi.push(it); return; }   // 1.6: sorular konu konu soru bankasında; hazır testler tek başlıkta
     const kn = [].concat(it.kn || []).filter(id => byDeck.has(id));
     if (kn.length) kn.forEach(id => byDeck.get(id).its.push(it)); else loose.push(it);
   });
@@ -1221,9 +1226,9 @@ function viewCourse(g, cs) {
       rows = groups.sort((a, b) => (b.d.d || "").localeCompare(a.d.d || "")).map(G => {
         const n = deckQn(G.d.id), cx = cxDeckN(G.d.id);
         const hv = (G.d.hv || []).length;
-        return grp(G.d.t, G.its, (cx ? '<button type="button" class="tag cx" data-cxs="' + G.d.id + '">' + icon("star") + "çıkmışta " + cx + " soru ›</button>" : "") + (hv ? '<button type="button" class="tag hv" data-hvs="' + G.d.id + '">' + icon("star") + "hoca " + hv + " yer vurguladı ›</button>" : "") + (n ? '<span class="tag">' + n + " soru</span>" : ""));
+        return grp(G.d.t, G.its, (cx ? '<button type="button" class="tag cx" data-cxs="' + G.d.id + '">' + icon("star") + "çıkmışta " + cx + " soru ›</button>" : "") + (hv ? '<button type="button" class="tag hv" data-hvs="' + G.d.id + '">' + icon("star") + "hoca " + hv + " yer vurguladı ›</button>" : "") + (n ? '<button type="button" class="tag bq" data-bq="' + G.d.id + '">' + icon("test") + n + " soru ›</button>" : ""));
       }).join("")
-        + grp("Birden çok konudan testler", multi) + grp(groups.length ? "Diğer notlar" : "Notlar ve dosyalar", loose) + grp("Çıkmışlar", cxs);
+        + grp("Hazır testler", multi) + grp(groups.length ? "Diğer notlar" : "Notlar ve dosyalar", loose) + grp("Çıkmışlar", cxs);
     } else {
       const q = qf(); let lastM = "";
       items.filter(okRow).filter(it => !q || hitT(it.t, q) || hitT(it.h, q)).forEach(it => {
@@ -1239,6 +1244,7 @@ function viewCourse(g, cs) {
     const pend = (S.cat.todo || []).filter(t => t.g === g && slug(t.c) === cs && (!F.k || t.kind === F.k) && (!F.h || t.h === F.h));
     if (pend.length && !qf()) rows += '<div class="month">Eklenmeyi bekleyen</div><div class="card list">' + pend.map(t => '<div class="it pend">' + kindBox(t.kind)
       + '<div class="txt"><div class="t">' + esc(t.t) + '</div><div class="m"><span>Drive’da · ' + Math.round((t.kb || 0) / 1024) + " MB</span><span>Dosya büyük olduğu için otomatik çekilemedi; sohbete ek olarak gönderilince eklenir.</span></div></div></div>").join("") + "</div>";
+    drawBank();
     $("#rows").innerHTML = rows || '<div class="card empty">' + (qf() ? "Başlıklarda “" + esc(F.q) + "” geçmiyor." : "Bu filtreye uyan öğe yok.") + "</div>";
   };
   // Ders içi arama: başlıkları süzer, slayt ve notların içinde geçen sayfaları da gösterir
@@ -1253,14 +1259,39 @@ function viewCourse(g, cs) {
   const chip = (f, v, l, n) => '<button class="chip' + (F[f] === v ? " on" : "") + '" data-f="' + f + '" data-v="' + esc(v) + '">' + esc(l) + (n != null ? '<span class="n">' + n + "</span>" : "") + "</button>";
   main().innerHTML = bar({ title: c, crumb: crumbFor(g, null), back: "#/lib/" + g })
     + '<div class="page"><div class="sbox csrch">' + icon("search") + '<input id="cq" type="search" placeholder="Bu derste ara: konu, başlık ya da slayttaki bir kelime" autocomplete="off" value="' + esc(F.q || "") + '"></div>'
-    + '<div class="filters" id="flt"></div><div id="rows"></div><div id="chits"></div></div>';
+    + '<div class="filters" id="flt"></div><div id="bank"></div><div id="rows"></div><div id="chits"></div></div>';
   $("#flt").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (!b) return; F[b.dataset.f] = b.dataset.v; render(); });
+  // Soru bankası: bütün testlerin soruları konu konu; açılınca testler yüklenir, ilerleme sonra dolar
+  let BK = null;
+  const bctx = { c, back: "#/lib/" + g + "/" + cs };
+  const bankRows = () => groups.map(G => [G.d, BK ? BK.get(G.d.id) || [] : null, deckQn(G.d.id)]).filter(r => r[1] ? r[1].length : r[2]);
+  function drawBank() {
+    const box = $("#bank"); if (!box) return;
+    if (F.by !== "konu" || qf() || (F.k && F.k !== "test")) { box.innerHTML = ""; return; }
+    const R = bankRows(); if (!R.length) { box.innerHTML = ""; return; }
+    const all = BK ? Array.from(BK.values()).reduce((a, L) => a.concat(L), []) : null;
+    box.innerHTML = '<div class="kgrp bank"><div class="kh"><b>Soru bankası</b><span class="muted small">' + (all ? all.length + " soru, bütün testlerden" : "bütün testlerden") + '</span></div><div class="card list">'
+      + R.sort((x, y) => (y[0].d || "").localeCompare(x[0].d || "")).map(([d, L, n]) => { const st = L ? bankStat(L) : null, pc = st && st.n ? Math.round(100 * st.done / st.n) : 0;
+        return '<button type="button" class="it bkr" data-bq="' + d.id + '">' + kindBox("test") + '<div class="txt"><div class="t">' + esc(d.t) + '</div><div class="m"><span>' + (L ? L.length : n) + " soru</span>" + (st ? "<span>çözdüğün " + st.done + (st.done ? " · " + st.ok + " doğru" : "") + "</span>" : "") + "</div>"
+          + (st ? '<span class="pbar"><i class="' + (st.done && st.ok === st.done ? "ok" : "") + '" style="width:' + pc + '%"></i></span>' : "") + "</div>" + icon("chev", "chev") + "</button>"; }).join("")
+      + (R.length > 1 ? '<button type="button" class="it bkr" data-bq="_all">' + kindBox("test") + '<div class="txt"><div class="t">Bütün konulardan karışık</div><div class="m"><span>' + (all ? all.length : R.reduce((a, r) => a + r[2], 0)) + " soru</span></div></div>" + icon("chev", "chev") + "</button>" : "")
+      + "</div></div>";
+  }
+  const openBank = async id => {
+    if (!BK) { toast("Sorular yükleniyor…"); BK = await bankPool(g, c); drawBank(); }
+    if (id === "_all") return bankSheet(c + " · karışık", Array.from(BK.values()).reduce((a, L) => a.concat(L), []), bctx);
+    const d = S.byId[id], L = BK.get(id) || [];
+    if (!L.length) return toast("Bu konudan henüz soru yok.");
+    bankSheet(d.t, L, bctx);
+  };
+  $("#bank").addEventListener("click", e => { const b = e.target.closest("[data-bq]"); if (b) openBank(b.dataset.bq); });
   $("#rows").addEventListener("click", e => {
-    const h = e.target.closest("[data-hvs]"), x = e.target.closest("[data-cxs]");
-    if (h) deckHvSheet(S.byId[h.dataset.hvs]); else if (x) deckCxSheet(S.byId[x.dataset.cxs]);
+    const h = e.target.closest("[data-hvs]"), x = e.target.closest("[data-cxs]"), bq = e.target.closest("[data-bq]");
+    if (h) deckHvSheet(S.byId[h.dataset.hvs]); else if (x) deckCxSheet(S.byId[x.dataset.cxs]); else if (bq) openBank(bq.dataset.bq);
   });
   $("#cq").addEventListener("input", e => { F.q = e.target.value; render(); clearTimeout(tq); tq = setTimeout(contentHits, 260); });
   render(); if (F.q) contentHits();
+  bankPool(g, c).then(m => { BK = m; if ($("#bank")) drawBank(); }).catch(() => {});
 }
 
 /* ---------- video (Drive'da durur) ---------- */
@@ -2424,6 +2455,59 @@ async function startDeckQuiz(deckId, n, pre) {
   PS.set("mix", { at: Date.now(), k: "mix:" + Date.now(), t: (pre ? "Ön test · " : "Deste testi · ") + L.length + " soru", c: d.c, ids: shuffled(L), back: "#/d/" + deckId + "/1",
     d: pre ? "Okumadan önce dene: bilmemen normal; cevabı görüp sonra okuyunca daha iyi aklında kalır." : d.t + " destesinden sorular.", auto: { mode: "study" } });
   navTo("#/t/mix");
+}
+// Soru bankası (1.6): bir dersin bütün testlerindeki sorular konu (slayt destesi) konu tek havuzda
+async function bankPool(g, c) {
+  // başka kuruldaki testler (ör. geçen kurulun çıkmışı) yalnız bu kurulun destelerine bağlı sorularıyla girer
+  const tests = S.cat.items.filter(t => t.k === "test" && t.c === c && (t.g === g || (t.dk || []).some(d => S.byId[d[0]] && S.byId[d[0]].g === g)));
+  const by = new Map();
+  for (const t of tests) {
+    const b = await loadTest(t).catch(() => null); if (!b) continue;
+    (b.data || []).forEach(q => {
+      const r = b.refs && b.refs[q.id], dk = r && S.byId[r[0]] ? r[0] : "_";
+      if (t.g !== g && (dk === "_" || S.byId[dk].g !== g)) return;
+      if (!by.has(dk)) by.set(dk, []); by.get(dk).push([t.id, q.id]);
+    });
+  }
+  return by;
+}
+function bankStat(L) {
+  const qh = PS.get("qh", {}); let done = 0, ok = 0, wrong = 0;
+  L.forEach(x => { const h = qh[x[0] + "|" + x[1]]; if (h) { done++; if (h.l) ok++; else wrong++; } });
+  return { n: L.length, done, ok, wrong, fresh: L.length - done };
+}
+function bankSheet(title, L, ctx) {
+  const st = Object.assign({ n: 20, f: "new", mode: "study" }, S.bankPref || {});
+  const bg = sheet('<div class="bks"><h3>' + esc(title) + '</h3><div id="bkb"></div></div>');
+  const draw = () => {
+    const S0 = bankStat(L);
+    if (st.f === "new" && !S0.fresh) st.f = "all";
+    if (st.f === "wrong" && !S0.wrong) st.f = "all";
+    const ch = (k, v, l, n, dis) => '<button class="chip' + (st[k] === v ? " on" : "") + '" data-' + k + '="' + v + '"' + (dis ? " disabled" : "") + ">" + l + (n != null ? '<span class="n">' + n + "</span>" : "") + "</button>";
+    $("#bkb", bg).innerHTML = '<p class="muted small">' + S0.n + " soru · çözdüğün " + S0.done + (S0.done ? " (" + S0.ok + " doğru)" : "") + "</p>"
+      + '<div class="flabel">Hangileri</div><div class="chips">' + ch("f", "new", "Yeni", S0.fresh, !S0.fresh) + ch("f", "wrong", "Yanlışlarım", S0.wrong, !S0.wrong) + ch("f", "all", "Hepsi", S0.n) + "</div>"
+      + '<div class="flabel">Kaç soru</div><div class="chips">' + ch("n", 10, "10") + ch("n", 20, "20") + ch("n", 40, "40") + ch("n", 0, "Hepsi") + "</div>"
+      + '<div class="flabel">Nasıl çözeceksin</div><div class="chips">' + ch("mode", "study", "Çalışma") + ch("mode", "exam", "Sınav") + ch("mode", "timed", "Zamana karşı") + "</div>"
+      + '<p class="note">' + (st.mode === "study" ? "Her cevaptan sonra doğru şık ve açıklama görünür." : st.mode === "exam" ? "Cevaplar en sonda değerlendirilir." : "Soru başına 1 dakika; süre bitince biter.") + "</p>"
+      + '<div class="row-btns"><button class="btn primary" id="bkgo">' + icon("test") + "Başla</button><button class=\"btn\" data-close>Kapat</button></div>";
+    $$("[data-f]", bg).forEach(b => b.onclick = () => { st.f = b.dataset.f; draw(); });
+    $$("[data-n]", bg).forEach(b => b.onclick = () => { st.n = +b.dataset.n; draw(); });
+    $$("[data-mode]", bg).forEach(b => b.onclick = () => { st.mode = b.dataset.mode; draw(); });
+    $("#bkgo", bg).onclick = () => {
+      const qh = PS.get("qh", {});
+      let P = L.filter(x => { const h = qh[x[0] + "|" + x[1]]; return st.f === "new" ? !h : st.f === "wrong" ? h && !h.l : true; });
+      if (!P.length) return toast("Bu seçimde soru kalmadı.");
+      P = shuffled(P); if (st.f === "all") P.sort((a, b) => (qh[a[0] + "|" + a[1]] ? 1 : 0) - (qh[b[0] + "|" + b[1]] ? 1 : 0));
+      if (st.n) P = P.slice(0, st.n);
+      S.bankPref = { n: st.n, f: st.f, mode: st.mode };
+      const old = PS.get("mix", null);
+      if (old) { const e = Object.assign({}, PS.get("eng", {})); delete e[engKey(old.k)]; PS.set("eng", e); LS.del(engKey(old.k)); }
+      PS.set("mix", { at: Date.now(), k: "mix:" + Date.now(), t: title + " · " + P.length + " soru", c: ctx.c, ids: shuffled(P), back: ctx.back,
+        d: (st.f === "new" ? "Hiç çözmediğin" : st.f === "wrong" ? "Yanlış yaptığın" : "Önce çözmediklerin olmak üzere") + " sorular; bütün testlerden.", auto: { mode: st.mode, minutes: st.mode === "timed" ? P.length : 0 } });
+      bg.close(); navTo("#/t/mix");
+    };
+  };
+  draw();
 }
 async function viewMix(q) {
   setNav("karma");

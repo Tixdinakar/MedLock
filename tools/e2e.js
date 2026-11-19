@@ -57,6 +57,22 @@ async function openTest(pg, href) {
       await shot("2-kurul");
       const course = await pg.$eval(".course", a => a.getAttribute("href"));
       await pg.goto(BASE + course); await pg.waitForSelector(".it");
+      // 1.6: ders sayfasında soru bankası (konu konu, bütün testlerden)
+      const bk = await pg.waitForSelector(".bank .bkr", { timeout: 15000 }).catch(() => null);
+      ok(bk, name + ": ders sayfasında soru bankası yok");
+      if (bk) {
+        await pg.waitForFunction(() => document.querySelector(".bank .pbar"), null, { timeout: 15000 }).catch(() => fails.push(name + ": soru bankasında ilerleme çubuğu yok"));
+        await pg.click(".bank .bkr");
+        const go = await pg.waitForSelector("#bkgo", { timeout: 15000 }).catch(() => null);
+        ok(go, name + ": soru bankası penceresi açılmadı");
+        if (go) {
+          await pg.click('[data-n="10"]'); await pg.click("#bkgo");
+          const fr = await (await pg.waitForSelector(".tpane iframe", { timeout: 20000 })).contentFrame().catch(() => null);
+          ok(fr && await fr.waitForSelector(".q, .qcard, button.go, .opt", { timeout: 20000 }).catch(() => null), name + ": soru bankasından test açılmadı");
+          await pg.goto(BASE + course); await pg.waitForSelector(".it");
+        }
+      }
+      ok(!(await pg.$$eval(".kh b", xs => xs.some(x => x.textContent === "Birden çok konudan testler"))), name + ": eski 'Birden çok konudan testler' başlığı duruyor");
       const links = await pg.$$eval(".it", as => as.map(a => a.getAttribute("href")));
       const doc = links.find(h => h && h.startsWith("#/d/"));
       if (doc) {
