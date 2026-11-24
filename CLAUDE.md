@@ -65,7 +65,7 @@ Yeni testte konu adlarını (`t`) aynı dersin mevcut testlerindeki adlarla ayn�
 
 Seçmeli dersler (ör. TIP253 "Kanser ve Kök Hücre") ortak derstir: `--kurul ortak` (Buğra için "seçmeli" = "ortak ders"; ayrı grup açma).
 
-Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tarihi", "Biyoistatistik", "Davranış Bilimleri", "ATA 151 · Türk Dili I". Drive'daki "Psikoloji" ve "DavranışBilimleri" klasörleri "Davranış Bilimleri"ne gider (`COURSE_RENAME`, `FOLDER_COURSE`). Yeni ders gelirse Drive klasör adını kullan.
+Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tarihi", "Biyoistatistik", "Davranış Bilimleri", "Anatomi" (K2, Deniz Ay; terminoloji ve Latince desteleri, 24 Kas), "ATA 151 · Türk Dili I". Drive'daki "Psikoloji" ve "DavranışBilimleri" klasörleri "Davranış Bilimleri"ne gider (`COURSE_RENAME`, `FOLDER_COURSE`). Yeni ders gelirse Drive klasör adını kullan.
 
 ## Drive denetimi
 1. Drive'da "Ders Slaytları ve Notlar" klasörünü ve alt klasörlerini (K1/Biyokimya, K2/BiyokimyaSes...) dosya id'leri ve boyutlarıyla listele.
@@ -98,7 +98,7 @@ Drive'da ses kaydı dökümü (Ders › "[Ders] Ses Kayıtları", içinde "Konu�
 
 ## Kartlar (#/kartlar, 1.5)
 - Hazır desteler: her slayt destesinden bir kart destesi, katalogda `k:"kart"`, id `<deste-id>-kart`, `kn: [deste-id]`. Kart JSON'u scratchpad'de `[{t: konu, f: ön yüz, b: arka yüz, p: slayt sayfası, z?: boşluk cümlesi}]`; `z` içinde gizlenecek yer `[[...]]` (yoksa arka yüzün en uzun kelimesi gizlenir). Ekleme: `python3 tools/medlock.py add-cards kartlar.json --deck <slayt-id>` (aynı komut güncellerken de kullanılır; sayfa numarası deste dışındaysa reddeder). Kart yazımı test kurallarına uyar: yalnız slayttan, kısa ve öz, ana kavram/ilke/karşılaştırma (ayrıntı değil); hoca vurgusu olan sayfaları mutlaka kapsa. Konu adları (`t`) aynı dersin testlerindeki konu adlarıyla uyumlu olsun.
-- Kurul 2'nin bütün slayt destelerinin kartı var (17 Kas: 25 deste); Kurul 1'de Biyokimya, Tıbbi Biyoloji ve Biyofizik destelerinin de (19 Kas; Tıp Tarihi'nde ayrı `tt-kart`; tanıtım dersleri Tıbbi Biyokimyaya Giriş, Tıbbi Biyolojiye Giriş ve Optik el notu kartsız). Kart ve test şıklarında doğru şık diğerlerinden belirgin uzun olmasın (Buğra'nın kuralı); test yazarken doğru şıkkı ilk sıraya yazıp karıştırmak ve uzunluğu denetlemek işe yarıyor. Yeni slayt destesi gelince (Drive denetimi dahil) kartını da hazırla.
+- Kurul 2'nin bütün slayt destelerinin kartı var (24 Kas: 33 deste); Kurul 1'de Biyokimya, Tıbbi Biyoloji ve Biyofizik destelerinin de (19 Kas; Tıp Tarihi'nde ayrı `tt-kart`; tanıtım dersleri Tıbbi Biyokimyaya Giriş, Tıbbi Biyolojiye Giriş ve Optik el notu kartsız). Kart ve test şıklarında doğru şık diğerlerinden belirgin uzun olmasın (Buğra'nın kuralı); test yazarken doğru şıkkı ilk sıraya yazıp karıştırmak ve uzunluğu denetlemek işe yarıyor. Yeni slayt destesi gelince (Drive denetimi dahil) kartını da hazırla.
 - Kendi desteler: profilde `cd` {id: {id, n, c, vis: "gizli"|"acik", at, del?, cards: {kid: {f, b, at, o, del?}}}}; senkronda deste düzeyinde en yeni kazanır. Açık desteler senkronla arkadaşa gider (cihazda `ml.ocd`), o yalnız çalışır, düzenleyemez.
 - Kart tekrarı soru tekrarından ayrı: profilde `cs` {anahtar: {b, due, u, n, dk}}; anahtar hazırda `<kart-id>|<sıra>`, kendi destede `u|<deste>|<kart>`, arkadaşınkinde `o|<profil>|<deste>|<kart>`. Bilemedim → kutu bir geri, yarın; Zorlandım → aralığın yarısı; Bildim → bir sonraki aralık (1, 3, 7, 14, 30). Yaklaşan sınavın kartları önce gelir. Oturumda Bilemedim'ler sona bir kez daha eklenir. Tekrar sayfasında (1.5.2) soru istatistiklerinin altında ayrı "Kartlar" bölümü (`cardRevBlock`): kart sayacı ve "Kart tekrarına başla"; Tekrar sekmesinin rozeti yalnız soruları sayar.
 - Çalışma biçimleri (cihazda `ml.cmode`): Çevir, Yazarak (cevap benzerliği ipucu, kararı kullanıcı verir), Boşluk doldur. Arka yüzde "Slayta git" (`s`/`p`) ve sayfada `hv` varsa hoca rozeti. Eski `#/c/<id>` adresi desteye yönlenir.
@@ -126,7 +126,7 @@ Aralıklar 1, 3, 7, 14, 30 gün; yanlışta kutu bir basamak geri iner (sıfırl
 ## Anatomi Latincesi (#/sozluk)
 `tools/anatomi.py`: genel anatomi Latincesi (ders kaynağı değil, uygulamada böyle yazıyor; Buğra bunu açıkça istedi): kelimeler (isim/sıfat, kategori, Türkçe anlam ve -in/iyelik biçimleri), örnek terimler (`EX`, Latince + doğru Türkçe adı), dilbilgisi dersleri. `python3 tools/anatomi.py` örneklerin hepsi çözülüyor mu diye bakar.
 - Blob `d/<hid("anatomi")>`, katalogda `lat`. `index`/`add-doc` her seferinde yeniden kurar ve slaytlardaki Latince terimleri tarar (`sl`, sayfa dizini `pg`; slayt görünümünde sözlük düğmesi çıkar).
-- Anatomi/Histoloji slaytları gelince: slaytta geçen ama çözülemeyen kelimeleri (`anatomi.py` içinde N/A listelerine) ekle; testlerde yine yalnız slayt kaynak olur.
+- Anatomi/Histoloji slaytları gelince: slaytta geçen ama çözülemeyen kelimeleri (`anatomi.py` içinde N/A listelerine) ekle; testlerde yine yalnız slayt kaynak olur. 24 Kas: Deniz Ay'ın 5 destesindeki 78 kelime eklendi (anlamlar slayttan). Slaytlarda cins hataları var (os "Masc.", systema "Fem.", funiculus "Fem."); sözlük ve kartlar doğrusunu kullanır (slayt 155: os neutrum).
 - Eski kök sözlüğü (`kokler.py`, `lex`) "Kökler" sekmesinde durur. Tekrar anahtarları: `lex|<kök>`, `lat|w:<kelime>`, `lat|t:<terim>`.
 
 ## Denetim
