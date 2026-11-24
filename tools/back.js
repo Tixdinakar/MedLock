@@ -122,6 +122,23 @@ const ok = (c, m) => { if (!c) fails.push(m); };
     log.push("geri dönülen sayfa: " + H());
   });
 
+  await step("tam ekran: uygulamadan çıkıp dönünce ve çıkış düğmesiyle sayfa yerinde kalır", async () => {
+    await pg.goto(BASE + "#/lib/k2/biyokimya"); await pg.waitForSelector(".it");
+    await tap('a.it[href^="#/d/"]'); await pg.waitForSelector(".pg img"); await sleep(500);
+    const id = H().split("/")[2];
+    await tap("#fsb"); await sleep(400);
+    await pg.$eval("#doc", d => { d.scrollTop = d.querySelector('[data-p="3"]').offsetTop; }); await sleep(900);
+    ok(H() === "/d/" + id + "/3", "tam ekranda sayfa 3 olmalı: " + H());
+    await pg.evaluate(() => { const set = v => { Object.defineProperty(document, "hidden", { configurable: true, get: () => v }); Object.defineProperty(document, "visibilityState", { configurable: true, get: () => v ? "hidden" : "visible" }); document.dispatchEvent(new Event("visibilitychange")); };
+      set(true); if (document.fullscreenElement) document.exitFullscreen(); setTimeout(() => set(false), 700); });
+    await sleep(1600);
+    ok(H() === "/d/" + id + "/3", "uygulamaya dönünce sayfa: " + H());
+    ok(await pg.$eval("#shell", e => e.classList.contains("fs")), "uygulamaya dönünce tam ekran görünümü kalmalı");
+    await tap(".fsx"); await sleep(1200);
+    ok(H() === "/d/" + id + "/3", "tam ekrandan çıkınca sayfa: " + H());
+    ok(!(await pg.$eval("#shell", e => e.classList.contains("fs"))), "çıkış düğmesi tam ekranı kapatmalı");
+  });
+
   await b.close();
   console.log(JSON.stringify({ ok: !fails.length, fails, log }, null, 1));
 })();

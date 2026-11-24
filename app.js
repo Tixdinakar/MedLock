@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.6";
+const VERSION = "1.6.1";
 const CHANGES = [
+  { v: "1.6.1", d: "2026-11-24", l: [
+    "Tam ekranda okurken başka uygulamaya bakıp dönünce not ya da slayt artık başa dönmüyor; kaldığın sayfada açılıyor",
+    "Tam ekrandaysan tam ekran da geri geliyor (ekrana ilk dokunuşunda); kendin tam ekrandan çıkınca da sayfan yerinde kalıyor"
+  ] },
   { v: "1.6", d: "2026-11-19", l: [
     "Ders sayfasının başında Soru bankası: aynı konunun ayrı testlere dağılmış bütün soruları tek yerde, konu konu",
     "Konuya dokun: kaç soru, yeni sorular ya da yanlışların, çalışma ya da sınav biçimi seç ve başla; her konuda kaç soru çözdüğün görünür",
@@ -131,7 +135,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "df9ee26ddc";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "76002dac76";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -775,6 +779,7 @@ function navDepth() {
 }
 const keepState = () => history.state;
 function replaceHash(h) {                                        // adresi değiştir, geçmişe kayıt ekleme
+  if (FS) FS.h = h;                                              // tam ekrandayken sayfa değişti: çıkınca geri dönülen eski kayıt değil bu geçerli
   history.replaceState(keepState(), "", h);
   const A = navStack(); A[S.nav] = h; navSave(A);
 }
@@ -1597,19 +1602,42 @@ function fsEnter() {
   x.onclick = () => fsExit(false);
   document.body.appendChild(x);
   fsFrame(true);
-  try { const de = document.documentElement, p = de.requestFullscreen && de.requestFullscreen({ navigationUI: "hide" }); if (p && p.catch) p.catch(() => {}); } catch (e) {}
-  FS = { x, tok: null };
+  fsReq();
+  FS = { x, tok: null, h0: curHash(), h: null };
   FS.tok = ovOpen(() => fsExit(true));
 }
 function fsExit(fromPop) {
   if (!FS) return;
   const f = FS; FS = null;
+  fsDisarm(f);
+  if (f.h && f.h !== f.h0) { FSKEEP = f.h; setTimeout(() => { FSKEEP = null; }, 1500); }   // geri dönülen kayıtta eski sayfa var: adresi koru, yeniden çizme
   const sh = $("#shell"); if (sh) sh.classList.remove("fs");
   f.x.remove(); fsFrame(false);
   if (document.fullscreenElement) { try { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
   if (!fromPop) ovDone(f.tok); else { const i = OV.indexOf(f.tok); if (i >= 0) OV.splice(i, 1); }
 }
-document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && FS) fsExit(false); });
+function fsReq() { try { const de = document.documentElement, p = de.requestFullscreen && de.requestFullscreen({ navigationUI: "hide" }); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+// Başka uygulamaya geçince Android tam ekranı kendisi kapatır. Bu bir "çıkış" değil: görünüm tam ekran kalır,
+// sistem tam ekranı da yalnız dokunuşla açılabildiği için dönünce ilk dokunuşta yeniden istenir.
+let FSKEEP = null, visAt = 0;
+function fsDisarm(f) { if (f && f.arm) { f.arm.forEach(([d, g]) => { try { d.removeEventListener("pointerup", g, true); d.removeEventListener("click", g, true); } catch (e) {} }); f.arm = null; } }
+function fsRearm() {
+  if (!FS || FS.arm || document.fullscreenElement) return;
+  const f = FS, g = () => { fsDisarm(f); if (FS === f && !document.fullscreenElement) fsReq(); };
+  const fr = $(".tpane iframe"), docs = [document];
+  try { if (fr && fr.contentDocument) docs.push(fr.contentDocument); } catch (e) {}
+  f.arm = docs.map(d => { d.addEventListener("pointerup", g, true); d.addEventListener("click", g, true); return [d, g]; });
+}
+document.addEventListener("visibilitychange", () => { visAt = Date.now(); if (document.visibilityState === "visible" && FS && FS.lost) fsRearm(); });
+document.addEventListener("fullscreenchange", () => {
+  if (document.fullscreenElement || !FS) return;
+  const f = FS;
+  setTimeout(() => {                                             // önce mi gizlendi sonra mı, ikisi de olabiliyor: biraz bekle
+    if (FS !== f || document.fullscreenElement) return;
+    if (document.hidden || Date.now() - visAt < 2000) { f.lost = true; if (!document.hidden) fsRearm(); }
+    else fsExit(false);
+  }, 400);
+});
 window.MLBridge = function (win) {
   const C = S.cur;
   if (!C) return null;
@@ -3614,7 +3642,12 @@ function viewProfiles() {
     }).catch(() => { if ($("#pf")) draw("Senkrona ulaşılamadı; bu cihazdaki profiller gösteriliyor."); });
   });
 }
-window.addEventListener("hashchange", () => { navDepth(); OV.length = 0; if (S.cat) route(); else if (!KEY) viewLogin(); });
+window.addEventListener("hashchange", () => {
+  if (FSKEEP) {                                                  // tam ekrandan çıkış eski sayfanın kaydına döndü: aynı belgedeysek yerinde kal
+    const h = FSKEEP, k = x => String(x).split("?")[0].split("/").slice(0, 3).join("/"); FSKEEP = null;
+    if (location.hash !== h && k(location.hash) === k(h)) { replaceHash(h); return; }
+  }
+  navDepth(); OV.length = 0; if (S.cat) route(); else if (!KEY) viewLogin(); });
 if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {});
 (async () => {
   if (!window.crypto || !crypto.subtle) { app().innerHTML = '<div class="gate"><div class="gate-card"><h1>' + NAME + "</h1><p>Bu tarayıcı desteklenmiyor. Güncel Chrome ya da Safari kullan.</p></div></div>"; return; }
