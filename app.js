@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.6.1";
+const VERSION = "1.6.2";
 const CHANGES = [
+  { v: "1.6.2", d: "2026-11-24", l: [
+    "Tekrar sayfasında her dersin yanında “Tekrardan çıkar”: o dersin soruları ve kartları tekrara gelmez, kayıtların silinmez; sayfanın altından istediğin zaman geri alırsın",
+    "Sınavı geçmiş dersler (Kanser ve Kök Hücre) artık Tekrar sayfasındaki sayılarda ve ders listesinde de görünmüyor"
+  ] },
   { v: "1.6.1", d: "2026-11-24", l: [
     "Tam ekranda okurken başka uygulamaya bakıp dönünce not ya da slayt artık başa dönmüyor; kaldığın sayfada açılıyor",
     "Tam ekrandaysan tam ekran da geri geliyor (ekrana ilk dokunuşunda); kendin tam ekrandan çıkınca da sayfan yerinde kalıyor"
@@ -135,7 +139,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "76002dac76";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "8f96c0cc5e";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -423,7 +427,11 @@ const srsLoad = () => Object.assign({}, PS.get("srs", {}));
 const srsSave = s => PS.set("srs", s);
 // Uyuyan dersler (katalogda "uyut", medlock.py uyut): soruları ve kartları yalnız o dersin sınavına UYW gün kala tekrara gelir; son sınav geçince hiç gelmez
 const UYW = 14;
+// Kullanıcının Tekrar sayfasından çıkardığı dersler (profilde ux {ders: {on, at}}; senkronda en yeni kazanır)
+const uxOn = c => { const e = PS.get("ux", {})[c]; return !!(e && e.on); };
+function uxSet(c, on) { const X = Object.assign({}, PS.get("ux", {})); X[c] = { on: on ? 1 : 0, at: Date.now() }; PS.set("ux", X); }
 function asleep(it) {
+  if (it && it.c && uxOn(it.c)) return true;
   const U = S.cat.uyut || [];
   if (!it || !U.length || !U.some(c => cMatch(it.c, c))) return false;
   const t = today();
@@ -549,7 +557,7 @@ function mergeP(a, b) {
   const o = Object.assign({}, a);
   o.name = (b.at > a.at ? b.name : a.name) || a.name || b.name;
   o.srs = mergeMap(a.srs, b.srs, "u");
-  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx", "cd"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
+  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx", "cd", "ux"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
   o.cs = mergeMap(a.cs, b.cs, "u");
   const newer = (x, y) => !x ? y : !y ? x : (y.at || 0) > (x.at || 0) ? y : x;
   o.mix = newer(a.mix, b.mix); o.dz = newer(a.dz, b.dz);
@@ -2173,7 +2181,7 @@ function viewReview() {
   trkSet("Tekrar"); S.cleanup.push(() => trkSet(""));
   const s = srsLoad(), t = today(), keys = Object.keys(s), X = upcomingExams(EXW), X7 = upcomingExams(7);
   const back = k => finalBack(s[k]) || !!examBackKey(k, s[k], X);
-  const active = keys.filter(k => (!s[k].m || back(k)) && srsKeyItem(k));
+  const active = keys.filter(k => (!s[k].m || back(k)) && srsKeyItem(k) && !asleep(srsKeyItem(k)));
   const due = active.filter(k => s[k].due <= t || back(k));
   const fb = active.filter(k => finalBack(s[k])).length, xb = active.filter(k => !finalBack(s[k]) && examBackKey(k, s[k], X)).length;
   const tomorrow = active.filter(k => !back(k) && s[k].due === addDays(t, 1)).length;
@@ -2191,13 +2199,32 @@ function viewReview() {
     + (active.length ? '<a class="btn' + (due.length ? "" : " primary") + '" href="#/tekrar?s=1&all=1">Hepsini çalış (' + active.length + ")</a>" : "") + "</div>"
     + cardRevBlock()
     + (byC.size ? '<h2 class="sec">Derslere göre</h2><div class="card">' + Array.from(byC.entries()).sort((a, b) => b[1].due - a[1].due || b[1].all - a[1].all).map(([c, o]) =>
-      '<div class="crow"><i class="cdot" style="background:' + ccol(c) + '"></i><div class="txt"><b>' + esc(c) + '</b></div><span class="n">' + o.due + " / " + o.all + '</span><a class="btn" href="#/tekrar?s=1&c=' + encodeURIComponent(c) + (o.due ? "" : "&all=1") + '">Çalış</a></div>').join("") + "</div>" : "")
+      '<div class="crow"><i class="cdot" style="background:' + ccol(c) + '"></i><div class="txt"><b>' + esc(c) + '</b></div><span class="n">' + o.due + " / " + o.all + '</span><a class="btn" href="#/tekrar?s=1&c=' + encodeURIComponent(c) + (o.due ? "" : "&all=1") + '">Çalış</a><button type="button" class="ibtn" data-ux="' + esc(c) + '" title="Tekrardan çıkar" aria-label="' + esc(c) + ' tekrardan çıkar">' + icon("close") + "</button></div>").join("") + "</div>" : "")
+    + offRevHTML(s)
     + resultsHTML()
     + '<h2 class="sec">Nasıl çalışır</h2><p class="note">Testte yanlış yaptığın her soru buraya düşer ve ertesi gün sorulur. Doğru bildikçe aralık uzar: 1, 3, 7, 14, 30 gün. 30 günlük aralıktan sonra da doğru bilirsen soru öğrenildi sayılır'
     + (learned ? " (şimdiye kadar " + learned + ")" : "") + ". Yanlış yaparsan aralık bir basamak geri iner, soru ertesi gün yine gelir. Doğru ama tahminle bildiğin soruda “Tahmin ettim”e dokun; o da listeye girer. "
     + "Yaklaşan sınavın soruları önce gelir; sınavdan önceki " + EXW + " gün o sınavın öğrendiğin soruları bir kez daha sorulur. Şıkların yeri her seferinde karışır (“hepsi”, “I ve II” gibi şıklı sorular hariç). Kart tekrarı ayrı tutulur; aşağıdaki Kartlar bölümünden ya da Kartlar sayfasından çalışılır."
     + (finalInfo() ? " Final döneminde (" + fdate(finalInfo().start) + " – " + fdate(finalInfo().end, true) + ") öğrenilmiş sorular bir kez daha gelir." : "") + "</p>"
     + (active.length ? "" : '<div class="card empty" style="margin-top:14px">Listen boş. Bir test çöz; yanlışların burada birikir.</div>')
+    + "</div>";
+  $$("[data-ux]").forEach(b => b.onclick = () => {
+    const c = b.dataset.ux;
+    const bg = sheet("<h3>" + esc(c) + " tekrardan çıkarılsın mı?</h3><p>Bu dersin soruları ve kartları Tekrar'a gelmez. Kayıtların silinmez; bu sayfanın altındaki “Tekrara gelmeyen dersler”den istediğin zaman geri alırsın.</p>"
+      + '<div class="row-btns" style="margin-top:12px"><button class="btn primary" id="uxok">Tekrardan çıkar</button><button class="btn" data-close>Vazgeç</button></div>');
+    $("#uxok", bg).onclick = () => { uxSet(c, 1); bg.close(); toast(c + " tekrardan çıkarıldı", "Geri al", () => { uxSet(c, 0); if (parseHash().parts[0] === "tekrar") viewReview(); }); viewReview(); updateBadge(); };
+  });
+  $$("[data-uxr]").forEach(b => b.onclick = () => { uxSet(b.dataset.uxr, 0); toast(b.dataset.uxr + " yeniden tekrarda"); viewReview(); updateBadge(); });
+}
+// Tekrara gelmeyen dersler: kullanıcının çıkardıkları (geri alınabilir) ve sınavı geçmiş/uyuyan dersler (sınavına yakın kendiliğinden döner)
+function offRevHTML(s) {
+  const own = new Map(), sl = new Map();
+  Object.keys(s).forEach(k => { const it = srsKeyItem(k); if (!it || !it.c || !asleep(it)) return; const M = uxOn(it.c) ? own : sl; M.set(it.c, (M.get(it.c) || 0) + 1); });
+  Object.entries(PS.get("ux", {})).forEach(([c, e]) => { if (e && e.on && !own.has(c)) own.set(c, 0); });
+  if (!own.size && !sl.size) return "";
+  return '<h2 class="sec">Tekrara gelmeyen dersler</h2><div class="card">'
+    + Array.from(own.entries()).map(([c, n]) => '<div class="crow"><i class="cdot" style="background:' + ccol(c) + '"></i><div class="txt"><b>' + esc(c) + '</b><div class="muted small">Sen çıkardın' + (n ? " · " + n + " soru bekliyor" : "") + '</div></div><button type="button" class="btn" data-uxr="' + esc(c) + '">Geri al</button></div>').join("")
+    + Array.from(sl.entries()).map(([c, n]) => '<div class="crow"><i class="cdot" style="background:' + ccol(c) + '"></i><div class="txt"><b>' + esc(c) + '</b><div class="muted small">Sınavı geçti · ' + n + " soru · sonraki sınavına " + UYW + " gün kala kendiliğinden geri gelir</div></div></div>").join("")
     + "</div>";
 }
 // Tekrar sayfasında kart tekrarı: soru tekrarından bağımsız, yalnız özeti ve kısayolu
