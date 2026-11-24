@@ -327,14 +327,19 @@ def add_doc(V, pdf=None, rendered=None, **meta):
     ident = meta.get("id") or V.new_id(meta["title"])
     old = V.item(ident) or {}
     keep = meta.get("keep_text") and old
+    olg = old.get("lg", 0)
+    leg = None
+    if olg:        # sondaki "Semboller ve kısaltmalar" sayfaları yeniden eklemede korunur
+        ob = old["n"] - olg
+        leg = ([V.get(f"d/{old['x']}/{i}") for i in range(ob + 1, old["n"] + 1)], V.get_json(f"d/{old['x']}/t")[ob:])
     if rendered is None:
         tmp = tempfile.mkdtemp()
         render_pdf(pdf, tmp, ocr=not keep)
         rendered = tmp
     n = int(open(os.path.join(rendered, "done")).read())
     texts = json.load(open(os.path.join(rendered, "text.json")))
-    if keep and old.get("n") == n:      # yalnız görseller yenileniyor: eski (OCR'lı) metinleri koru
-        texts = V.get_json(f"d/{old['x']}/t")
+    if keep and old.get("n", 0) - olg == n:      # yalnız görseller yenileniyor: eski (OCR'lı) metinleri koru
+        texts = V.get_json(f"d/{old['x']}/t")[:n]
     from PIL import Image
     w, h = Image.open(os.path.join(rendered, "1.webp")).size
     x = V.hid("doc:" + ident)
@@ -368,10 +373,52 @@ def add_doc(V, pdf=None, rendered=None, **meta):
         if k not in it and k in old:
             it[k] = old[k]
     V.upsert(it)
+    if leg:
+        set_legend(V, ident, pages=leg)
     if it["k"] in ("not", "ozet", "soru") and not it.get("kn"):
         assign_konu(V, [it])
     if tmp:
         shutil.rmtree(tmp)
+    return it
+
+
+def set_legend(V, ident, pdf=None, pages=None):
+    """Notun sonuna "Semboller ve kısaltmalar" sayfası ekler (notun kendi sayfalarına dokunmaz).
+    Öğede lg = sondaki ek sayfa sayısı; yeniden çalışınca yalnız onlar yenilenir. pdf=None: ek sayfaları kaldırır."""
+    it = V.item(ident) or sys.exit("yok: " + ident)
+    x, lg = it["x"], it.get("lg", 0)
+    base = it["n"] - lg
+    texts = V.get_json(f"d/{x}/t")[:base]
+    new = []
+    if pages:                                        # add_doc'tan: eski ek sayfalar (bayt, metin)
+        new = list(pages[0])
+        texts += list(pages[1])
+    elif pdf:
+        tmp = tempfile.mkdtemp()
+        render_pdf(pdf, tmp, ocr=False)
+        k = int(open(os.path.join(tmp, "done")).read())
+        new = [open(os.path.join(tmp, f"{i}.webp"), "rb").read() for i in range(1, k + 1)]
+        texts += [" ".join(t.split()) for t in json.load(open(os.path.join(tmp, "text.json")))]
+        shutil.rmtree(tmp)
+    for i, b in enumerate(new, base + 1):
+        V.put(f"d/{x}/{i}", b)
+    for f in glob.glob(os.path.join(V.repo, "d", x, "*")):
+        n = os.path.basename(f)
+        if n.isdigit() and int(n) > base + len(new):
+            os.remove(f)
+    V.put_json(f"d/{x}/t", texts)
+    hv = hashlib.sha256((it.get("v0") or it["v"]).encode())
+    for b in new:
+        hv.update(hashlib.sha256(b).digest())
+    it = dict(it)
+    it.setdefault("v0", it["v"])                     # notun kendi sürümü; ek sayfa değişince v yenilenir
+    it.setdefault("sz0", it.get("sz", 0))
+    it.update(n=base + len(new), v=hv.hexdigest()[:8] if new else it["v0"], sz=it["sz0"] + sum(map(len, new)))
+    if new:
+        it["lg"] = len(new)
+    else:
+        it.pop("lg", None)
+    V.upsert(it)
     return it
 
 
@@ -567,7 +614,9 @@ def build_index(V):
     D, Q = {}, []
     for it in V.cat["items"]:
         if it["k"] in ("slayt", "not", "ozet", "cikmis", "soru", "ses"):
-            D[it["id"]] = V.get_json(f"d/{it['x']}/t")
+            t = V.get_json(f"d/{it['x']}/t")
+            lg = it.get("lg", 0)   # sondaki "Semboller ve kısaltmalar" sayfaları aramaya girmez
+            D[it["id"]] = t[:len(t) - lg] + [""] * lg if lg else t
         elif it["k"] == "test":
             b = V.get_json(f"d/{it['x']}")
             for q in b["data"]:
@@ -1160,6 +1209,8 @@ def main():
     sp.add_parser("index")
     sp.add_parser("check")
     sp.add_parser("passwd")
+    p_lg = sp.add_parser("lejant", help="notun sonuna sembol/kısaltma sayfası: lejant <id> sayfa.pdf [<id> sayfa.pdf ...]; pdf yerine - kaldırır")
+    p_lg.add_argument("ids", nargs="+")
     sp.add_parser("stamp")
     sp.add_parser("scan")
     td = sp.add_parser("test-dump", help="testi düzenlemek için JSON'a yaz (scratchpad'e; commit etme)")
@@ -1285,6 +1336,11 @@ def main():
                      date=a.date, id=a.id, src=a.src, sub=a.sub, by=a.by)
         print("eklendi", it["id"], it["n"], "sayfa")
         print(compute_refs(V)); build_index(V)
+    elif a.cmd == "lejant":
+        for ident, pdf in zip(a.ids[0::2], a.ids[1::2]):
+            it = set_legend(V, ident, None if pdf == "-" else pdf)
+            print("lejant", it["id"], it["n"], "sayfa", "(ek " + str(it.get("lg", 0)) + ")")
+        build_index(V)
     elif a.cmd == "add-test":
         cfg, data = parse_test_html(a.file)
         it = add_test(V, cfg, data, kurul=a.kurul, course=a.course, hoca=a.hoca, title=a.title,
