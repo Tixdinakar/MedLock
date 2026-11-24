@@ -4,8 +4,14 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.6.2";
+const VERSION = "1.7";
 const CHANGES = [
+  { v: "1.7", d: "2026-11-24", l: [
+    "Soru bankası, karma ve deste testlerinde çözdüğün denemeler artık kaybolmuyor: soru bankasında o konunun altında, Karma deneme sayfasında hepsi “Son denemelerin” olarak durur; sonucu açıp yanlışlarına bakabilir, yarım kalanlara devam edebilirsin. Sen ✕ ile kaldırana kadar silinmez",
+    "Karma deneme ve İlerleme'de konular slayt destesine göre gruplandı: aynı dersin (ör. Redoks) konuları tek başlık altında; başlığa dokununca o dersin bütün konuları seçilir",
+    "I, II, III öncülleri olan sorularda öncüller artık alt alta liste hâlinde",
+    "Tepkime soruları molekül yapılarıyla (glutamat, pirüvat, glukoz…)"
+  ] },
   { v: "1.6.2", d: "2026-11-24", l: [
     "Tekrar sayfasında her dersin yanında “Tekrardan çıkar”: o dersin soruları ve kartları tekrara gelmez, kayıtların silinmez; sayfanın altından istediğin zaman geri alırsın",
     "Sınavı geçmiş dersler (Kanser ve Kök Hücre) artık Tekrar sayfasındaki sayılarda ve ders listesinde de görünmüyor"
@@ -139,7 +145,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "8f96c0cc5e";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "8468146f90";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -557,7 +563,7 @@ function mergeP(a, b) {
   const o = Object.assign({}, a);
   o.name = (b.at > a.at ? b.name : a.name) || a.name || b.name;
   o.srs = mergeMap(a.srs, b.srs, "u");
-  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx", "cd", "ux"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
+  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx", "cd", "ux", "mx"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
   o.cs = mergeMap(a.cs, b.cs, "u");
   const newer = (x, y) => !x ? y : !y ? x : (y.at || 0) > (x.at || 0) ? y : x;
   o.mix = newer(a.mix, b.mix); o.dz = newer(a.dz, b.dz);
@@ -808,7 +814,7 @@ function navKey(h) {
   return "/" + a.join("/");
 }
 function findUp(href) {                                          // geride, yığında aynı ekran var mı
-  const A = navStack(), exact = /[?&](h|final|s|w|e)=/.test(href) || /^#\/karma/.test(href);
+  const A = navStack(), exact = /[?&](h|final|s|w|e|r)=/.test(href) || /^#\/karma/.test(href);
   for (let k = S.nav - 1; k >= 1; k--) {
     const h = A[k];
     if (h && (h === href || (!exact && navKey(h) === navKey(href)))) return k;
@@ -1780,6 +1786,54 @@ function onEngineSave(C, st) {
   const eng = Object.assign({}, PS.get("eng", {}));
   eng[C.ekey] = { at: Date.now(), s: JSON.parse(JSON.stringify(st)) };
   PS.set("eng", eng);
+  if (C.mix && done) mxKeep(PS.get("mix", null), { ok, bad, done, n: r.ids.length, fin: !!r.finished });
+}
+/* 1.7: soru bankası, karma ve deste testlerinin sonuçları sen "Kaldır" diyene kadar saklanır (profilde mx) */
+const MX_MAX = 40;
+function mxKeep(M, o) {
+  if (!M || !M.k) return;
+  const X = Object.assign({}, PS.get("mx", {}));
+  X[M.k] = Object.assign({ k: M.k, M, at: Date.now(), t0: M.at || Date.now() }, o);
+  const live = Object.values(X).filter(x => x && !x.del).sort((a, b) => b.t0 - a.t0);
+  live.slice(MX_MAX).forEach(x => mxDrop(x.k, X));
+  PS.set("mx", X);
+}
+function mxDrop(k, X0) {
+  const X = X0 || Object.assign({}, PS.get("mx", {}));
+  X[k] = { del: 1, at: Date.now() };
+  const e = Object.assign({}, PS.get("eng", {})); delete e[engKey(k)]; PS.set("eng", e); LS.del(engKey(k));
+  if (!X0) PS.set("mx", X);
+}
+const mxLive = f => Object.values(PS.get("mx", {})).filter(x => x && !x.del && x.M && (!f || f(x.M))).sort((a, b) => b.t0 - a.t0);
+// yeni deneme başlarken eskisi: saklandıysa (en az bir cevap) dokunma, değilse sil
+function mixReplace(M) {
+  const old = PS.get("mix", null);
+  if (old && old.k !== M.k && !mxLive(x => x.k === old.k).length) { const e = Object.assign({}, PS.get("eng", {})); delete e[engKey(old.k)]; PS.set("eng", e); LS.del(engKey(old.k)); }
+  PS.set("mix", M);
+}
+// 1.7'den önce çözülen son deneme (yalnız biri saklanıyordu) listeye bir kez eklenir
+let mxMig = null;
+function mxMigrate() {
+  if (!mxMig) mxMig = (async () => {
+    const M = PS.get("mix", null), e = M && PS.get("eng", {})[engKey(M.k)], r = e && e.s && e.s.run;
+    if (!r || !r.ans || (PS.get("mx", {}))[M.k]) return;
+    const b = (await mixBlob(M)).blob, by = {}; b.data.forEach(q => { by[q.id] = q; });
+    let ok = 0, bad = 0, done = 0; r.ids.forEach(id => { const a = r.ans[id]; if (a !== undefined) { done++; if (by[id] && a === by[id].a) ok++; else bad++; } });
+    if (done) mxKeep(M, { ok, bad, done, n: r.ids.length, fin: !!r.finished });
+  })().catch(() => {});
+  return mxMig;
+}
+function mxListHTML(L, title) {
+  if (!L.length) return "";
+  return '<div class="mxl"><div class="flabel">' + esc(title || "Son çözdüklerin") + '<span class="muted small"> · sen kaldırana kadar durur</span></div>'
+    + L.map(x => { const pc = x.done ? Math.round(100 * x.ok / x.done) : 0;
+      return '<div class="mxr"><button type="button" class="mxo" data-mxo="' + esc(x.k) + '"><b>' + esc(x.M.t) + '</b><span class="muted small">' + fdate(new Date(x.t0 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10)) + " · "
+        + (x.fin ? x.ok + "/" + x.n + " doğru (%" + Math.round(100 * x.ok / x.n) + ")" : "yarım · " + x.done + "/" + x.n + " çözüldü" + (x.done ? ", %" + pc + " doğru" : "")) + "</span></button>"
+        + '<button type="button" class="btn ghost small" data-mxo="' + esc(x.k) + '">' + (x.fin ? "Sonucu aç" : "Devam et") + '</button><button type="button" class="ibtn" data-mxd="' + esc(x.k) + '" title="Kaldır">' + icon("close") + "</button></div>"; }).join("") + "</div>";
+}
+function mxBind(root, redraw, closeFn) {
+  $$("[data-mxo]", root).forEach(b => b.onclick = () => { const x = (PS.get("mx", {}))[b.dataset.mxo]; if (!x || !x.M) return; mixReplace(x.M); if (closeFn) closeFn(); navTo("#/t/mix?r=" + Date.now()); });   // ayrı adres: yığındaki eski deneme kaydına geri sarmasın
+  $$("[data-mxd]", root).forEach(b => b.onclick = () => { mxDrop(b.dataset.mxd); toast("Kaldırıldı"); redraw(); });
 }
 const jsLit = o => JSON.stringify(o).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 async function mixBlob(M) {
@@ -2349,6 +2403,22 @@ async function viewSession(q) {
 }
 
 /* ---------- progress ---------- */
+// 1.7: konular slayt destesine göre gruplanır (S.cat.tdk, medlock.py refs yazar); aynı destenin konuları tek parçadır
+let TDc = null, TD = null;
+function tdeck(c, t) {
+  if (TDc !== S.cat) {
+    TDc = S.cat; TD = new Map();
+    Object.entries(S.cat.tdk || {}).forEach(([cc, m]) => Object.entries(m || {}).forEach(([t0, d]) => { const k = cc + "|" + tname(cc, t0); if (!TD.has(k)) TD.set(k, d); }));
+  }
+  return TD.get(c + "|" + t) || "";
+}
+function topicGroups(c, items, key) {
+  const G = new Map();
+  items.forEach(x => { const d = tdeck(c, key ? key(x) : x); if (!G.has(d)) G.set(d, []); G.get(d).push(x); });
+  const it = d => S.byId[d] || null;
+  return Array.from(G.entries()).map(([d, L]) => ({ d, t: it(d) ? it(d).t : "Diğer", items: L }))
+    .sort((a, b) => (!it(a.d)) - (!it(b.d)) || ((it(b.d) || {}).g || "").localeCompare((it(a.d) || {}).g || "") || ((it(a.d) || {}).d || "").localeCompare((it(b.d) || {}).d || ""));
+}
 function topicTotals(gs) {
   const T = new Map();
   S.cat.items.filter(i => i.k === "test" && (!gs || gs.has(i.g))).forEach(it => {
@@ -2431,10 +2501,15 @@ function viewProgress() {
       const pa = a.o && a.o.seen >= 3 ? a.o.ok / a.o.seen : a.o ? 1.5 : 2, pb = b.o && b.o.seen >= 3 ? b.o.ok / b.o.seen : b.o ? 1.5 : 2; return pa - pb || b.n - a.n; });
     const seenC = rows.reduce((x, r) => x + (r.o ? r.o.seen : 0), 0), totC = rows.reduce((x, r) => x + r.n, 0);
     const shown = rows.filter(r => r.o), rest = rows.length - shown.length;
+    const mrow = r => {
+      const pc = r.o && r.o.seen ? Math.round(100 * r.o.ok / r.o.seen) : null, weak = r.o && r.o.seen >= 3 && pc < 60;
+      return '<div class="mrow' + (weak ? " weak" : "") + (r.sub ? " sub" : "") + '"><span class="tn">' + esc(r.tp) + (weak ? ' <span class="wtag">zayıf</span>' : "") + '</span><span class="mb"><i style="width:' + (pc || 0) + '%"></i></span><span class="pc">' + (pc == null ? "–" : "%" + pc) + '</span><span class="cv">' + (r.o ? r.o.seen : 0) + "/" + r.n + "</span></div>";
+    };
     return '<details class="card mcard"' + (mm.size ? " open" : "") + '><summary><i class="cdot" style="background:' + ccol(c) + '"></i><b>' + esc(c) + '</b><span class="muted small">' + seenC + " / " + totC + " soru görüldü</span></summary>"
-      + (mm.size ? shown : rows).map(r => {
-        const pc = r.o && r.o.seen ? Math.round(100 * r.o.ok / r.o.seen) : null, weak = r.o && r.o.seen >= 3 && pc < 60;
-        return '<div class="mrow' + (weak ? " weak" : "") + '"><span class="tn">' + esc(r.tp) + (weak ? ' <span class="wtag">zayıf</span>' : "") + '</span><span class="mb"><i style="width:' + (pc || 0) + '%"></i></span><span class="pc">' + (pc == null ? "–" : "%" + pc) + '</span><span class="cv">' + (r.o ? r.o.seen : 0) + "/" + r.n + "</span></div>";
+      + topicGroups(c, mm.size ? shown : rows, r => r.tp).map(g => {
+        if (g.items.length < 2) return g.items.map(mrow).join("");
+        const sn = g.items.reduce((a, r) => a + (r.o ? r.o.seen : 0), 0), ok = g.items.reduce((a, r) => a + (r.o ? r.o.ok : 0), 0);
+        return mrow({ tp: g.t, n: g.items.reduce((a, r) => a + r.n, 0), o: sn ? { seen: sn, ok } : null }).replace('class="mrow', 'class="mrow grp') + g.items.map(r => mrow(Object.assign({ sub: 1 }, r))).join("");
       }).join("") + (mm.size && rest ? '<div class="mrow more"><span class="tn muted">' + rest + " konudan henüz soru çözmedin</span></div>" : "") + "</details>";
   }).join("");
   const H = PS.get("hist", []).slice().reverse().filter(h => !gs || gs.has(h.g));
@@ -2507,7 +2582,7 @@ async function startDeckQuiz(deckId, n, pre) {
   let L = shuffled(await deckQs(deckId));
   if (!L.length) return toast("Bu desteden henüz soru yok.");
   L = L.sort((a, b) => (qh[a[0] + "|" + a[1]] ? 1 : 0) - (qh[b[0] + "|" + b[1]] ? 1 : 0)).slice(0, n);
-  PS.set("mix", { at: Date.now(), k: "mix:" + Date.now(), t: (pre ? "Ön test · " : "Deste testi · ") + L.length + " soru", c: d.c, ids: shuffled(L), back: "#/d/" + deckId + "/1",
+  mixReplace({ at: Date.now(), k: "mix:" + Date.now(), t: (pre ? "Ön test · " : "Deste testi · ") + L.length + " soru", c: d.c, ids: shuffled(L), back: "#/d/" + deckId + "/1",
     d: pre ? "Okumadan önce dene: bilmemen normal; cevabı görüp sonra okuyunca daha iyi aklında kalır." : d.t + " destesinden sorular.", auto: { mode: "study" } });
   navTo("#/t/mix");
 }
@@ -2540,6 +2615,7 @@ function bankSheet(title, L, ctx) {
     if (st.f === "wrong" && !S0.wrong) st.f = "all";
     const ch = (k, v, l, n, dis) => '<button class="chip' + (st[k] === v ? " on" : "") + '" data-' + k + '="' + v + '"' + (dis ? " disabled" : "") + ">" + l + (n != null ? '<span class="n">' + n + "</span>" : "") + "</button>";
     $("#bkb", bg).innerHTML = '<p class="muted small">' + S0.n + " soru · çözdüğün " + S0.done + (S0.done ? " (" + S0.ok + " doğru)" : "") + "</p>"
+      + mxListHTML(mxLive(M => (M.bk || M.c + "|" + (M.t || "").replace(/ · \d+ soru$/, "")) === ctx.c + "|" + title))
       + '<div class="flabel">Hangileri</div><div class="chips">' + ch("f", "new", "Yeni", S0.fresh, !S0.fresh) + ch("f", "wrong", "Yanlışlarım", S0.wrong, !S0.wrong) + ch("f", "all", "Hepsi", S0.n) + "</div>"
       + '<div class="flabel">Kaç soru</div><div class="chips">' + ch("n", 10, "10") + ch("n", 20, "20") + ch("n", 40, "40") + ch("n", 0, "Hepsi") + "</div>"
       + '<div class="flabel">Nasıl çözeceksin</div><div class="chips">' + ch("mode", "study", "Çalışma") + ch("mode", "exam", "Sınav") + ch("mode", "timed", "Zamana karşı") + "</div>"
@@ -2548,6 +2624,7 @@ function bankSheet(title, L, ctx) {
     $$("[data-f]", bg).forEach(b => b.onclick = () => { st.f = b.dataset.f; draw(); });
     $$("[data-n]", bg).forEach(b => b.onclick = () => { st.n = +b.dataset.n; draw(); });
     $$("[data-mode]", bg).forEach(b => b.onclick = () => { st.mode = b.dataset.mode; draw(); });
+    mxBind(bg, draw, () => bg.close());
     $("#bkgo", bg).onclick = () => {
       const qh = PS.get("qh", {});
       let P = L.filter(x => { const h = qh[x[0] + "|" + x[1]]; return st.f === "new" ? !h : st.f === "wrong" ? h && !h.l : true; });
@@ -2555,14 +2632,12 @@ function bankSheet(title, L, ctx) {
       P = shuffled(P); if (st.f === "all") P.sort((a, b) => (qh[a[0] + "|" + a[1]] ? 1 : 0) - (qh[b[0] + "|" + b[1]] ? 1 : 0));
       if (st.n) P = P.slice(0, st.n);
       S.bankPref = { n: st.n, f: st.f, mode: st.mode };
-      const old = PS.get("mix", null);
-      if (old) { const e = Object.assign({}, PS.get("eng", {})); delete e[engKey(old.k)]; PS.set("eng", e); LS.del(engKey(old.k)); }
-      PS.set("mix", { at: Date.now(), k: "mix:" + Date.now(), t: title + " · " + P.length + " soru", c: ctx.c, ids: shuffled(P), back: ctx.back,
+      mixReplace({ at: Date.now(), k: "mix:" + Date.now(), t: title + " · " + P.length + " soru", c: ctx.c, ids: shuffled(P), back: ctx.back, bk: ctx.c + "|" + title,
         d: (st.f === "new" ? "Hiç çözmediğin" : st.f === "wrong" ? "Yanlış yaptığın" : "Önce çözmediklerin olmak üzere") + " sorular; bütün testlerden.", auto: { mode: st.mode, minutes: st.mode === "timed" ? P.length : 0 } });
       bg.close(); navTo("#/t/mix");
     };
   };
-  draw();
+  draw(); mxMigrate().then(() => { if (bg.isConnected) draw(); });
 }
 async function viewMix(q) {
   setNav("karma");
@@ -2592,14 +2667,14 @@ async function viewMix(q) {
     return out;
   };
   const go = (M, rep) => {
-    const old = PS.get("mix", null);
-    if (old) { const e = Object.assign({}, PS.get("eng", {})); delete e[engKey(old.k)]; PS.set("eng", e); LS.del(engKey(old.k)); }
-    PS.set("mix", M);
+    mixReplace(M);
     if (rep) { replaceHash("#/t/mix"); route(); } else navTo("#/t/mix");   // rep: "Prova" bağlantısıyla gelindi; geri tuşu provayı yeniden başlatmasın
   };
   const ks = st.k !== "all" && kurulById(st.k);
+  const GK = new Map();
   const draw = () => {
     const sc = main().scrollTop, TT = T(), M2 = mastery(st.k === "all" ? null : new Set([st.k]));
+    GK.clear();
     const avail = loaded ? pool().length : 0, take = st.n ? Math.min(st.n, avail) : avail;
     const k = st.k !== "all" && kurulById(st.k);
     const pn = k && k.no ? Math.min(100, kurulPrep(k.id).nQ) : 0;
@@ -2608,13 +2683,20 @@ async function viewMix(q) {
       + (fin || (F && F.on) ? '<button class="card tile preset" id="finp"><span class="big">' + icon("mix") + '</span><span class="txt"><b>Final denemesi</b><span class="muted small">Bütün kurullardan 100 soru, 100 dakika</span></span>' + icon("chev", "chev") + "</button>" : "");
     main().innerHTML = bar({ title: fin ? "Final denemesi" : "Karma deneme", crumb: "Testlerdeki sorulardan yeni bir deneme" }) + '<div class="page narrow mixp">'
       + (presets ? '<div class="presets">' + presets + "</div>" : "")
+      + mxListHTML(mxLive(), "Son denemelerin")
       + '<div class="flabel">Kurul</div>' + kchips(st.k, "data-k")
       + '<div class="flabel" style="margin-top:14px">Dersler</div><div class="chips" style="flex-wrap:wrap">' + courses().map(c => '<button class="chip' + (st.c.has(c) ? " on" : "") + '" data-c="' + esc(c) + '"><i class="cdot" style="background:' + ccol(c) + '"></i>' + esc(c) + "</button>").join("") + "</div>"
       + '<div class="flabel" style="margin-top:14px">Konular</div>'
       + Array.from(st.c).map(c => { const tm = TT.get(c) || new Map(), mm = M2.get(c) || new Map();
         return '<details class="card tlist"' + (st.c.size <= 2 ? " open" : "") + '><summary class="th"><b>' + esc(c) + '</b><span class="muted small">' + Array.from(tm.keys()).filter(t => st.t.has(c + "|" + t)).length + " / " + tm.size + ' konu</span><button class="btn ghost" data-all="' + esc(c) + '">Hepsi</button><button class="btn ghost" data-none="' + esc(c) + '">Hiçbiri</button></summary>'
-          + Array.from(tm.entries()).map(([t, n]) => { const o = mm.get(t), pc = o && o.seen ? Math.round(100 * o.ok / o.seen) : null, key = c + "|" + t;
-            return '<label class="tl"><input type="checkbox" data-t="' + esc(key) + '"' + (st.t.has(key) ? " checked" : "") + '><span class="tn">' + esc(t) + (o && o.seen >= 3 && pc < 60 ? ' <span class="wtag">zayıf</span>' : "") + '</span><span class="muted small">' + n + " soru" + (pc != null ? " · %" + pc : "") + "</span></label>"; }).join("") + "</details>"; }).join("")
+          + topicGroups(c, Array.from(tm.entries()), x => x[0]).map(g => {
+            const rows = g.items.map(([t, n]) => { const o = mm.get(t), pc = o && o.seen ? Math.round(100 * o.ok / o.seen) : null, key = c + "|" + t;
+              return '<label class="tl"><input type="checkbox" data-t="' + esc(key) + '"' + (st.t.has(key) ? " checked" : "") + '><span class="tn">' + esc(t) + (o && o.seen >= 3 && pc < 60 ? ' <span class="wtag">zayıf</span>' : "") + '</span><span class="muted small">' + n + " soru" + (pc != null ? " · %" + pc : "") + "</span></label>"; }).join("");
+            if (g.items.length < 2) return rows;
+            const keys = g.items.map(([t]) => c + "|" + t), on = keys.filter(k => st.t.has(k)).length, gk = c + "|" + g.d;
+            GK.set(gk, keys);
+            return '<div class="tg"><label class="tl tgh"><input type="checkbox" data-tg="' + esc(gk) + '"' + (on === keys.length ? " checked" : "") + (on && on < keys.length ? ' data-ind="1"' : "") + '><span class="tn"><b>' + esc(g.t) + '</b></span><span class="muted small">' + keys.length + " konu · " + g.items.reduce((a, x) => a + x[1], 0) + " soru</span></label>" + rows + "</div>";
+          }).join("") + "</details>"; }).join("")
       + '<div class="flabel" style="margin-top:14px">Hangi sorular</div><div class="chips" style="flex-wrap:wrap">'
       + [["all", "Hepsi"], ["new", "Hiç çözmediklerim"], ["wrong", "Yanlış yaptıklarım"]].map(([v, l]) => '<button class="chip' + (st.f === v ? " on" : "") + '" data-f="' + v + '">' + l + "</button>").join("") + "</div>"
       + '<div class="flabel" style="margin-top:14px">Soru sayısı</div><div class="chips">' + [10, 20, 40, 80, 0].map(n => '<button class="chip' + (st.n === n ? " on" : "") + '" data-n="' + n + '">' + (n || "Hepsi") + "</button>").join("") + "</div>"
@@ -2626,11 +2708,13 @@ async function viewMix(q) {
     $$("[data-k]").forEach(b => b.onclick = () => { st.k = b.dataset.k; resetSel(); draw(); });
     $$("[data-c]").forEach(b => b.onclick = () => { const c = b.dataset.c; if (st.c.has(c)) st.c.delete(c); else { st.c.add(c); (TT.get(c) || new Map()).forEach((n, t) => st.t.add(c + "|" + t)); } draw(); });
     $$("[data-t]").forEach(i => i.onchange = () => { if (i.checked) st.t.add(i.dataset.t); else st.t.delete(i.dataset.t); draw(); });
+    $$("[data-tg]").forEach(i => { if (i.dataset.ind) i.indeterminate = true; i.onchange = () => { const L = GK.get(i.dataset.tg) || [], all = L.every(k => st.t.has(k)); L.forEach(k => all ? st.t.delete(k) : st.t.add(k)); draw(); }; });
     $$("[data-all]").forEach(b => b.onclick = e => { e.preventDefault(); const c = b.dataset.all; (TT.get(c) || new Map()).forEach((n, t) => st.t.add(c + "|" + t)); draw(); });
     $$("[data-none]").forEach(b => b.onclick = e => { e.preventDefault(); const c = b.dataset.none; Array.from(st.t).forEach(k => { if (k.split("|")[0] === c) st.t.delete(k); }); draw(); });
     $$("[data-f]").forEach(b => b.onclick = () => { st.f = b.dataset.f; draw(); });
     $$("[data-n]").forEach(b => b.onclick = () => { st.n = +b.dataset.n; st.min = 0; draw(); });
     $$("[data-m]").forEach(b => b.onclick = () => { st.mode = b.dataset.m; draw(); });
+    mxBind(main(), draw);
     const mi = $("#mmin"); if (mi) mi.onchange = () => { st.min = Math.max(1, Math.min(600, parseInt(mi.value, 10) || 0)); };
     const pv = $("#prova"); if (pv) pv.onclick = async () => { pv.disabled = true; const M = await buildProva([st.k]); if (!M.ids.length) { pv.disabled = false; return toast("Bu kurulda henüz soru yok."); } go(M); };
     const fp = $("#finp"); if (fp) fp.onclick = async () => { fp.disabled = true; const dn = donemOf(currentKurul().id).id; const M = await buildProva(S.cat.kurullar.filter(k => (k.dn || "d1") === dn).map(k => k.id).concat(specialGs().filter(g => (kurulById(g).dn || "d1") === dn)), true); go(M); };
@@ -2643,7 +2727,7 @@ async function viewMix(q) {
         d: (st.f === "new" ? "Hiç çözmediğin" : st.f === "wrong" ? "Yanlış yaptığın" : "Seçtiğin konulardan") + " sorular, karışık sırayla.", auto: { mode: st.mode, minutes: st.mode === "timed" ? (st.min || P2.length) : 0 } });
     };
   };
-  draw();
+  draw(); mxMigrate().then(() => { if (parseHash().parts[0] === "karma") draw(); });
   await Promise.all(tests.map(it => loadTest(it).catch(() => null)));
   if (parseHash().parts[0] !== "karma") return;
   loaded = true; draw();

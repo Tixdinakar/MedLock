@@ -483,7 +483,36 @@ def add_video(V, fid, folder, name, **o):
     return it
 
 
+ROMAN_RE = re.compile(r"^(I|II|III|IV|V)\.\s*")
+
+
+def norm_question(q):
+    """Soru kökündeki satır satır öncülleri (I. … II. …) motorun liste alanına (l) taşır; kalan satır sonları <br> olur.
+    Motor q'yu HTML olarak yazar, satır sonları görünmez (24 Kas: öncüller yan yana çıkıyordu)."""
+    if "\n" not in (q.get("q") or ""):
+        return q
+    L = [x.strip() for x in q["q"].split("\n")]
+    i = next((k for k, x in enumerate(L) if x.startswith("I.") or x.startswith("I ")), None) if not q.get("l") else None
+    if i is not None and ROMAN_RE.match(L[i]):
+        j = i
+        items = []
+        while j < len(L) and ROMAN_RE.match(L[j]):
+            items.append(ROMAN_RE.sub("", L[j]))
+            j += 1
+        if len(items) >= 2:
+            q["q"] = "<br>".join(x for x in L[:i] if x)
+            q["l"] = items
+            rest = [x for x in L[j:] if x] + ([q["q2"]] if q.get("q2") else [])
+            if rest:
+                q["q2"] = "<br>".join(rest)
+            return q
+    q["q"] = "<br>".join(x for x in L if x)
+    return q
+
+
 def write_test(V, it, blob):
+    for q in blob.get("data", []):
+        norm_question(q)
     V.put_json(f"d/{it['x']}", blob)
     raw = json.dumps(blob, ensure_ascii=False, sort_keys=True).encode()
     it["v"] = hashlib.sha256(raw).hexdigest()[:8]
@@ -567,6 +596,7 @@ def compute_refs(V, verbose=False):
             by_title.setdefault(norm(t), it)
     sims = {}
     report = collections.Counter()
+    tdk = collections.defaultdict(collections.Counter)   # (ders, konu) → desteler: konular desteye göre gruplanır
     for it in V.cat["items"]:
         if it["k"] != "test":
             continue
@@ -584,6 +614,7 @@ def compute_refs(V, verbose=False):
                 report["kaynak bulunamadı: " + title[:50]] += 1
                 continue
             decks[d["id"]] += 1
+            tdk[(it["c"], q.get("t") or "")][d["id"]] += 1
             if d["id"] not in sims:
                 sims[d["id"]] = Sim(V.get_json(f"d/{d['x']}/t"))
             order, sc = sims[d["id"]].rank(qtext(q))
@@ -602,6 +633,11 @@ def compute_refs(V, verbose=False):
         blob["refs"] = refs
         it["dk"] = decks.most_common()
         write_test(V, it, blob)
+    T = {}
+    for (c, t), C in tdk.items():
+        if t:
+            T.setdefault(c, {})[t] = C.most_common(1)[0][0]
+    V.cat["tdk"] = T          # {ders: {konu: deste id}}; uygulama konu listelerini desteye göre gruplar (1.7)
     return report
 
 

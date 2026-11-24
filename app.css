@@ -702,3 +702,18 @@ button.tag.bq{cursor:pointer;background:var(--surface-2)}
 .bks{padding:16px 16px 18px;overflow:auto}
 .bks .flabel{margin-top:12px}
 .bks .row-btns{margin-top:14px}
+
+/* 1.7: aynı destenin konuları bir grup (üst konu = slayt destesi) */
+.tg{border-top:1px solid var(--line)}
+.tg:first-of-type{border-top:0}
+.tg .tl{padding-left:40px;border-top:1px dashed var(--line)}
+.tg .tl.tgh{padding-left:14px;border-top:0;background:var(--surface-2)}
+.tg .tl.tgh b{font-weight:650}
+.mrow.grp{background:var(--surface-2);font-weight:650}
+.mrow.sub .tn{padding-left:18px}
+.mxl{margin:4px 0 14px}
+.mxl .flabel{margin-bottom:6px}
+.mxr{display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--line)}
+.mxr .mxo{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:none;border:0;color:inherit;text-align:left;padding:2px 0;cursor:pointer;font:inherit}
+.mxr .mxo b{font-weight:600;font-size:14px}
+.mxr .btn.small{padding:5px 10px;font-size:12.5px}
