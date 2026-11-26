@@ -769,3 +769,8 @@ button.tag.bq{cursor:pointer;background:var(--surface-2)}
 .xbtns{display:grid;gap:8px;margin-top:8px}
 .xbtns .btn{justify-content:flex-start}
 .course .pbar{max-width:220px;margin-top:5px}
+/* 1.12: Kütüphane'de kurullar sırayla, ortak dersler tam genişlikte */
+.kgrid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+@media (min-width:600px){.kgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kurul.wide{grid-column:1/-1}
+.kurul.past .st{opacity:.8}

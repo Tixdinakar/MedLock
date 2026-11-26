@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.11";
+const VERSION = "1.12";
 const CHANGES = [
+  { v: "1.12", d: "2026-11-27", l: [
+    "Kütüphane'de kurullar sırayla (I, II, III, IV), ortak dersler en altta; her kartta konu ve soru sayısı",
+    "Diğer menüsünden Çıkmışlar ve Anatomi Latincesi kalktı (ana sayfada ve Kütüphane'de duruyor)"
+  ] },
   { v: "1.11", d: "2026-11-27", l: [
     "Kurul sayfası sadeleşti: uzun test listesi kalktı (testler ders sayfalarında ve soru bankasında); her derste konu ve soru sayısı, okuduğun konulara göre çubuk; İndir düğmesi Kurul provası'nın yanında",
     "Ana sayfa sadeleşti: son eklenenler, senkron ve ana ekrana ekle kartları kalktı (Ayarlar'da duruyor); sınav satırında tek Hazırlan düğmesi"
@@ -163,7 +167,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "93f318bd49";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "e55a150905";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -708,7 +712,7 @@ function toast(msg, act, fn, ms) {
 const app = () => $("#app");
 const main = () => $("#main");
 function shell() {
-  const kl = S.cat.kurullar.filter(k => k.start <= today() || S.cat.items.some(i => i.g === k.id)).slice().reverse();
+  const kl = S.cat.kurullar.filter(k => k.start <= today() || S.cat.items.some(i => i.g === k.id));   // 1.12: sırayla
   app().innerHTML = '<div class="shell" id="shell">'
     + '<aside class="side"><a class="brand" href="#/"><img src="icons/64.png" alt=""><span>' + NAME + '</span><small class="ver">' + VERSION + '</small></a><nav>'
     + '<a data-nav="home" href="#/">' + icon("home") + 'Ana sayfa</a>'
@@ -741,7 +745,7 @@ function shell() {
   clockTick();
 }
 // Alttaki "Diğer": yukarı doğru açılan menü (telefonun geri tuşu kapatır)
-const MOREKEYS = ["kartlar", "ilerleme", "saat", "duello", "karma", "cikmis", "sozluk", "isaretler", "ayarlar"];
+const MOREKEYS = ["kartlar", "ilerleme", "saat", "duello", "karma", "isaretler", "ayarlar"];   // 1.12: Çıkmışlar ve Latince ana sayfada ve Kütüphane'de
 function moreItems() {
   const cn = cardsDueKeys().length;
   return [["kartlar", "#/kartlar", "cards", "Kartlar", cn ? cn + " kart tekrar bekliyor" : "Çevir, yaz ya da boşluk doldur"],
@@ -749,8 +753,6 @@ function moreItems() {
     ["saat", "#/saat", "clock", "Saat", "Kronometre ve çalışma turu"],
     ["duello", "#/duello", "duel", "Düello", "Bugün kim ne kadar çalıştı"],
     ["karma", "#/karma", "mix", "Karma deneme", "Kurul provası ya da seçtiğin konulardan"],
-    cxAny() && ["cikmis", "#/cikmis", "star", "Çıkmışlar", "Çöz ya da orijinalini aç"],
-    (S.cat.lex || S.cat.lat) && ["sozluk", "#/sozluk", "lex", "Anatomi Latincesi", "Terim çözücü, kelimeler"],
     ["isaretler", "#/isaretler", "bm", "İşaretli sayfalar", ""],
     ["ayarlar", "#/ayarlar", "set", "Ayarlar", "Profil, senkron, çevrimdışı"]].filter(Boolean);
 }
@@ -1174,7 +1176,9 @@ function viewLib(q) {
   const t = today();
   const card = (k, cls) => {
     const its = S.cat.items.filter(i => i.g === k.id);
-    const cnt = KORDER.map(kk => [kk, its.filter(i => i.k === kk).length]).filter(x => x[1]).map(x => x[1] + " " + KIND[x[0]].l.toLowerCase()).join(" · ");
+    // 1.12: kartta yalnız konu (slayt destesi) ve soru sayısı
+    const nd = its.filter(i => i.k === "slayt").length, nq = its.filter(i => i.k === "test" && !i.cx).reduce((a, x) => a + (x.n || 0), 0);
+    const cnt = its.length ? [nd ? nd + " konu" : its.length + " dosya", nq ? nq + " soru" : ""].filter(Boolean).join(" · ") : "";
     const now = k.start && t >= k.start && t <= k.end;
     return '<a class="card kurul ' + (cls || "") + '" href="#/lib/' + k.id + '">' + (k.no ? '<span class="no">KURUL ' + k.no + "</span>" : '<span class="no">' + esc(donemById(k.dn).name.toLocaleUpperCase("tr")) + "</span>")
       + "<h3>" + esc(k.name) + "</h3>" + (k.start ? '<span class="d">' + fdate(k.start) + " – " + fdate(k.end, true) + "</span>" : '<span class="d">Kurul dışı dersler</span>')
@@ -1184,10 +1188,10 @@ function viewLib(q) {
   const DN = donemler().slice().reverse(), curDn = donemOf(currentKurul().id).id;
   const sec = d => {
     const ks = S.cat.kurullar.filter(k => (k.dn || "d1") === d.id);
-    const started = ks.filter(k => k.start <= t).reverse(), future = ks.filter(k => k.start > t);
     const sp = specialGs().map(kurulById).filter(k => (k.dn || "d1") === d.id);
+    // 1.12: kurullar sırayla (I, II, III, IV), ortak dersler en sonda tam genişlikte
     return '<h2 class="sec" id="dn-' + d.id + '">' + esc(d.name) + (d.yil ? ' <span class="muted">· ' + esc(d.yil) + "</span>" : "") + "</h2>"
-      + '<div class="grid">' + started.map(k => card(k)).join("") + sp.map(k => card(k)).join("") + future.map(k => card(k, "future")).join("") + "</div>";
+      + '<div class="grid kgrid">' + ks.slice().sort((a, b) => (a.no || 0) - (b.no || 0)).map(k => card(k, k.start > t ? "future" : k.end && t > k.end ? "past" : "")).join("") + sp.map(k => card(k, "wide")).join("") + "</div>";
   };
   main().innerHTML = bar({ title: "Kütüphane", crumb: crumbs([["Tıp", ""]]), actions: '<button class="ibtn" id="upb" title="Dosya ekle" aria-label="Dosya ekle">' + icon("plus") + "</button>" }) + '<div class="page">'
     + (cxAny() ? '<a class="card tile" href="#/cikmis" style="margin-top:4px"><span class="big">' + icon("star") + '</span><span class="txt"><b>Çıkmışlar</b><span class="muted small">Kurul sınavlarının çıkmış soruları: çözülebilir test ve orijinal PDF</span></span>' + icon("chev", "chev") + "</a>" : "")

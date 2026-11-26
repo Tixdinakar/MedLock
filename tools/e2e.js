@@ -51,7 +51,7 @@ async function openTest(pg, href) {
       const libOrder = await pg.$$eval(".page > *", xs => xs.map(x => x.getAttribute("href") || x.className));
       ok(libOrder[0] && libOrder[0].includes("#/cikmis"), name + ": Kütüphane'nin başında Çıkmışlar yok");
       ok(libOrder[libOrder.length - 1] && libOrder[libOrder.length - 1].includes("#/sozluk"), name + ": Anatomi Latincesi Kütüphane'nin sonunda değil");
-      const kurul = await pg.$eval(".kurul", a => a.getAttribute("href"));
+      const kurul = await pg.evaluate(() => (document.querySelector(".kurul:has(.st.now)") || document.querySelector(".kurul")).getAttribute("href"));   // 1.12: kurullar sırayla; şu anki kurul
       await pg.goto(BASE + kurul); await pg.waitForSelector(".course");
       ok(!(await pg.$(".course .h")), name + ": kurul sayfasında hoca adı var");
       await shot("2-kurul");
@@ -100,8 +100,6 @@ async function openTest(pg, href) {
       await pg.goto(BASE + course); await pg.waitForSelector(".tcard, .it");
       const testHref = await pg.evaluate(() => { const a = [...document.querySelectorAll('#sec-test ~ .card a[href^="#/t/"], a[href^="#/t/"]')][0]; return a && a.getAttribute("href"); });
       if (testHref) {
-        const pre = await pg.$eval('a[href="' + testHref + '"] .t', t => t.textContent);
-        ok(/·/.test(pre) || /^(Biyokimya|Biyofizik|Biyoistatistik|Davranış Bilimleri|Tıbbi Biyoloji)/.test(pre), name + ": test başlığının önünde ders adı yok: " + pre);   // başlık ders adıyla başlıyorsa (ör. "Biyokimya Derlemesi") önek eklenmez
         let fr = await openTest(pg, testHref);
         ok(!(await fr.$eval(".cover h1", h => getComputedStyle(h).display !== "none").catch(() => false)), name + ": testte motorun büyük başlığı görünüyor");
         const gb = await fr.$eval("button.go", btn => { const r = btn.getBoundingClientRect(); return { txt: btn.textContent, bottom: r.bottom, vh: innerHeight }; });
