@@ -19,7 +19,7 @@ const ok = (c, m) => { if (!c) fails.push(m); };
 
   await step("yolla yukarı, sonra ok", async () => {
     await tap('.tabs a[href="#/lib"]'); await tap('a.kurul[href="#/lib/k2"]'); await tap('a.course[href="#/lib/k2/biyokimya"]');
-    await tap('a.it[href^="#/d/"]'); await pg.waitForSelector(".pg img");
+    await tap('.tcard a[href^="#/d/"]'); await pg.waitForSelector(".pg img");
     const d0 = await depth();
     await tap('.bar .crumb a[href="#/lib/k2"]');
     ok(H() === "/lib/k2" && (await depth()) === d0 - 2, "yol: Kurul II'ye geçmişte geri dönülmedi (" + H() + ", derinlik " + (await depth()) + ")");
@@ -114,17 +114,17 @@ const ok = (c, m) => { if (!c) fails.push(m); };
 
   await step("slayt sayfa değişimi + ok", async () => {
     await pg.goto(BASE + "#/lib/k2/biyokimya"); await pg.waitForSelector(".it");
-    await tap('a.it[href^="#/d/"]'); await pg.waitForSelector(".pg img");
+    await tap('.tcard a[href^="#/d/"]'); await pg.waitForSelector(".pg img");
     await pg.$eval("#doc", d => { d.scrollTop = d.scrollHeight / 2; }); await sleep(800);
     await tap(".bar [data-back]");
     ok(H() === "/lib/k2/biyokimya", "slayttan ok: " + H());
-    await tap('a.it[href^="#/d/"]');
+    await tap('.tcard a[href^="#/d/"]');
     log.push("geri dönülen sayfa: " + H());
   });
 
   await step("tam ekran: uygulamadan çıkıp dönünce ve çıkış düğmesiyle sayfa yerinde kalır", async () => {
     await pg.goto(BASE + "#/lib/k2/biyokimya"); await pg.waitForSelector(".it");
-    await tap('a.it[href^="#/d/"]'); await pg.waitForSelector(".pg img"); await sleep(500);
+    await tap('.tcard a[href^="#/d/"]'); await pg.waitForSelector(".pg img"); await sleep(500);
     const id = H().split("/")[2];
     await tap("#fsb"); await sleep(400);
     await pg.$eval("#doc", d => { d.scrollTop = d.querySelector('[data-p="3"]').offsetTop; }); await sleep(900);

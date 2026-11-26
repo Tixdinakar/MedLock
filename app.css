@@ -743,3 +743,24 @@ button.tag.bq{cursor:pointer;background:var(--surface-2)}
 .ufm{display:grid;gap:10px;margin:4px 0 14px}
 .ufm label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .ufm select,.ufm input{font:inherit;font-size:15px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}
+
+/* 1.10: ana sayfada üç kısayol tek satırda; ders sayfasında konu = tek kart */
+.qrow{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;margin-top:12px}
+.qb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:12px 6px;color:var(--ink);text-decoration:none;text-align:center;min-width:0}
+.qb .ic{width:22px;height:22px;color:var(--accent)}
+.qb b{font:600 13.5px/1.2 var(--f-ui)}
+.tcard{padding:12px 14px;margin-top:10px}
+.tc-h{display:block;color:inherit;text-decoration:none}
+.tc-h b{display:block;font:700 15.5px/1.3 var(--f-cond)}
+.tc-m{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:3px;font-size:12.5px;color:var(--muted)}
+.tc-m .ok{color:var(--ok);display:inline-flex;align-items:center;gap:3px}
+.tc-m .ok .ic{width:13px;height:13px}
+.tc-t{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tcard .pbar{margin-top:8px}
+.tc-a{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.tc-t{margin-top:6px}
+.tcb{display:inline-flex;align-items:center;gap:4px;font:600 13px var(--f-ui);color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:7px 9px;cursor:pointer;text-decoration:none;line-height:1.2}
+.tcb .ic{width:16px;height:16px;color:var(--kc)}
+.tcb small{font-weight:500;color:var(--muted)}
+.tcb:active{transform:scale(.97)}
+#bank .kgrp.bank{margin-top:0}

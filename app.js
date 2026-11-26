@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.9";
+const VERSION = "1.10";
 const CHANGES = [
+  { v: "1.10", d: "2026-11-27", l: [
+    "Ders sayfası sadeleşti: her konu tek kart; slayt, not, kart ve sorular kartın altındaki düğmelerde. Arama ve süzgeçler sağ üstteki büyüteçte",
+    "Ana sayfada Karma, Çıkmışlar ve Latince tek satırda; son eklenenler 3 tane"
+  ] },
   { v: "1.9", d: "2026-11-27", l: [
     "Dosya ekle: Kütüphane'de ve ders sayfasında sağ üstteki + ile slayt, not, özet ya da çıkmış gönderebilirsin. Dosya şifrelenip gider; Claude işleyince (sayfalar, kartlar, hoca vurguları) kütüphanede görünür. Bir kez Ayarlar › Dosya ekleme'den anahtar girilmeli; bekleyen dosyalar da orada görünür"
   ] },
@@ -155,7 +159,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "3119bafc3e";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "57278e622d";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1100,15 +1104,15 @@ function viewHome() {
       + "</div></div>";
   main().innerHTML = bar({ title: NAME, crumb: fdate(t, true) + (P && P.name ? " · " + esc(P.name) : ""), actions: '<a class="ibtn" href="#/ayarlar" aria-label="Ayarlar">' + icon("set") + "</a>" })
     + '<div class="page">' + hero   // kurul kartı ve kutular hep en üstte (Buğra'nın isteği)
-    + '<div class="grid tiles4" style="margin-top:12px">'
-    + '<a class="card tile" href="#/karma"><span class="big">' + icon("mix") + '</span><span class="txt"><b>Karma deneme</b><span class="muted small">Kurul provası ya da seçtiğin konulardan</span></span>' + icon("chev", "chev") + "</a>"
-    + (hasCx ? '<a class="card tile" href="#/cikmis"><span class="big">' + icon("star") + '</span><span class="txt"><b>Çıkmışlar</b><span class="muted small">' + cxCount() + " ders · çöz ya da orijinalini aç</span></span>" + icon("chev", "chev") + "</a>" : "")
-    + (S.cat.lex || S.cat.lat ? '<a class="card tile" href="#/sozluk"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Anatomi Latincesi</b><span class="muted small">' + (S.cat.lat ? "Terim çözücü, " + S.cat.lat.n + " kelime, alıştırma" : "Latince ve Yunanca kökler") + "</span></span>" + icon("chev", "chev") + "</a>" : "")
+    + '<div class="qrow">'
+    + '<a class="card qb" href="#/karma">' + icon("mix") + "<b>Karma</b></a>"
+    + (hasCx ? '<a class="card qb" href="#/cikmis">' + icon("star") + "<b>Çıkmışlar</b></a>" : "")
+    + (S.cat.lex || S.cat.lat ? '<a class="card qb" href="#/sozluk">' + icon("lex") + "<b>Latince</b></a>" : "")
     + "</div>"
     + (welcomeCard() || updCard()) + scoreCard() + todayCard
     + syncHint() + installCard()
     + (bms.length ? '<h2 class="sec">İşaretli sayfalar' + (bms.length > 4 ? ' · <a href="#/isaretler" style="color:var(--accent)">tümü (' + bms.length + ")</a>" : "") + '</h2><div class="card list">' + bms.slice(0, 4).map(bmRow).join("") + "</div>" : "")
-    + '<h2 class="sec sec-a">Son eklenenler<a href="#/yeni">Tümü ' + icon("chev") + '</a></h2><div class="card list">' + S.cat.items.slice(0, 5).map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>"
+    + '<h2 class="sec sec-a">Son eklenenler<a href="#/yeni">Tümü ' + icon("chev") + '</a></h2><div class="card list">' + S.cat.items.slice(0, 3).map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>"
     + "</div>";
   bindUpd(); bindScoreCard();
   const sx = $("#syhx"); if (sx) sx.onclick = () => { LS.set("ml.syh", 1); $("#synch").remove(); };
@@ -1251,11 +1255,30 @@ function viewCourse(g, cs) {
   const grp = (title, its, extra, open) => {
     const q = qf(), vis = its.filter(okRow).filter(it => !q || hitT(title, q) || hitT(it.t, q) || hitT(it.h, q));
     if (!vis.length) return "";
-    return '<div class="kgrp"><div class="kh"><b>' + esc(title) + "</b>" + (extra || "") + '</div><div class="card list">' + vis.map(it => itemRow(it, { noHoca: !!F.h, tag: it.k === "slayt" || it.k === "not" || it.k === "ozet" ? rdTag(it) : "" })).join("") + "</div></div>";
+    return '<div class="kgrp"><div class="kh"><b>' + esc(title) + "</b>" + (extra || "") + '</div><div class="card list">' + vis.map(it => itemRow(it, { noHoca: !!F.h || plain(), tag: it.k === "slayt" || it.k === "not" || it.k === "ozet" ? rdTag(it) : "" })).join("") + "</div></div>";
+  };
+  const plain = () => F.by === "konu" && !qf() && !F.k && !F.h;   // süzgeç yoksa konu kartları
+  // 1.10: konu = tek kart (başlık, vurgu/çıkmış etiketi, okuma çubuğu, altında Slayt · Not · Kart · Soru düğmeleri)
+  const tcard = G => {
+    const d = G.d, n = deckQn(d.id), cx = cxDeckN(d.id), hv = (d.hv || []).length;
+    const o = PS.get("rd", {})[d.id], pc = o ? (o.ok ? 100 : Math.round(100 * (o.m || 0) / (d.n || 1))) : 0;
+    const L = BK ? BK.get(d.id) || [] : null, st = L && L.length ? bankStat(L) : null;
+    const seen = {}, btn = it => { const K = KIND[it.k] || KIND.not; seen[it.k] = (seen[it.k] || 0) + 1;
+      return '<a class="tcb" style="--kc:' + K.c + '" href="' + itemHref(it) + '" title="' + esc(it.t + (it.u ? " · Yükleyen: " + it.u : "")) + '">' + icon(K.ic) + K.l + (seen[it.k] > 1 ? " " + seen[it.k] : "") + (it.k === "kart" && it.n ? " <small>" + it.n + "</small>" : "") + "</a>"; };
+    const others = G.its.filter(it => it !== d).sort((a, b) => KORDER.indexOf(a.k) - KORDER.indexOf(b.k));
+    return '<div class="card tcard"><a class="tc-h" href="' + itemHref(d) + '"><b>' + esc(d.t) + '</b><span class="tc-m"><span>' + (d.d && !d.dq ? fdate(d.d) + " · " : "") + d.n + " slayt</span>" + (o && o.ok ? '<span class="ok">' + icon("check") + "okundu</span>" : o && o.m > 1 ? "<span>" + o.m + "/" + d.n + " okundu</span>" : "") + "</span></a>"
+      + (hv || cx ? '<div class="tc-t">' + (hv ? '<button type="button" class="tag hv" data-hvs="' + d.id + '">' + icon("star") + "hoca " + hv + " yer vurguladı ›</button>" : "") + (cx ? '<button type="button" class="tag cx" data-cxs="' + d.id + '">' + icon("star") + "çıkmışta " + cx + " soru ›</button>" : "") + "</div>" : "")
+      + (pc ? '<span class="pbar"><i class="' + (o && o.ok ? "ok" : "") + '" style="width:' + pc + '%"></i></span>' : "")
+      + '<div class="tc-a">' + btn(d) + others.map(btn).join("")
+      + (n || (L && L.length) ? '<button type="button" class="tcb" style="--kc:' + KIND.test.c + '" data-bq="' + d.id + '">' + icon("test") + "Soru <small>" + (st && st.done ? st.done + "/" + st.n : L ? L.length : n) + "</small></button>" : "")
+      + "</div></div>";
   };
   const render = () => {
     let rows = "";
-    if (F.by === "konu") {
+    if (plain()) {
+      rows = groups.sort((a, b) => (b.d.d || "").localeCompare(a.d.d || "")).map(tcard).join("")
+        + grp("Hazır testler", multi) + grp(groups.length ? "Diğer notlar" : "Notlar ve dosyalar", loose) + grp("Çıkmışlar", cxs);
+    } else if (F.by === "konu") {
       rows = groups.sort((a, b) => (b.d.d || "").localeCompare(a.d.d || "")).map(G => {
         const n = deckQn(G.d.id), cx = cxDeckN(G.d.id);
         const hv = (G.d.hv || []).length;
@@ -1290,10 +1313,12 @@ function viewCourse(g, cs) {
     box.innerHTML = H.docs.length ? '<h2 class="sec">İçerikte geçenler · ' + H.docs.reduce((a, d) => a + d.pages.length, 0) + " sayfa</h2>" + docHitsHTML(H, 8) : "";
   };
   const chip = (f, v, l, n) => '<button class="chip' + (F[f] === v ? " on" : "") + '" data-f="' + f + '" data-v="' + esc(v) + '">' + esc(l) + (n != null ? '<span class="n">' + n + "</span>" : "") + "</button>";
-  main().innerHTML = bar({ title: c, crumb: crumbFor(g, null), back: "#/lib/" + g, actions: '<button class="ibtn" id="upb" title="Bu derse dosya ekle" aria-label="Dosya ekle">' + icon("plus") + "</button>" })
-    + '<div class="page"><div class="sbox csrch">' + icon("search") + '<input id="cq" type="search" placeholder="Bu derste ara: konu, başlık ya da slayttaki bir kelime" autocomplete="off" value="' + esc(F.q || "") + '"></div>'
-    + '<div class="filters" id="flt"></div><div id="bank"></div><div id="rows"></div><div id="chits"></div></div>';
-  $("#flt").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (!b) return; F[b.dataset.f] = b.dataset.v; render(); });
+  const toolsOn = () => F.t || !plain();
+  main().innerHTML = bar({ title: c, crumb: crumbFor(g, null), back: "#/lib/" + g, actions: '<button class="ibtn" id="csb" title="Ara ve süz" aria-label="Ara ve süz">' + icon("search") + '</button><button class="ibtn" id="upb" title="Bu derse dosya ekle" aria-label="Dosya ekle">' + icon("plus") + "</button>" })
+    + '<div class="page"><div id="ctools"' + (toolsOn() ? "" : " hidden") + '><div class="sbox csrch">' + icon("search") + '<input id="cq" type="search" placeholder="Bu derste ara: konu, başlık ya da slayttaki bir kelime" autocomplete="off" value="' + esc(F.q || "") + '"></div>'
+    + '<div class="filters" id="flt"></div></div><div id="bank"></div><div id="rows"></div><div id="chits"></div></div>';
+  $("#csb").onclick = () => { const t = $("#ctools"); F.t = t.hidden ? 1 : 0; t.hidden = !F.t && plain(); if (!t.hidden) $("#cq").focus(); };
+  $("#flt").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (!b) return; F[b.dataset.f] = b.dataset.v; F.t = 1; render(); });
   // Soru bankası: bütün testlerin soruları konu konu; açılınca testler yüklenir, ilerleme sonra dolar
   let BK = null;
   const bctx = { c, back: "#/lib/" + g + "/" + cs };
@@ -1303,6 +1328,12 @@ function viewCourse(g, cs) {
     if (F.by !== "konu" || qf() || (F.k && F.k !== "test")) { box.innerHTML = ""; return; }
     const R = bankRows(); if (!R.length) { box.innerHTML = ""; return; }
     const all = BK ? Array.from(BK.values()).reduce((a, L) => a.concat(L), []) : null;
+    if (plain()) {
+      const st = all ? bankStat(all) : null, pc = st && st.n ? Math.round(100 * st.done / st.n) : 0;
+      box.innerHTML = '<div class="kgrp bank"><div class="card list"><button type="button" class="it bkr" data-bq="' + (R.length > 1 ? "_all" : R[0][0].id) + '">' + kindBox("test") + '<div class="txt"><div class="t">' + (R.length > 1 ? "Bütün konulardan soru çöz" : "Soru çöz") + '</div><div class="m"><span>' + (all ? all.length : R.reduce((a, r) => a + r[2], 0)) + " soru</span>" + (st ? "<span>çözdüğün " + st.done + (st.done ? " · " + st.ok + " doğru" : "") + "</span>" : "") + "</div>"
+        + (st ? '<span class="pbar"><i class="' + (st.done && st.ok === st.done ? "ok" : "") + '" style="width:' + pc + '%"></i></span>' : "") + "</div>" + icon("chev", "chev") + "</button></div></div>";
+      return;
+    }
     box.innerHTML = '<div class="kgrp bank"><div class="kh"><b>Soru bankası</b><span class="muted small">' + (all ? all.length + " soru, bütün testlerden" : "bütün testlerden") + '</span></div><div class="card list">'
       + R.sort((x, y) => (y[0].d || "").localeCompare(x[0].d || "")).map(([d, L, n]) => { const st = L ? bankStat(L) : null, pc = st && st.n ? Math.round(100 * st.done / st.n) : 0;
         return '<button type="button" class="it bkr" data-bq="' + d.id + '">' + kindBox("test") + '<div class="txt"><div class="t">' + esc(d.t) + '</div><div class="m"><span>' + (L ? L.length : n) + " soru</span>" + (st ? "<span>çözdüğün " + st.done + (st.done ? " · " + st.ok + " doğru" : "") + "</span>" : "") + "</div>"
@@ -1311,7 +1342,7 @@ function viewCourse(g, cs) {
       + "</div></div>";
   }
   const openBank = async id => {
-    if (!BK) { toast("Sorular yükleniyor…"); BK = await bankPool(g, c); drawBank(); }
+    if (!BK) { toast("Sorular yükleniyor…"); BK = await bankPool(g, c); render(); }
     if (id === "_all") return bankSheet(c + " · karışık", Array.from(BK.values()).reduce((a, L) => a.concat(L), []), bctx);
     const d = S.byId[id], L = BK.get(id) || [];
     if (!L.length) return toast("Bu konudan henüz soru yok.");
@@ -1325,7 +1356,7 @@ function viewCourse(g, cs) {
   $("#cq").addEventListener("input", e => { F.q = e.target.value; render(); clearTimeout(tq); tq = setTimeout(contentHits, 260); });
   render(); if (F.q) contentHits();
   $("#upb").onclick = () => uploadSheet({ g, c });
-  bankPool(g, c).then(m => { BK = m; if ($("#bank")) drawBank(); }).catch(() => {});
+  bankPool(g, c).then(m => { BK = m; if ($("#rows")) render(); }).catch(() => {});
 }
 
 /* ---------- video (Drive'da durur) ---------- */

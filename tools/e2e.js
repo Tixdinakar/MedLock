@@ -43,8 +43,8 @@ async function openTest(pg, href) {
       ok(await pg.$("#updc"), name + ": ana sayfada yeni sürüm notu yok");
       await shot("0-surum-notu");
       if (await pg.$("#updok")) { await pg.click("#updok"); await sleep(200); ok(!(await pg.$("#updc")), name + ": sürüm notu kapanmadı"); }
-      ok(!(await pg.$('a.tile[href="#/ara"]')), name + ": ana sayfada hâlâ 'Her yerde ara' var");
-      ok(await pg.$('a.tile[href="#/cikmis"]'), name + ": ana sayfada Çıkmışlar yok");
+      ok(!(await pg.$('a[href="#/ara"].qb')), name + ": ana sayfada hâlâ 'Her yerde ara' var");
+      ok(await pg.$('.qrow a[href="#/cikmis"]'), name + ": ana sayfada Çıkmışlar yok");
       ok((await pg.$$eval(".sec-a + .card .it", x => x.length)) <= 5, name + ": son eklenenler 5'ten fazla");
       await shot("1-ana");
       await pg.goto(BASE + "#/lib"); await pg.waitForSelector(".kurul");
@@ -56,7 +56,7 @@ async function openTest(pg, href) {
       ok(!(await pg.$(".course .h")), name + ": kurul sayfasında hoca adı var");
       await shot("2-kurul");
       const course = await pg.$eval(".course", a => a.getAttribute("href"));
-      await pg.goto(BASE + course); await pg.waitForSelector(".it");
+      await pg.goto(BASE + course); await pg.waitForSelector(".tcard, .it");
       // 1.6: ders sayfasında soru bankası (konu konu, bütün testlerden)
       const bk = await pg.waitForSelector(".bank .bkr", { timeout: 15000 }).catch(() => null);
       ok(bk, name + ": ders sayfasında soru bankası yok");
@@ -69,11 +69,11 @@ async function openTest(pg, href) {
           await pg.click('[data-n="10"]'); await pg.click("#bkgo");
           const fr = await (await pg.waitForSelector(".tpane iframe", { timeout: 20000 })).contentFrame().catch(() => null);
           ok(fr && await fr.waitForSelector(".q, .qcard, button.go, .opt", { timeout: 20000 }).catch(() => null), name + ": soru bankasından test açılmadı");
-          await pg.goto(BASE + course); await pg.waitForSelector(".it");
+          await pg.goto(BASE + course); await pg.waitForSelector(".tcard, .it");
         }
       }
       ok(!(await pg.$$eval(".kh b", xs => xs.some(x => x.textContent === "Birden çok konudan testler"))), name + ": eski 'Birden çok konudan testler' başlığı duruyor");
-      const links = await pg.$$eval(".it", as => as.map(a => a.getAttribute("href")));
+      const links = await pg.$$eval(".it, .tcard a", as => as.map(a => a.getAttribute("href")));
       const doc = links.find(h => h && h.startsWith("#/d/"));
       if (doc) {
         await pg.goto(BASE + doc); await pg.waitForSelector(".pg img", { timeout: 20000 });
