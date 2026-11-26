@@ -1198,6 +1198,31 @@ def _tk_match(e, cands, es, strict=False):
     return best if bs >= 0.5 else None
 
 
+_SES_TS = re.compile(r"^ses[ _-]*(\d{6})_(\d{4})\d{2}", re.I)
+
+
+def ses_zaman(name):
+    """Kaydedicinin varsayılan adı ("Ses 261126_100553"): kaydın başladığı tarih ve saat (Drive'a yükleme zamanı değil)."""
+    m = _SES_TS.match(name.strip())
+    if not m:
+        return None
+    d, hm = m.groups()
+    return f"20{d[:2]}-{d[2:4]}-{d[4:]}", f"{hm[:2]}:{hm[2:]}"
+
+
+def ses_ders(V, name):
+    """Adı yalnız zaman damgası olan kaydı takvimdeki derse bağlar: başlangıç dersin saatleri içinde (15 dk önce de olur)."""
+    z = ses_zaman(name)
+    if not z:
+        return None
+    d, t = z
+    def mins(x): h, m = x.split(":"); return int(h) * 60 + int(m)
+    for e in V.cat.get("takvim", []):
+        if e["d"] == d and e.get("chk") and mins(e["s"]) - 15 <= mins(t) < mins(e["e"]):
+            return e
+    return None
+
+
 def takvim_kontrol(V, bugun=None, drive=None, gun=None):
     """İşlenmiş (tarihi geçmiş) derslerin slaytı katalogda, ses kaydı dökümü Drive listesinde var mı."""
     bugun = bugun or datetime.date.today().isoformat()
@@ -1214,7 +1239,8 @@ def takvim_kontrol(V, bugun=None, drive=None, gun=None):
         if m is None:
             miss_s.append(e)
         sc = [x for x in ses if norm(e["c"].split()[0]) in norm(x.get("folder", ""))] or ses
-        if drive is not None and _tk_match(e, sc, V.cat.get("takvim_ses", {}), strict=True) is None:
+        if drive is not None and not any(ses_ders(V, x.get("name", "")) is e for x in ses) \
+                and _tk_match(e, sc, V.cat.get("takvim_ses", {}), strict=True) is None:
             miss_a.append(e)
     fmt = lambda e: f"  {e['d']} · {e['c']} · {e['t']} ({e['h']})"
     print(f"Takvim denetimi ({bugun}'e kadar işlenen dersler)")
@@ -1302,6 +1328,8 @@ def main():
     tk.add_argument("--drive", help="Drive listesi JSON [{id,name,folder}] (ses kontrolü için)")
     tk.add_argument("--bugun"); tk.add_argument("--gun", type=int, help="yalnız son N gün")
     tk = sp.add_parser("takvim-es", help="takvimdeki ders adını desteye elle eşle (hedef: deste id, '-' = slayt beklenmez, rm = sil)")
+    tsd = sp.add_parser("takvim-ses", help='adı yalnız zaman damgası olan ses kaydının dersi: takvim-ses "Ses 261126_100553_original.txt"')
+    tsd.add_argument("adlar", nargs="+")
     tk.add_argument("konu"); tk.add_argument("hedef"); tk.add_argument("--ses", action="store_true", help="ses dökümü eşlemesi (hedef: Drive adı ya da '-')")
     dn = sp.add_parser("dersnot", help="kurul dışı ders not ağırlıkları (vize/final yüzdesi, geçme notu)")
     dn.add_argument("ders"); dn.add_argument("--vize", type=int, default=40); dn.add_argument("--final", type=int, default=60)
@@ -1404,6 +1432,10 @@ def main():
     elif a.cmd == "takvim":
         drv = json.load(open(a.drive)) if a.drive else None
         takvim_kontrol(V, a.bugun, drv, a.gun)
+    elif a.cmd == "takvim-ses":
+        for n in a.adlar:
+            e = ses_ders(V, n)
+            print(f"{n} → " + (f"{e['d']} {e['s']}–{e['e']} · {e['c']} · {e['t']} ({e['h']})" if e else "takvimde ders yok (adı zaman damgası değil ya da o saatte ders yok)"))
     elif a.cmd == "takvim-es":
         key = "takvim_ses" if a.ses else "takvim_es"
         M = V.cat.setdefault(key, {})
