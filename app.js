@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.8";
+const VERSION = "1.9";
 const CHANGES = [
+  { v: "1.9", d: "2026-11-27", l: [
+    "Dosya ekle: Kütüphane'de ve ders sayfasında sağ üstteki + ile slayt, not, özet ya da çıkmış gönderebilirsin. Dosya şifrelenip gider; Claude işleyince (sayfalar, kartlar, hoca vurguları) kütüphanede görünür. Bir kez Ayarlar › Dosya ekleme'den anahtar girilmeli; bekleyen dosyalar da orada görünür"
+  ] },
   { v: "1.8", d: "2026-11-27", l: [
     "Slayt ve notlara not ekleyebilirsin: sayfanın altındaki “Not ekle” ile açıklayıcı not yaz; “Arkadaşım da görsün” işaretliyse senkronla arkadaşına da gider. Notlar sayfanın altında başlığıyla durur, dokununca açılıp kapanır; destenin sonunda bütün notların listesi var",
     "Bilgisayarda ok tuşlarıyla sayfa atlama: ← → (slaytta ↑ ↓ da), Page Up/Down, Home/End"
@@ -152,7 +155,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "087e8159b0";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "3119bafc3e";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1176,11 +1179,12 @@ function viewLib(q) {
     return '<h2 class="sec" id="dn-' + d.id + '">' + esc(d.name) + (d.yil ? ' <span class="muted">· ' + esc(d.yil) + "</span>" : "") + "</h2>"
       + '<div class="grid">' + started.map(k => card(k)).join("") + sp.map(k => card(k)).join("") + future.map(k => card(k, "future")).join("") + "</div>";
   };
-  main().innerHTML = bar({ title: "Kütüphane", crumb: crumbs([["Tıp", ""]]) }) + '<div class="page">'
+  main().innerHTML = bar({ title: "Kütüphane", crumb: crumbs([["Tıp", ""]]), actions: '<button class="ibtn" id="upb" title="Dosya ekle" aria-label="Dosya ekle">' + icon("plus") + "</button>" }) + '<div class="page">'
     + (cxAny() ? '<a class="card tile" href="#/cikmis" style="margin-top:4px"><span class="big">' + icon("star") + '</span><span class="txt"><b>Çıkmışlar</b><span class="muted small">Kurul sınavlarının çıkmış soruları: çözülebilir test ve orijinal PDF</span></span>' + icon("chev", "chev") + "</a>" : "")
     + DN.filter(d => d.id === curDn).concat(DN.filter(d => d.id !== curDn)).map(sec).join("")
     + (S.cat.lex || S.cat.lat ? '<h2 class="sec">Ek kaynaklar</h2><a class="card tile" href="#/sozluk"><span class="big">' + icon("lex") + '</span><span class="txt"><b>Anatomi Latincesi</b><span class="muted small">Terim çözücü, kelimeler, dilbilgisi, alıştırma ve kökler</span></span>' + icon("chev", "chev") + "</a>" : "")
     + "</div>";
+  $("#upb").onclick = () => uploadSheet();
   const dn = q && q.get("dn"), el = dn && donemler().length > 1 && document.getElementById("dn-" + dn);
   if (el) el.scrollIntoView();
 }
@@ -1286,7 +1290,7 @@ function viewCourse(g, cs) {
     box.innerHTML = H.docs.length ? '<h2 class="sec">İçerikte geçenler · ' + H.docs.reduce((a, d) => a + d.pages.length, 0) + " sayfa</h2>" + docHitsHTML(H, 8) : "";
   };
   const chip = (f, v, l, n) => '<button class="chip' + (F[f] === v ? " on" : "") + '" data-f="' + f + '" data-v="' + esc(v) + '">' + esc(l) + (n != null ? '<span class="n">' + n + "</span>" : "") + "</button>";
-  main().innerHTML = bar({ title: c, crumb: crumbFor(g, null), back: "#/lib/" + g })
+  main().innerHTML = bar({ title: c, crumb: crumbFor(g, null), back: "#/lib/" + g, actions: '<button class="ibtn" id="upb" title="Bu derse dosya ekle" aria-label="Dosya ekle">' + icon("plus") + "</button>" })
     + '<div class="page"><div class="sbox csrch">' + icon("search") + '<input id="cq" type="search" placeholder="Bu derste ara: konu, başlık ya da slayttaki bir kelime" autocomplete="off" value="' + esc(F.q || "") + '"></div>'
     + '<div class="filters" id="flt"></div><div id="bank"></div><div id="rows"></div><div id="chits"></div></div>';
   $("#flt").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (!b) return; F[b.dataset.f] = b.dataset.v; render(); });
@@ -1320,6 +1324,7 @@ function viewCourse(g, cs) {
   });
   $("#cq").addEventListener("input", e => { F.q = e.target.value; render(); clearTimeout(tq); tq = setTimeout(contentHits, 260); });
   render(); if (F.q) contentHits();
+  $("#upb").onclick = () => uploadSheet({ g, c });
   bankPool(g, c).then(m => { BK = m; if ($("#bank")) drawBank(); }).catch(() => {});
 }
 
@@ -3532,6 +3537,84 @@ function viewDuel() {
 /* ---------- settings ---------- */
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; });
+/* ---------- 1.9: Dosya ekle (gelen kutusu) ----------
+   Seçilen dosya cihazda uygulama anahtarıyla şifrelenir ve depoya d/in/<id> (dosya) + d/in/<id>.j (bilgi) olarak tek commit'le gider.
+   Claude bekleyenleri işler (medlock.py inbox): sayfalar, ders/hoca, kartlar, vurgular; sonra gelen kutusundan siler.
+   Yazma anahtarı (yalnız MedLock deposuna Contents: Read and write) yalnız bu cihazda durur: ml.ghw. */
+const GH_REPO = "Tixdinakar/MedLock", GHW = () => LS.get("ml.ghw", "") || "";
+async function ghApi(path, opt) {
+  opt = opt || {};
+  const r = await fetchT("https://api.github.com/repos/" + GH_REPO + path, { method: opt.method || "GET", cache: "no-store",
+    headers: Object.assign({ Authorization: "Bearer " + (opt.tok || GHW()), Accept: "application/vnd.github+json" }, opt.body ? { "Content-Type": "application/json" } : {}),
+    body: opt.body ? JSON.stringify(opt.body) : undefined }, opt.ms || 120000);
+  if (!r.ok) { const e = new Error(r.status === 401 ? "Anahtar geçersiz ya da süresi dolmuş." : r.status === 403 || r.status === 404 ? "Anahtarın MedLock deposuna yazma izni yok." : "GitHub " + r.status); e.status = r.status; throw e; }
+  return r.status === 204 ? null : r.json();
+}
+async function encBytes(u8) { const iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, KEY, u8)); const o = new Uint8Array(12 + ct.length); o.set(iv); o.set(ct, 12); return o; }
+function b64big(u8) { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+// dosyaları ve silinecekleri tek commit'te yazar; dal arada ilerlediyse yeniden dener
+async function ghCommit(files, del, msg, prog) {
+  const blobs = [];
+  for (const f of files) { prog && prog("Yükleniyor · " + f.label); const b = await ghApi("/git/blobs", { method: "POST", body: { content: b64big(f.data), encoding: "base64" }, ms: 600000 }); blobs.push({ path: f.path, mode: "100644", type: "blob", sha: b.sha }); }
+  for (let k = 0; k < 4; k++) {
+    const ref = await ghApi("/git/ref/heads/main"), head = ref.object.sha, cm = await ghApi("/git/commits/" + head);
+    const tree = await ghApi("/git/trees", { method: "POST", body: { base_tree: cm.tree.sha, tree: blobs.concat((del || []).map(p => ({ path: p, mode: "100644", type: "blob", sha: null }))) } });
+    const nc = await ghApi("/git/commits", { method: "POST", body: { message: msg, tree: tree.sha, parents: [head] } });
+    try { await ghApi("/git/refs/heads/main", { method: "PATCH", body: { sha: nc.sha } }); return nc.sha; }
+    catch (e) { if (e.status !== 422 && e.status !== 409) throw e; await new Promise(r => setTimeout(r, 1500 * (k + 1))); }
+  }
+  throw new Error("Depo o sırada güncelleniyordu; biraz sonra yeniden dene.");
+}
+async function inboxList() {
+  const L = await ghApi("/contents/d/in?ref=main").catch(e => { if (e.status === 404) return []; throw e; });
+  const js = L.filter(f => /\.j$/.test(f.name));
+  return (await Promise.all(js.map(async f => {
+    try { const r = await ghApi("/contents/" + f.path + "?ref=main"); const m = JSON.parse(new TextDecoder().decode(await decrypt(b64d(r.content.replace(/\s/g, "")).buffer))); return Object.assign({ id: f.name.slice(0, -2) }, m); } catch (e) { return null; }
+  }))).filter(Boolean).sort((a, b) => b.at - a.at);
+}
+const INK = { slayt: "Slayt", not: "Not", ozet: "Özet", cikmis: "Çıkmış", diger: "Diğer" };
+function uploadSheet(pre) {
+  pre = pre || {};
+  if (!GHW()) {
+    const bg = sheet('<h3>Dosya ekle</h3><p class="muted">Bu cihazdan dosya eklemek için bir kez MedLock deposuna yazma anahtarı girilmeli (Ayarlar › Dosya ekleme).</p><div class="row-btns"><button class="btn primary" id="ugo">Ayarlara git</button><button class="btn ghost" data-close>Kapat</button></div>');
+    $("#ugo", bg).onclick = () => { bg.close(); navTo("#/ayarlar"); setTimeout(() => { const x = $("#ghw"); if (x) x.scrollIntoView({ block: "center" }); }, 400); };
+    return;
+  }
+  const ks = S.cat.kurullar.filter(k => k.start <= today()).concat(specialGs().map(kurulById));
+  const cur = pre.g || currentKurul().id, cs = g => Array.from(new Set(S.cat.items.filter(i => i.g === g).map(i => i.c))).sort((a, b) => a.localeCompare(b, "tr"));
+  const bg = sheet('<h3>Dosya ekle</h3><p class="muted small">Dosya şifrelenip MedLock’a gönderilir; Claude işleyince kütüphanede görünür (sayfalar, kartlar, hoca vurguları). Ekleyen: ' + esc(P.name) + "</p>"
+    + '<label class="btn" style="margin:6px 0 10px">' + icon("plus") + '<span id="ufn">Dosya seç (PDF)</span><input type="file" id="uf" accept="application/pdf,.pdf,image/*,.pptx,.docx" hidden></label>'
+    + '<div class="ufm"><label>Kurul<select id="ug">' + ks.map(k => '<option value="' + k.id + '"' + (k.id === cur ? " selected" : "") + ">" + esc(k.no ? "Kurul " + k.no : k.name) + "</option>").join("") + '<option value="">Bilmiyorum</option></select></label>'
+    + '<label>Ders<input id="uc" list="ucl" value="' + esc(pre.c || "") + '" placeholder="ör. Biyokimya (boş bırakılabilir)"><datalist id="ucl"></datalist></label>'
+    + '<label>Tür<select id="uk">' + Object.entries(INK).map(([k, v]) => '<option value="' + k + '">' + v + "</option>").join("") + '</select></label>'
+    + '<label>Not (isteğe bağlı)<input id="un" placeholder="ör. hocanın 2. dersi, eksik slayt"></label></div>'
+    + '<div class="row-btns"><button class="btn primary" id="uok" disabled>' + icon("check") + "Gönder</button><button class=\"btn ghost\" data-close>Vazgeç</button></div>"
+    + '<div id="upl"></div>');
+  const fill = () => { $("#ucl", bg).innerHTML = cs($("#ug", bg).value).map(c => '<option value="' + esc(c) + '">').join(""); };
+  fill(); $("#ug", bg).onchange = fill;
+  let file = null;
+  $("#uf", bg).onchange = e => { file = e.target.files[0] || null; $("#ufn", bg).textContent = file ? file.name + " · " + fmtMB(file.size) : "Dosya seç (PDF)"; $("#uok", bg).disabled = !file;
+    if (file && /\.pdf$/i.test(file.name)) { const n = file.name.toLowerCase(); if (/özet|ozet/.test(n)) $("#uk", bg).value = "ozet"; else if (/çıkmış|cikmis/.test(n)) $("#uk", bg).value = "cikmis"; else if (/not/.test(n)) $("#uk", bg).value = "not"; } };
+  $("#uok", bg).onclick = async () => {
+    const b = $("#uok", bg); if (!file) return;
+    if (file.size > 95 * 1048576) return toast("Dosya 95 MB'tan büyük; Drive'a koyup Claude'a söyle.");
+    b.disabled = true;
+    const st = t => { b.innerHTML = esc(t); };
+    try {
+      st("Şifreleniyor…");
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const meta = { name: file.name, type: file.type, size: file.size, g: $("#ug", bg).value, c: $("#uc", bg).value.trim(), k: $("#uk", bg).value, note: $("#un", bg).value.trim(), by: P.name, at: Date.now() };
+      const data = await encBytes(new Uint8Array(await file.arrayBuffer())), mj = await encBytes(new TextEncoder().encode(JSON.stringify(meta)));
+      await ghCommit([{ path: "d/in/" + id, data, label: fmtMB(file.size) }, { path: "d/in/" + id + ".j", data: mj, label: "bilgi" }], [], "Gelen kutusu: yeni dosya", st);
+      bg.close(); toast("Gönderildi · Claude işleyince kütüphanede görünecek");
+    } catch (e) { logErr(e, "upload"); toast(netMsg(String(e.message || e))); b.disabled = false; b.innerHTML = icon("check") + "Gönder"; }
+  };
+}
+function inboxRowsHTML(L) {
+  if (!L.length) return '<div class="row"><div class="txt"><span>Bekleyen dosya yok.</span></div></div>';
+  return L.map(m => '<div class="row"><div class="txt"><b>' + esc(m.name) + "</b><span>" + esc([m.by, new Date(m.at).toLocaleDateString("tr", { day: "numeric", month: "short" }), m.g ? (kurulById(m.g) || {}).name : "", m.c, INK[m.k]].filter(Boolean).join(" · ")) + " · işlenmeyi bekliyor</span></div>"
+    + (m.by === P.name ? '<button class="ibtn" data-ixd="' + esc(m.id) + '" title="Geri al">' + icon("close") + "</button>" : "") + "</div>").join("");
+}
 async function viewSettings() {
   setNav("ayarlar");
   const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate().catch(() => null) : null;
@@ -3559,6 +3642,11 @@ async function viewSettings() {
     + '<div class="row"><div class="txt"><b>Yedek al</b><span>' + (syncOn() ? "İlerlemen zaten senkronda; yine de dosya olarak saklayabilirsin." : "Senkron kapalıyken ilerleme bu cihazda durur; cihaz değiştirirken yedeği taşı.") + '</span></div><button class="btn" id="bk">İndir</button></div>'
     + '<div class="row"><div class="txt"><b>Yedekten yükle</b><span>Başka cihazdan aldığın yedek dosyasını seç.</span></div><label class="btn">Seç<input type="file" accept="application/json,.json" id="rs" hidden></label></div>'
     + "</div>"
+    + '<h2 class="sec">Dosya ekleme</h2><div class="card set" id="ghw">'
+    + (GHW() ? '<div class="row"><div class="txt"><b>Dosya ekleme açık</b><span>Kütüphane’de ve ders sayfalarında “Dosya ekle”. Yazma anahtarı bu cihazda kayıtlı.</span></div><button class="btn primary" id="upn">' + icon("plus") + 'Dosya ekle</button><button class="btn danger" id="ghdel">Kaldır</button></div><div id="inbx"><div class="row"><div class="txt"><span>Bekleyenler yükleniyor…</span></div></div></div>'
+      : '<form class="row" id="ghf"><div class="txt"><b>Bu cihazdan dosya ekle</b><span>GitHub’da yalnız MedLock deposu için “Contents: Read and write” izinli bir anahtar (fine-grained token) oluşturup bir kez gir. Anahtar yalnız bu cihazda durur.</span>'
+        + '<input id="ghin" type="password" autocomplete="off" placeholder="github_pat_…" class="stin"></div><button class="btn primary">Kaydet</button></form>')
+    + "</div>"
     + repSection()
     + '<h2 class="sec">Cihaz</h2><div class="card set"><div class="row"><div class="txt"><b>Bu cihazdan çıkış yap</b><span>Anahtar ve indirilen içerik silinir; profiller ve ilerleme kalır.</span></div><button class="btn danger" id="lo">' + icon("out") + "Çıkış</button></div></div>"
     + "</div>";
@@ -3582,6 +3670,23 @@ async function viewSettings() {
       shell(); viewSettings();
     } catch (err) { btn.disabled = false; btn.textContent = "Kaydet"; toast(netMsg(String(err.message || err))); }
   };
+  const ghf = $("#ghf");
+  if (ghf) ghf.onsubmit = async e => {
+    e.preventDefault();
+    const tok = $("#ghin").value.trim(), btn = ghf.querySelector("button"); if (!tok) return;
+    btn.disabled = true; btn.textContent = "Deneniyor…";
+    try { const r = await ghApi("", { tok, ms: 20000 }); if (!r.permissions || !r.permissions.push) throw new Error("Anahtarın MedLock deposuna yazma izni yok."); LS.set("ml.ghw", tok); toast("Dosya ekleme açıldı"); viewSettings(); }
+    catch (err) { btn.disabled = false; btn.textContent = "Kaydet"; toast(netMsg(String(err.message || err))); }
+  };
+  const ghd = $("#ghdel"); if (ghd) ghd.onclick = () => { LS.del("ml.ghw"); toast("Dosya ekleme bu cihazda kapatıldı"); viewSettings(); };
+  const upn = $("#upn"); if (upn) upn.onclick = () => uploadSheet();
+  const ibx = $("#inbx");
+  if (ibx) {
+    const drawI = () => inboxList().then(L => { if (!ibx.isConnected) return; ibx.innerHTML = inboxRowsHTML(L);
+      $$("[data-ixd]", ibx).forEach(b => b.onclick = async () => { b.disabled = true; try { await ghCommit([], ["d/in/" + b.dataset.ixd, "d/in/" + b.dataset.ixd + ".j"], "Gelen kutusu: geri alındı"); toast("Geri alındı"); drawI(); } catch (e) { b.disabled = false; toast(netMsg(String(e.message || e))); } }); })
+      .catch(e => { if (ibx.isConnected) ibx.innerHTML = '<div class="row"><div class="txt"><span>Bekleyenler alınamadı: ' + esc(netMsg(String(e.message || e))) + "</span></div></div>"; });
+    drawI();
+  }
   const sd = $("#stdel"); if (sd) sd.onclick = () => { LS.del("ml.st"); LS.del("ml.gist"); SY.gist = null; viewSettings(); toast("Senkron bu cihazda kapatıldı"); };
   const sb = $("#syn"); if (sb) sb.onclick = async () => { sb.disabled = true; sb.textContent = "…"; await syncNow({ quiet: true }); viewSettings(); toast(SY.err ? "Eşitlenemedi: " + SY.err : "Eşitlendi"); };
   $("#bk").onclick = () => {

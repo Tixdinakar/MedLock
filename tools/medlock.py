@@ -1278,6 +1278,10 @@ def main():
     sp.add_parser("passwd")
     p_lg = sp.add_parser("lejant", help="notun sonuna sembol/kısaltma sayfası: lejant <id> sayfa.pdf [<id> sayfa.pdf ...]; pdf yerine - kaldırır")
     p_lg.add_argument("ids", nargs="+")
+    p_in = sp.add_parser("inbox", help="uygulamadan gönderilen dosyalar (d/in): listele; --get klasör dosyaları çözüp yazar")
+    p_in.add_argument("--get")
+    p_id = sp.add_parser("inbox-done", help="işlenen gelen kutusu dosyalarını sil")
+    p_id.add_argument("ids", nargs="+")
     sp.add_parser("stamp")
     sp.add_parser("scan")
     td = sp.add_parser("test-dump", help="testi düzenlemek için JSON'a yaz (scratchpad'e; commit etme)")
@@ -1406,6 +1410,29 @@ def main():
                      date=a.date, id=a.id, src=a.src, sub=a.sub, by=a.by)
         print("eklendi", it["id"], it["n"], "sayfa")
         print(compute_refs(V)); build_index(V)
+    elif a.cmd == "inbox":
+        d = os.path.join(V.repo, "d", "in")
+        ids = sorted(f[:-2] for f in os.listdir(d) if f.endswith(".j")) if os.path.isdir(d) else []
+        if not ids:
+            print("gelen kutusu boş")
+        for i in ids:
+            m = json.loads(V.get(f"d/in/{i}.j"))
+            line = f"{i} · {m.get('name')} · {m.get('size', 0) // 1024} KB · {m.get('by')} · {datetime.datetime.fromtimestamp(m['at'] / 1000):%d.%m %H:%M} · kurul={m.get('g') or '?'} ders={m.get('c') or '?'} tür={m.get('k')}" + (f" · not: {m['note']}" if m.get("note") else "")
+            if a.get:
+                os.makedirs(a.get, exist_ok=True)
+                out = os.path.join(a.get, i + "__" + re.sub(r"[\\/:*?\"<>|]+", " ", m.get("name") or i))
+                open(out, "wb").write(V.get(f"d/in/{i}"))
+                line += " → " + out
+            print(line)
+        return
+    elif a.cmd == "inbox-done":
+        for i in a.ids:
+            for f in (f"d/in/{i}", f"d/in/{i}.j"):
+                p = os.path.join(V.repo, f)
+                if os.path.exists(p):
+                    os.remove(p)
+            print("silindi", i)
+        return
     elif a.cmd == "lejant":
         for ident, pdf in zip(a.ids[0::2], a.ids[1::2]):
             it = set_legend(V, ident, None if pdf == "-" else pdf)
