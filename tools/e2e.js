@@ -95,8 +95,9 @@ async function openTest(pg, href) {
         await pg.click('.bar .crumb a[href="' + kHref + '"]'); await pg.waitForSelector(".course", { timeout: 10000 });
         ok(pg.url().endsWith(kHref), name + ": yoldaki kurul bağlantısı çalışmadı");
       }
-      // test: kurul sayfasındaki testler (ders adı önde)
-      await pg.goto(BASE + kurul); await pg.waitForSelector(".course");
+      // test: ders sayfasındaki hazır testler (1.11: kurul sayfasında test listesi yok)
+      ok(!(await pg.goto(BASE + kurul).then(() => pg.waitForSelector(".course")).then(() => pg.$("#sec-test"))), name + ": kurul sayfasında test listesi duruyor");
+      await pg.goto(BASE + course); await pg.waitForSelector(".tcard, .it");
       const testHref = await pg.evaluate(() => { const a = [...document.querySelectorAll('#sec-test ~ .card a[href^="#/t/"], a[href^="#/t/"]')][0]; return a && a.getAttribute("href"); });
       if (testHref) {
         const pre = await pg.$eval('a[href="' + testHref + '"] .t', t => t.textContent);

@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.10";
+const VERSION = "1.11";
 const CHANGES = [
+  { v: "1.11", d: "2026-11-27", l: [
+    "Kurul sayfası sadeleşti: uzun test listesi kalktı (testler ders sayfalarında ve soru bankasında); her derste konu ve soru sayısı, okuduğun konulara göre çubuk; İndir düğmesi Kurul provası'nın yanında",
+    "Ana sayfa sadeleşti: son eklenenler, senkron ve ana ekrana ekle kartları kalktı (Ayarlar'da duruyor); sınav satırında tek Hazırlan düğmesi"
+  ] },
   { v: "1.10", d: "2026-11-27", l: [
     "Ders sayfası sadeleşti: her konu tek kart; slayt, not, kart ve sorular kartın altındaki düğmelerde. Arama ve süzgeçler sağ üstteki büyüteçte",
     "Ana sayfada Karma, Çıkmışlar ve Latince tek satırda; son eklenenler 3 tane"
@@ -159,7 +163,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "57278e622d";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "93f318bd49";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1017,7 +1021,9 @@ function finalNeed(c) {
   return { p, need: Math.max(0, Math.ceil((gec - got) / (W.final / 100) - 1e-9)), W, gec };
 }
 const needTxt = c => { const f = finalNeed(c); if (!f) return ""; return f.need > 100 ? "Vize " + f.p + " (%" + f.W.vize + "): finalle ortalama " + f.gec + "’ye ulaşılamıyor" : "Vize " + f.p + " (%" + f.W.vize + ") · ortalama " + f.gec + " için finalde en az " + f.need; };
+let EXP = [];   // Bugün kartındaki sınav satırlarının "Hazırlan" penceresi
 function examRows() {
+  EXP = [];
   const t = today(), L = (S.cat.sinavlar || []).filter(x => x.d >= t && dayDiff(t, x.d) <= (x.w || 21));   // w: kaç gün önceden (seçmeliler 5)
   S.cat.kurullar.forEach(k => { if (k.end && k.end >= t && dayDiff(t, k.end) <= 14 && S.cat.items.some(i => i.g === k.id)) L.push({ d: k.end, c: "Kurul " + k.no, t: "sınavı", g: k.id }); });
   return L.sort((a, b) => a.d.localeCompare(b.d)).map(x => {
@@ -1026,9 +1032,10 @@ function examRows() {
     const pick = k => its.filter(i => i.k === k && !i.cx).sort((a, b) => (b.d || "").localeCompare(a.d || ""))[0];
     const oz = pick("ozet"), ts = pick("test");
     return '<div class="trow exam' + (n <= 2 ? " soon" : "") + '"><span class="ex-n">' + (n === 0 ? "Bugün" : n === 1 ? "Yarın" : n + " gün") + '</span><span class="tx"><b>' + esc(x.c) + " · " + esc(x.t || "Sınav") + '</b><small>' + fdate(x.d) + " " + wd + (/final|yarıyıl/i.test(x.t || "") && needTxt(x.c) ? " · " + esc(needTxt(x.c)) : "") + "</small>"
-      + '<span class="row-btns">' + (x.g ? '<a class="btn sm" href="#/karma?g=' + x.g + '&prova=1">Prova</a><a class="btn sm" href="#/lib/' + x.g + '">Kurul</a>'
-        : (oz ? '<a class="btn sm" href="#/d/' + oz.id + '/1">Özet</a>' : "") + (ts ? '<a class="btn sm" href="#/t/' + ts.id + '">Deneme</a>' : "") + (g ? '<a class="btn sm" href="#/lib/' + g + "/" + slug(x.c) + '">Ders</a>' : ""))
-      + (g && n <= 7 && S.cat.items.some(i => i.g === g && i.k !== "video") ? '<button class="btn sm" data-off="' + g + '">' + icon("dl") + "İndir</button>" : "") + "</span></span></div>";
+      + "</span>" + '<button type="button" class="btn sm" data-xp="' + EXP.length + '">Hazırlan</button></div>'
+      + ((EXP.push({ t: x.c + " · " + (x.t || "Sınav"), h: (x.g ? '<a class="btn" href="#/karma?g=' + x.g + '&prova=1">' + icon("test") + "Kurul provası</a><a class=\"btn\" href=\"#/lib/" + x.g + '">' + icon("lib") + "Kurula git</a>"
+        : (oz ? '<a class="btn" href="#/d/' + oz.id + '/1">' + icon("ozet") + "Özet</a>" : "") + (ts ? '<a class="btn" href="#/t/' + ts.id + '">' + icon("test") + "Deneme</a>" : "") + (g ? '<a class="btn" href="#/lib/' + g + "/" + slug(x.c) + '">' + icon("lib") + "Ders sayfası</a>" : ""))
+        + (g && S.cat.items.some(i => i.g === g && i.k !== "video") ? '<button class="btn" data-off="' + g + '">' + icon("dl") + "İndir</button>" : "") }), ""));
   }).join("");
 }
 // Kaldığın yer: bütün yarım testler, yarım karma deneme ve sonuna kadar okunmamış slaytlar (en yeni üstte)
@@ -1110,11 +1117,10 @@ function viewHome() {
     + (S.cat.lex || S.cat.lat ? '<a class="card qb" href="#/sozluk">' + icon("lex") + "<b>Latince</b></a>" : "")
     + "</div>"
     + (welcomeCard() || updCard()) + scoreCard() + todayCard
-    + syncHint() + installCard()
     + (bms.length ? '<h2 class="sec">İşaretli sayfalar' + (bms.length > 4 ? ' · <a href="#/isaretler" style="color:var(--accent)">tümü (' + bms.length + ")</a>" : "") + '</h2><div class="card list">' + bms.slice(0, 4).map(bmRow).join("") + "</div>" : "")
-    + '<h2 class="sec sec-a">Son eklenenler<a href="#/yeni">Tümü ' + icon("chev") + '</a></h2><div class="card list">' + S.cat.items.slice(0, 3).map(it => itemRow(it, { course: 1, noHoca: 1 })).join("") + "</div>"
     + "</div>";
   bindUpd(); bindScoreCard();
+  $$("[data-xp]").forEach(b => b.onclick = () => { const X = EXP[+b.dataset.xp]; if (!X) return; sheet("<h3>" + esc(X.t) + '</h3><div class="xbtns">' + X.h + '</div><div class="row-btns" style="margin-top:10px"><button class="btn ghost" data-close>Kapat</button></div>'); bindOff(); });
   const sx = $("#syhx"); if (sx) sx.onclick = () => { LS.set("ml.syh", 1); $("#synch").remove(); };
   bindOff();
 }
@@ -1200,13 +1206,17 @@ function viewKurul(g) {
   const cx = cxGroups().find(x => x.g === g);
   main().innerHTML = bar({ title: k.no ? "Kurul " + k.no + " · " + k.name : k.name, crumb: crumbFor(g, null, "dn"), back: "#/lib" })
     + '<div class="page">' + (k.start ? '<p class="muted small" style="margin:0 0 6px">' + fdate(k.start, true) + " – " + fdate(k.end, true) + (k.end >= today() ? " · kurul sınavına " + dayDiff(today(), k.end) + " gün" : "") + "</p>" : "")
-    + (() => { const pr = kurulPrep(g), L = prepLine(pr, 1); return L || pr.nQ ? '<div class="kprep"><span class="muted small">' + L + "</span>" + (pr.nQ && k.no ? '<a class="btn sm" href="#/karma?g=' + g + '&prova=1">' + icon("test") + "Kurul provası</a>" : "") + "</div>" : ""; })()
-    + (S.cat.items.some(i => i.g === g && i.k !== "video") ? '<div class="kprep"><span class="muted small">Çevrimdışı: internet olmadan da açılsın diye bütün kurulu indir (yaklaşık ' + fmtMB(offSize(g)) + ")</span>" + '<button class="btn sm" data-off="' + g + '">' + icon("dl") + "İndir</button></div>" : "")
+    + (() => { const pr = kurulPrep(g), L = prepLine(pr, 1), off = S.cat.items.some(i => i.g === g && i.k !== "video");
+      return L || pr.nQ || off ? '<div class="kprep"><span class="muted small">' + L + "</span>" + (pr.nQ && k.no ? '<a class="btn sm" href="#/karma?g=' + g + '&prova=1">' + icon("test") + "Kurul provası</a>" : "")
+        + (off ? '<button class="btn sm" data-off="' + g + '" data-sz="1" title="İnternet olmadan da açılsın diye bütün kurulu cihaza indir">' + icon("dl") + "İndir</button>" : "") + "</div>" : ""; })()
     + (cs.length ? '<div class="card list crs">' + cs.map(o => {
-      const cnt = KORDER.map(kk => [kk, o.items.filter(i => i.k === kk && !(kk === "test" && i.cx)).length]).filter(x => x[1]).map(x => "<span><b>" + x[1] + "</b> " + KIND[x[0]].l.toLowerCase() + "</span>").join("");
-      return '<a class="course" href="#/lib/' + g + "/" + slug(o.c) + '"><span class="bar-c" style="background:' + ccol(o.c) + '"></span><span class="txt"><b>' + esc(o.c) + '</b><span class="cnt">' + cnt + "</span></span>" + icon("chev", "chev") + "</a>";
+      // 1.11: ders satırı = konu (slayt destesi) ve soru sayısı, okunan destelere göre çubuk
+      const rd = PS.get("rd", {}), dk = o.items.filter(i => i.k === "slayt"), rdn = dk.filter(d => rd[d.id] && rd[d.id].ok).length;
+      const nq = o.items.filter(i => i.k === "test" && !i.cx).reduce((a, t) => a + (t.n || 0), 0);
+      const cnt = (dk.length ? "<span><b>" + dk.length + "</b> konu</span>" : "<span><b>" + o.items.length + "</b> dosya</span>") + (nq ? "<span><b>" + nq + "</b> soru</span>" : "") + (rdn ? "<span>" + rdn + "/" + dk.length + " okundu</span>" : "");
+      return '<a class="course" href="#/lib/' + g + "/" + slug(o.c) + '"><span class="bar-c" style="background:' + ccol(o.c) + '"></span><span class="txt"><b>' + esc(o.c) + '</b><span class="cnt">' + cnt + "</span>"
+        + (rdn ? '<span class="pbar"><i class="' + (rdn === dk.length ? "ok" : "") + '" style="width:' + Math.round(100 * rdn / dk.length) + '%"></i></span>' : "") + "</span>" + icon("chev", "chev") + "</a>";
     }).join("") + "</div>" : '<div class="card empty">Bu kurula henüz içerik eklenmedi. Ders dosyaları Drive’a yüklendikçe burada görünecek.</div>')
-    + kurulSection(g, "test", k.no ? "Bu kuruldaki testler" : "Testler", "test")
     + (cx ? '<h2 class="sec" id="sec-cikmis">Çıkmışlar</h2><div class="card list"><a class="it" href="#/cikmis?g=' + g + '">' + kindBox("cikmis") + '<div class="txt"><div class="t">Kurul ' + esc(k.no) + ' çıkmışları</div><div class="m"><span>' + cx.rows.map(r => esc(r.c)).join(" · ") + "</span></div></div>" + icon("chev", "chev") + "</a></div>" : "")
     + "</div>";
   const sec = parseHash().q.get("s");

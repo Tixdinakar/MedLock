@@ -543,7 +543,7 @@ b.mp{font-size:14px;padding:2px 8px}
 .trow.due .ti{background:var(--flame-soft);color:var(--flame)}
 .trow .chev{color:var(--faint)}
 .trow .row-btns{margin-top:6px}
-.today .trow.exam{display:flex;margin:0;border-left:0;border-radius:0;align-items:flex-start;background:none}
+.today .trow.exam{display:flex;margin:0;border-left:0;border-radius:0;align-items:center;background:none}
 .today .trow.exam .ex-n{min-width:48px;font:700 20px/1.2 var(--f-cond);color:var(--flame);text-align:center}
 .today .trow.exam.soon{background:var(--bad-soft)}
 .today .trow.exam.soon .ex-n{color:var(--bad)}
@@ -764,3 +764,8 @@ button.tag.bq{cursor:pointer;background:var(--surface-2)}
 .tcb small{font-weight:500;color:var(--muted)}
 .tcb:active{transform:scale(.97)}
 #bank .kgrp.bank{margin-top:0}
+/* 1.11: sınav satırında tek Hazırlan düğmesi; kurul sayfasında ders satırı çubuğu */
+.today .trow.exam .tx{flex:1;min-width:0}
+.xbtns{display:grid;gap:8px;margin-top:8px}
+.xbtns .btn{justify-content:flex-start}
+.course .pbar{max-width:220px;margin-top:5px}
