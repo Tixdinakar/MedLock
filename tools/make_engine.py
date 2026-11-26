@@ -371,6 +371,36 @@ function unsHTML(r, id){"""),
 .scr canvas.big{height:min(70vh, 560px)}
 .scr-n{font-size:11.5px;color:var(--muted);margin:5px 2px 0}
 .ml-chip.ml-all{font-family:var(--f-ui,system-ui)}"""),
+    # 2.0: "Ara ver": süre durur, soru gizlenir (Buğra'nın isteği); MedLock'ta ara süresi çalışma süresine sayılmaz
+    ("'\" id=\"timer\">' + timerText(r) + '</span></span>'",
+     "'\" id=\"timer\">' + timerText(r) + '</span></span>' + (r.finished ? '' : '<button class=\"btn ghost ml-pz\" type=\"button\" data-act=\"pause\" title=\"Ara ver\" aria-label=\"Ara ver\">Ara ver</button>')"),
+    ("  if(S.view === \"quiz\" && r && !r.finished && document.visibilityState === \"visible\"){",
+     "  if(S.view === \"quiz\" && r && !r.finished && !r.paused && document.visibilityState === \"visible\"){"),
+    ("    case \"finish-ask\":",
+     """    case "pause": { const r = S.run; if(!r || r.finished) break; r.paused = true; save(); try{ window.ML && ML.pause && ML.pause(true); }catch(e){} pauseShow(); break; }
+    case "unpause": { const r = S.run; if(r) r.paused = false; save(); try{ window.ML && ML.pause && ML.pause(false); }catch(e){} const o = document.getElementById("pauseov"); if(o) o.remove(); break; }
+    case \"finish-ask\":"""),
+    ("document.addEventListener(\"keydown\", e => {",
+     """function pauseShow(){
+  const r = S.run; if(!r || !r.paused || S.view !== "quiz" || document.getElementById("pauseov")) return;
+  const o = document.createElement("div"); o.id = "pauseov"; o.className = "pauseov";
+  o.innerHTML = '<div class="pausebox"><div class="pz-i">⏸</div><h2>Ara verildi</h2><p>' + answered(r) + ' / ' + r.ids.length + ' cevaplı · ' + (r.mode === "timed" ? "kalan " + fmtTime(remaining(r)) : "süre " + fmtTime(r.elapsed)) + '</p><p class="pz-n">Süre durdu; soru gizli.</p><button class="btn primary" type="button" data-act="unpause">Devam et</button></div>';
+  document.body.appendChild(o);
+}
+document.addEventListener("keydown", e => {
+  if(document.getElementById("pauseov")){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); const b = document.querySelector('#pauseov [data-act="unpause"]'); if(b) b.click(); } return; }"""),
+    (".ml-chip.ml-all{font-family:var(--f-ui,system-ui)}",
+     """.ml-chip.ml-all{font-family:var(--f-ui,system-ui)}
+/* 2.0 ara ver */
+.pauseov{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
+.pausebox{text-align:center;max-width:340px}
+.pausebox .pz-i{font-size:44px;line-height:1;color:var(--muted)}
+.pausebox h2{margin:12px 0 6px;font:700 24px var(--f-head,var(--f-ui,system-ui))}
+.pausebox p{margin:0 0 6px;color:var(--muted)}
+.pausebox .pz-n{font-size:13px;margin-bottom:18px}
+.pausebox .btn{min-width:180px;justify-content:center;text-align:center}"""),
+    ("  top.innerHTML = S.view === \"start\" ? \"\" : headerHTML();\n  if(toTop) window.scrollTo(0, 0);",
+     "  top.innerHTML = S.view === \"start\" ? \"\" : headerHTML();\n  if(toTop) window.scrollTo(0, 0);\n  if(S.view === \"quiz\" && S.run && S.run.paused) pauseShow(); else { const po = document.getElementById(\"pauseov\"); if(po) po.remove(); }"),
 ]
 
 

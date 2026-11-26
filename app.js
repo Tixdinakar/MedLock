@@ -4,19 +4,15 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.12";
+const VERSION = "2.0";
 const CHANGES = [
-  { v: "1.12", d: "2026-11-27", l: [
-    "Kütüphane'de kurullar sırayla (I, II, III, IV), ortak dersler en altta; her kartta konu ve soru sayısı",
-    "Diğer menüsünden Çıkmışlar ve Anatomi Latincesi kalktı (ana sayfada ve Kütüphane'de duruyor)"
-  ] },
-  { v: "1.11", d: "2026-11-27", l: [
+  { v: "2.0", d: "2026-11-27", l: [
+    "Soru çözerken Ara ver: üstteki düğmeyle süre durur, soru gizlenir; Devam et ile kaldığın yerden sürer. Arada geçen süre çalışma süresine sayılmaz",
+    "Ders sayfası sadeleşti: her konu tek kart; slayt, not, kart ve sorular kartın altındaki düğmelerde. Üstte tek satır \"Bütün konulardan soru çöz\"; arama ve süzgeçler sağ üstteki büyüteçte",
     "Kurul sayfası sadeleşti: uzun test listesi kalktı (testler ders sayfalarında ve soru bankasında); her derste konu ve soru sayısı, okuduğun konulara göre çubuk; İndir düğmesi Kurul provası'nın yanında",
-    "Ana sayfa sadeleşti: son eklenenler, senkron ve ana ekrana ekle kartları kalktı (Ayarlar'da duruyor); sınav satırında tek Hazırlan düğmesi"
-  ] },
-  { v: "1.10", d: "2026-11-27", l: [
-    "Ders sayfası sadeleşti: her konu tek kart; slayt, not, kart ve sorular kartın altındaki düğmelerde. Arama ve süzgeçler sağ üstteki büyüteçte",
-    "Ana sayfada Karma, Çıkmışlar ve Latince tek satırda; son eklenenler 3 tane"
+    "Kütüphane'de kurullar sırayla (I, II, III, IV), ortak dersler en altta; her kartta konu ve soru sayısı",
+    "Ana sayfa sadeleşti: Karma, Çıkmışlar ve Latince tek satırda; son eklenenler, senkron ve ana ekrana ekle kartları kalktı (Ayarlar'da duruyor); sınav satırında tek Hazırlan düğmesi",
+    "Diğer menüsünden Çıkmışlar ve Anatomi Latincesi kalktı (ana sayfada ve Kütüphane'de duruyor)"
   ] },
   { v: "1.9", d: "2026-11-27", l: [
     "Dosya ekle: Kütüphane'de ve ders sayfasında sağ üstteki + ile slayt, not, özet ya da çıkmış gönderebilirsin. Dosya şifrelenip gider; Claude işleyince (sayfalar, kartlar, hoca vurguları) kütüphanede görünür. Bir kez Ayarlar › Dosya ekleme'den anahtar girilmeli; bekleyen dosyalar da orada görünür"
@@ -167,7 +163,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "e55a150905";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "bfd693f0f3";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1809,6 +1805,8 @@ window.MLBridge = function (win) {
     } else openSlide(b.dataset.mld, b.dataset.mlp.split(",").map(Number), b.dataset.est === "1");
   });
   return {
+    // 2.0: testte "Ara ver": ara süresi çalışma süresine sayılmaz
+    pause(on) { if (on) { actNow(); TRK.paused = 1; } else { TRK.paused = 0; TRK.t = Date.now(); } },
     btn(qid) {
       const r = C.blob.refs[qid], d = r && S.byId[r[0]];
       if (!d) return cxOrig(C.byQ[qid]);
@@ -3460,11 +3458,12 @@ const GAP_T = 5 * 60e3;
 let LA = +LS.get("ml.la", 0) || Date.now(), laSaved = 0;
 const TRK = { c: "", t: 0, acc: 0 };
 function trkFlush() { const a = Math.floor(TRK.acc); if (a >= 1 && TRK.c) { tmAdd(TRK.c, a); TRK.acc -= a; } }
-function trkSet(c) { trkFlush(); TRK.c = c || ""; TRK.t = Date.now(); TRK.acc = 0; }
+function trkSet(c) { trkFlush(); TRK.c = c || ""; TRK.t = Date.now(); TRK.acc = 0; TRK.paused = 0; }
 function actNow() {
   const now = Date.now();
   if (!P) return;
   clkIdle(now);
+  if (TRK.paused) { LA = now; return; }
   if (TRK.c && document.visibilityState === "visible") {
     const c = clkGet();
     if (!(c.run && c.phase !== "idle")) TRK.acc += Math.min(now - TRK.t, GAP_T) / 1000;

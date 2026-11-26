@@ -346,6 +346,14 @@ html.mlfs body.dock-r .sheet.docked .sheet-head{padding-right:56px}
 .scr canvas.big{height:min(70vh, 560px)}
 .scr-n{font-size:11.5px;color:var(--muted);margin:5px 2px 0}
 .ml-chip.ml-all{font-family:var(--f-ui,system-ui)}
+/* 2.0 ara ver */
+.pauseov{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
+.pausebox{text-align:center;max-width:340px}
+.pausebox .pz-i{font-size:44px;line-height:1;color:var(--muted)}
+.pausebox h2{margin:12px 0 6px;font:700 24px var(--f-head,var(--f-ui,system-ui))}
+.pausebox p{margin:0 0 6px;color:var(--muted)}
+.pausebox .pz-n{font-size:13px;margin-bottom:18px}
+.pausebox .btn{min-width:180px;justify-content:center;text-align:center}
 /* 1.3.1 işlem alanı */
 .scr-open{all:unset;box-sizing:border-box;cursor:pointer;display:block;margin:10px 0 0;padding:9px 14px;border:1px dashed var(--line);border-radius:10px;font:600 13px var(--f-ui,system-ui);color:var(--muted);text-align:center}
 .scr{margin:10px 0 0}
@@ -494,7 +502,7 @@ function headerHTML(){
   if(S.view === "quiz" && r){
     const timed = r.mode === "timed" && !r.finished;
     h += '<div class="tools"><span class="chip">' + (window.ML ? MODE_SHORT : MODE_NAME)[r.mode] + '</span>'
-      + '<span class="chip" title="' + (timed ? "Kalan süre" : "Geçen süre") + '">' + (timed ? "Kalan" : "Süre") + ' <span class="timer' + (timed && remaining(r) <= 60 ? " low" : "") + '" id="timer">' + timerText(r) + '</span></span>'
+      + '<span class="chip" title="' + (timed ? "Kalan süre" : "Geçen süre") + '">' + (timed ? "Kalan" : "Süre") + ' <span class="timer' + (timed && remaining(r) <= 60 ? " low" : "") + '" id="timer">' + timerText(r) + '</span></span>' + (r.finished ? '' : '<button class="btn ghost ml-pz" type="button" data-act="pause" title="Ara ver" aria-label="Ara ver">Ara ver</button>')
       + '<span class="sp"></span><button class="btn ghost" type="button" data-act="home">Kapak</button>'
       + (r.finished ? '<button class="btn" type="button" data-act="to-result">Sonuç</button>' : '<button class="btn" type="button" data-act="finish-ask">Bitir</button>')
       + '</div>';
@@ -795,6 +803,7 @@ function render(toTop){
   document.body.classList.toggle("dock-l", dk === "l"); document.body.classList.toggle("dock-r", dk === "r");
   top.innerHTML = S.view === "start" ? "" : headerHTML();
   if(toTop) window.scrollTo(0, 0);
+  if(S.view === "quiz" && S.run && S.run.paused) pauseShow(); else { const po = document.getElementById("pauseov"); if(po) po.remove(); }
 }
 function bringCardIntoView(){
   const b = document.getElementById("booklet"); if(!b) return;
@@ -840,6 +849,8 @@ document.addEventListener("click", e => {
     case "choose": choose(+el.dataset.i); break;
     case "prev": go(-1); break;
     case "next": go(1); break;
+    case "pause": { const r = S.run; if(!r || r.finished) break; r.paused = true; save(); try{ window.ML && ML.pause && ML.pause(true); }catch(e){} pauseShow(); break; }
+    case "unpause": { const r = S.run; if(r) r.paused = false; save(); try{ window.ML && ML.pause && ML.pause(false); }catch(e){} const o = document.getElementById("pauseov"); if(o) o.remove(); break; }
     case "finish-ask":
       if(r && !r.finished){ r.confirm = true; S.view = "quiz"; save(); render(); const c = document.getElementById("confirm"); if(c) c.scrollIntoView({ block:"center" }); }
       break;
@@ -915,7 +926,14 @@ document.addEventListener("submit", e => {
   }
   startRun(ids, setLabel(S.set) + " · " + ids.length + " soru", S.mode, minutes);
 });
+function pauseShow(){
+  const r = S.run; if(!r || !r.paused || S.view !== "quiz" || document.getElementById("pauseov")) return;
+  const o = document.createElement("div"); o.id = "pauseov"; o.className = "pauseov";
+  o.innerHTML = '<div class="pausebox"><div class="pz-i">⏸</div><h2>Ara verildi</h2><p>' + answered(r) + ' / ' + r.ids.length + ' cevaplı · ' + (r.mode === "timed" ? "kalan " + fmtTime(remaining(r)) : "süre " + fmtTime(r.elapsed)) + '</p><p class="pz-n">Süre durdu; soru gizli.</p><button class="btn primary" type="button" data-act="unpause">Devam et</button></div>';
+  document.body.appendChild(o);
+}
 document.addEventListener("keydown", e => {
+  if(document.getElementById("pauseov")){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); const b = document.querySelector('#pauseov [data-act="unpause"]'); if(b) b.click(); } return; }
   if(S.view !== "quiz" || !S.run) return;
   if(e.metaKey || e.ctrlKey || e.altKey) return;
   const tag = (e.target && e.target.tagName || "").toLowerCase();
@@ -928,7 +946,7 @@ document.addEventListener("keydown", e => {
 });
 setInterval(() => {
   const r = S.run;
-  if(S.view === "quiz" && r && !r.finished && document.visibilityState === "visible"){
+  if(S.view === "quiz" && r && !r.finished && !r.paused && document.visibilityState === "visible"){
     r.elapsed++;
     if(r.mode === "timed" && r.elapsed >= r.limit){ finish(true); return; }
     const t = document.getElementById("timer");
