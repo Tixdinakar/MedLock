@@ -4,8 +4,11 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.7";
+const VERSION = "1.7.1";
 const CHANGES = [
+  { v: "1.7.1", d: "2026-11-26", l: [
+    "Hoca derste bir konu için “bunu sormam” dediyse slaytın altında artık “Hoca: sormam dedi” diye görünür (ses kaydı olan derslerde); o konudan soru da yazılmaz"
+  ] },
   { v: "1.7", d: "2026-11-24", l: [
     "Soru bankası, karma ve deste testlerinde çözdüğün denemeler artık kaybolmuyor: soru bankasında o konunun altında, Karma deneme sayfasında hepsi “Son denemelerin” olarak durur; sonucu açıp yanlışlarına bakabilir, yarım kalanlara devam edebilirsin. Sen ✕ ile kaldırana kadar silinmez",
     "Karma deneme ve İlerleme'de konular slayt destesine göre gruplandı: aynı dersin (ör. Redoks) konuları tek başlık altında; başlığa dokununca o dersin bütün konuları seçilir",
@@ -145,7 +148,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "8468146f90";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "70e06ce268";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -1349,15 +1352,17 @@ async function rotURL(u, a, key) {
   const blob = await new Promise(r => c.toBlob(r, "image/webp", 0.88));
   const url = URL.createObjectURL(blob); urlCache(key, url); return url;
 }
-// Hocanın derste vurguladığı yerler (ses kaydı dökümünden; katalogda it.hv = [{p, t: "dk:sn", s: ses dosyası, n: not, q: 1 = "soru olarak geldi" dedi}])
+// Hocanın derste vurguladığı yerler (ses kaydı dökümünden; katalogda it.hv = [{p, t: "dk:sn", s: ses dosyası, n: not, q: 1 = "soru olarak geldi" dedi, q: -1 = "sormam" dedi}])
+const hvLabel = (L, def) => L.some(h => h.q > 0) ? "Hoca: soru olarak geldi" : L.every(h => h.q < 0) ? "Hoca: sormam dedi" : def;
+const hvTag = h => h.q > 0 ? ' <span class="tag cx">' + icon("star") + "soru olarak geldi</span>" : h.q < 0 ? ' <span class="tag">sormam dedi</span>' : "";
 const hvList = (it, p) => (it.hv || []).filter(h => !p || h.p === p).sort((a, b) => a.p - b.p);
 function hvBadge(it, p) {
   const L = hvList(it, p);
-  return L.length ? ' <button class="hvb" data-hv="' + p + '">' + icon("star") + (L.some(h => h.q) ? "Hoca: soru olarak geldi" : "Hoca vurguladı") + "</button>" : "";
+  return L.length ? ' <button class="hvb" data-hv="' + p + '">' + icon("star") + hvLabel(L, "Hoca vurguladı") + "</button>" : "";
 }
 function hvRows(it, L, jump) {
   return L.map(h => (jump ? '<button class="hvr" data-hvp="' + h.p + '">' : '<div class="hvr">')
-    + '<b>' + (it.k === "slayt" ? "Slayt " : "Sayfa ") + h.p + (h.q ? ' <span class="tag cx">' + icon("star") + "soru olarak geldi</span>" : "") + "</b><span>" + esc(h.n) + '</span><small>Ses kaydı: ' + esc(h.s) + ", " + esc(h.t) + "</small>" + (jump ? "</button>" : "</div>")).join("");
+    + '<b>' + (it.k === "slayt" ? "Slayt " : "Sayfa ") + h.p + hvTag(h) + "</b><span>" + esc(h.n) + '</span><small>Ses kaydı: ' + esc(h.s) + ", " + esc(h.t) + "</small>" + (jump ? "</button>" : "</div>")).join("");
 }
 // Ders sayfasındaki etiketler: hangi sayfalar? Her satır desteyi o sayfada açar, bütün sayfalar işaretli gelir.
 const pagesHref = (d, pages, p) => "#/d/" + d.id + "/" + (p || pages[0]) + "?h=" + Array.from(new Set(pages)).sort((a, b) => a - b).join(",");
@@ -1365,7 +1370,7 @@ function deckHvSheet(d) {
   if (!d) return;
   const L = hvList(d), pages = L.map(h => h.p);
   const bg = sheet("<h3>Hoca derste vurguladı · " + esc(d.t) + '</h3><p class="muted small">Dokununca slayt o sayfada açılır; işaretli sayfalar arasında üstteki şeritle gezersin.</p>'
-    + L.map(h => '<a class="hvr" href="' + pagesHref(d, pages, h.p) + '"><b>Slayt ' + h.p + (h.q ? ' <span class="tag cx">' + icon("star") + "soru olarak geldi</span>" : "") + "</b><span>" + esc(h.n) + "</span><small>Ses kaydı: " + esc(h.s) + ", " + esc(h.t) + "</small></a>").join("")
+    + L.map(h => '<a class="hvr" href="' + pagesHref(d, pages, h.p) + '"><b>Slayt ' + h.p + hvTag(h) + "</b><span>" + esc(h.n) + "</span><small>Ses kaydı: " + esc(h.s) + ", " + esc(h.t) + "</small></a>").join("")
     + '<div class="row-btns" style="margin-top:10px"><a class="btn primary" href="' + pagesHref(d, pages) + '">' + icon("slide") + "Hepsini slaytta gör</a><button class=\"btn\">Kapat</button></div>");
   return bg;
 }
@@ -2186,7 +2191,7 @@ async function cardStudy(q) {
   let curC = "";
   S.cleanup.push(() => trkSet(""));
   const slideBtn = c => { const it = c.s && S.byId[c.s]; return it ? '<a class="btn" href="#/d/' + it.id + "/" + (c.p || 1) + (c.p ? "?h=" + c.p : "") + '">' + icon("slide") + "Slayta git" + (c.p ? " · " + c.p : "") + "</a>" : ""; };
-  const hvB = c => { const it = c.s && S.byId[c.s]; if (!it || !c.p) return ""; const L = hvList(it, c.p); return L.length ? '<div class="hvb" style="margin:10px auto 0">' + icon("star") + (L.some(h => h.q) ? "Hoca: soru olarak geldi" : "Hoca derste vurguladı") + "</div>" : ""; };
+  const hvB = c => { const it = c.s && S.byId[c.s]; if (!it || !c.p) return ""; const L = hvList(it, c.p); return L.length ? '<div class="hvb" style="margin:10px auto 0">' + icon("star") + hvLabel(L, "Hoca derste vurguladı") + "</div>" : ""; };
   const done = () => {
     cv.innerHTML = '<div class="card empty"><h3 style="margin-bottom:6px">Bitti</h3>' + (st.n[0] + st.n[1] + st.n[2]) + " kart · Bildim " + st.n[2] + " · Zorlandım " + st.n[1] + " · Bilemedim " + st.n[0]
       + '<div class="muted small" style="margin-top:6px">Bilemediklerin yarın yeniden gelir.</div><div class="row-btns" style="justify-content:center;margin-top:14px"><a class="btn primary" href="' + back + '">Tamam</a></div></div>';

@@ -1347,6 +1347,7 @@ def main():
     hv.add_argument("source", help="ses kaydı dökümünün adı, ör. 'Redoks 1'")
     hv.add_argument("note", nargs="?", default="", help="kısa not: hoca ne dedi (slayta göre düzeltilmiş)")
     hv.add_argument("--soru", action="store_true", help="hoca 'sınavda soru olarak geldi / gelir' dedi")
+    hv.add_argument("--sormaz", action="store_true", help="hoca 'bunu sormam / sınavda yok' dedi (uygulamada 'Hoca: sormam dedi')")
     hv.add_argument("--rm", action="store_true", help="bu sayfa ve zamandaki vurguyu sil")
     ka = sp.add_parser("konu-ad", help="aynı konunun farklı adlarını birleştir (testler, ilerleme, karma); argümansız: listele")
     ka.add_argument("course", nargs="?")
@@ -1476,7 +1477,7 @@ def main():
         if not a.rm:
             if not a.note:
                 sys.exit("not eksik")
-            L.append({"p": a.page, "t": a.time, "s": a.source, "n": a.note, **({"q": 1} if a.soru else {})})
+            L.append({"p": a.page, "t": a.time, "s": a.source, "n": a.note, **({"q": 1} if a.soru else {"q": -1} if a.sormaz else {})})
         L.sort(key=lambda h: (h["p"], h["t"]))
         if L:
             it["hv"] = L
