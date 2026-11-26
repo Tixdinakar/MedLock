@@ -4,8 +4,12 @@
 
 const NAME = "MedLock";
 // Sürüm: büyük güncelleme +0.1 (1.1 → 1.2), küçük düzeltme +0.0.1 (1.1.1 → 1.1.2). Her arayüz değişikliğinde CHANGES'in başına kısa not ekle.
-const VERSION = "1.7.1";
+const VERSION = "1.8";
 const CHANGES = [
+  { v: "1.8", d: "2026-11-27", l: [
+    "Slayt ve notlara not ekleyebilirsin: sayfanın altındaki “Not ekle” ile açıklayıcı not yaz; “Arkadaşım da görsün” işaretliyse senkronla arkadaşına da gider. Notlar sayfanın altında başlığıyla durur, dokununca açılıp kapanır; destenin sonunda bütün notların listesi var",
+    "Bilgisayarda ok tuşlarıyla sayfa atlama: ← → (slaytta ↑ ↓ da), Page Up/Down, Home/End"
+  ] },
   { v: "1.7.1", d: "2026-11-26", l: [
     "Hoca derste bir konu için “bunu sormam” dediyse slaytın altında artık “Hoca: sormam dedi” diye görünür (ses kaydı olan derslerde); o konudan soru da yazılmaz"
   ] },
@@ -148,7 +152,7 @@ const CHANGES = [
   { v: "1.0", l: ["İlk sürüm: kütüphane, slaytlar, testler ve “Slayta git”, tekrar listesi, arama, Anatomi Latincesi, cihazlar arası senkron"] },
 ];
 const vcmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
-const APPV = "70e06ce268";                            // arayüz sürümü; tools/medlock.py stamp yazar
+const APPV = "087e8159b0";                            // arayüz sürümü; tools/medlock.py stamp yazar
 const INT = [1, 3, 7, 14, 30];             // Leitner aralıkları (gün)
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -566,7 +570,7 @@ function mergeP(a, b) {
   const o = Object.assign({}, a);
   o.name = (b.at > a.at ? b.name : a.name) || a.name || b.name;
   o.srs = mergeMap(a.srs, b.srs, "u");
-  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx", "cd", "ux", "mx"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
+  ["tres", "qh", "bm", "real", "eng", "rot", "last", "rep", "rd", "tx", "cd", "ux", "mx", "sn"].forEach(k => { o[k] = mergeMap(a[k], b[k], "at"); });
   o.cs = mergeMap(a.cs, b.cs, "u");
   const newer = (x, y) => !x ? y : !y ? x : (y.at || 0) > (x.at || 0) ? y : x;
   o.mix = newer(a.mix, b.mix); o.dz = newer(a.dz, b.dz);
@@ -659,6 +663,9 @@ async function syncRun(opts) {
     // arkadaşın açık kart desteleri (yalnız açık olanlar cihazda tutulur; çevrimdışı da görünür)
     const oc = {}; SY.others.forEach(o => { const cd = {}; Object.entries(o.cd || {}).forEach(([k, d]) => { if (d && d.vis === "acik" && !d.del) cd[k] = d; }); if (Object.keys(cd).length) oc[o.id] = { name: o.name || o.id, cd }; });
     LS.set("ml.ocd", oc);
+    // arkadaşın paylaştığı sayfa notları (1.8)
+    const on = {}; SY.others.forEach(o => { const sn = {}; Object.entries(o.sn || {}).forEach(([k, n]) => { if (n && n.vis === "acik" && !n.del && n.d) sn[k] = n; }); if (Object.keys(sn).length) on[o.id] = { name: o.name || o.id, sn }; });
+    LS.set("ml.osn", on);
     const before = JSON.stringify(P);
     const merged = mergeP(P, remote);
     changedLocal = JSON.stringify(merged) !== before;
@@ -1403,10 +1410,19 @@ function mountDoc(el, it, page, opts) {
   for (let p = 1; p <= it.n; p++) {
     // sayfa numarası ve "soruyla ilgili" etiketi görselin üstüne değil altına yazılır
     html += '<figure class="pg' + ((it.r || 1.333) < 1 ? " portrait" : "") + (hl.has(p) ? " hl" : "") + '" data-p="' + p + '"><div class="pgi"><div class="ph" style="--ar:' + (it.r || 1.333) + '">' + p + "</div></div>"
-      + '<figcaption class="pn">' + p + " / " + it.n + (hl.has(p) ? ' <b class="hlt">' + (isEst(p) ? "tahmini sayfa" : "soruyla ilgili") + "</b>" : "") + hvBadge(it, p) + "</figcaption></figure>";
+      + '<figcaption class="pn">' + p + " / " + it.n + (hl.has(p) ? ' <b class="hlt">' + (isEst(p) ? "tahmini sayfa" : "soruyla ilgili") + "</b>" : "") + hvBadge(it, p)
+      + (opts.noteAdd ? '<button type="button" class="pnb" data-na="' + p + '">' + icon("edit") + "Not ekle</button>" : "") + '</figcaption><div class="pnotes" data-np="' + p + '"></div></figure>';
   }
   el.innerHTML = html + (opts.foot || "");
   el.querySelectorAll("[data-hv]").forEach(b => b.onclick = e => { e.stopPropagation(); hvSheet(it, +b.dataset.hv); });
+  const drawNotes = () => {
+    const N = pageNotes(it.id);
+    $$(".pnotes", el).forEach(box => { box.innerHTML = noteListHTML(N[box.dataset.np] || []); });
+    bindNotes(el, it, drawNotes);
+    opts.onNotes && opts.onNotes(N);
+  };
+  drawNotes();
+  el.querySelectorAll("[data-na]").forEach(b => b.onclick = e => { e.stopPropagation(); noteSheet(it, +b.dataset.na, null, drawNotes); });
   const loadP = async fig => {
     if (fig.dataset.l) return; fig.dataset.l = "1";
     try {
@@ -1445,7 +1461,46 @@ function mountDoc(el, it, page, opts) {
     const img = f.querySelector("img"); if (img) { const ph = document.createElement("div"); ph.className = "ph"; ph.style.setProperty("--ar", img.naturalWidth / img.naturalHeight); img.replaceWith(ph); }
     f.dataset.l = ""; loadP(f);
   };
-  return { goto, reload, destroy() { io.disconnect(); el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); }, get page() { return curP; } };
+  return { goto, reload, notes: drawNotes, destroy() { io.disconnect(); el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); }, get page() { return curP; } };
+}
+/* ---------- sayfa notları (1.8): slayt/not sayfasına açıklayıcı not; "Arkadaşım da görsün" ise senkronla öbür profile gider ----------
+   profilde sn {nid: {d, p, txt, vis: "acik"|"gizli", at, del?}}; arkadaşınkiler cihazda ml.osn (senkron yazar). Açık/kapalı durumu cihazda ml.sno. */
+function pageNotes(docId) {
+  const N = {}, put = (p, o) => { (N[p] = N[p] || []).push(o); };
+  Object.entries(PS.get("sn", {})).forEach(([k, n]) => { if (n && !n.del && n.d === docId) put(n.p, Object.assign({ nid: k, own: 1 }, n)); });
+  Object.entries(LS.get("ml.osn", {}) || {}).forEach(([pid, o]) => Object.entries(o.sn || {}).forEach(([k, n]) => { if (n.d === docId) put(n.p, Object.assign({ nid: pid + "|" + k, who: o.name }, n)); }));
+  Object.values(N).forEach(L => L.sort((a, b) => (a.at0 || a.at) - (b.at0 || b.at)));
+  return N;
+}
+const noteTitle = t => { const l = String(t || "").trim().split("\n")[0]; return l.length > 70 ? l.slice(0, 68) + "…" : l; };
+function noteListHTML(L) {
+  if (!L.length) return "";
+  const open = new Set(LS.get("ml.sno", []) || []);
+  return L.map(n => '<details class="pnote' + (n.own ? " own" : " oth") + '" data-nid="' + esc(n.nid) + '"' + (open.has(n.nid) ? " open" : "") + '><summary><span class="who">' + (n.own ? "Notun" + (n.vis === "acik" ? " · paylaşıldı" : "") : esc(n.who || "Arkadaşın") + " · not") + '</span><span class="nt1">' + esc(noteTitle(n.txt)) + "</span></summary>"
+    + '<div class="ntx">' + esc(n.txt).replace(/\n/g, "<br>") + "</div>" + (n.own ? '<div class="nact"><button type="button" class="btn ghost small" data-ne="' + esc(n.nid) + '">' + icon("edit") + "Düzenle</button></div>" : "") + "</details>").join("");
+}
+function bindNotes(root, it, redraw) {
+  $$(".pnote", root).forEach(d => d.ontoggle = () => { const S0 = new Set(LS.get("ml.sno", []) || []); if (d.open) S0.add(d.dataset.nid); else S0.delete(d.dataset.nid); LS.set("ml.sno", Array.from(S0).slice(-400)); });
+  $$("[data-ne]", root).forEach(b => b.onclick = e => { e.stopPropagation(); const n = PS.get("sn", {})[b.dataset.ne]; if (n) noteSheet(it, n.p, b.dataset.ne, redraw); });
+}
+function noteSheet(it, p, nid, redraw) {
+  const cur = nid ? PS.get("sn", {})[nid] : null, share = cur ? cur.vis === "acik" : LS.get("ml.snv", "acik") === "acik";
+  const bg = sheet('<h3>' + (cur ? "Notu düzenle" : "Not ekle") + '</h3><p class="muted small">' + esc(it.t) + " · " + (it.k === "slayt" ? "slayt " : "sayfa ") + p + '</p>'
+    + '<textarea id="ntx" class="ntin" rows="6" placeholder="Açıklayıcı notun (ilk satır başlık olarak görünür)">' + esc(cur ? cur.txt : "") + "</textarea>"
+    + '<label class="chk"><input type="checkbox" id="nsh"' + (share ? " checked" : "") + "> Arkadaşım da görsün (senkronla gider)</label>"
+    + '<div class="row-btns"><button class="btn primary" id="nok">' + icon("check") + "Kaydet</button>" + (cur ? '<button class="btn" id="ndel">Sil</button>' : "") + '<button class="btn ghost" data-close>Vazgeç</button></div>');
+  const ta = $("#ntx", bg); setTimeout(() => ta.focus(), 60);
+  $("#nok", bg).onclick = () => {
+    const txt = ta.value.replace(/\s+$/, "");
+    if (!txt.trim()) return toast("Not boş");
+    const vis = $("#nsh", bg).checked ? "acik" : "gizli", X = Object.assign({}, PS.get("sn", {})), k = nid || ("n" + Date.now().toString(36));
+    X[k] = { d: it.id, p, txt, vis, at: Date.now(), at0: cur ? cur.at0 || cur.at : Date.now() };
+    PS.set("sn", X); LS.set("ml.snv", vis);
+    const O = new Set(LS.get("ml.sno", []) || []); O.add(k); LS.set("ml.sno", Array.from(O).slice(-400));
+    bg.close(); redraw && redraw(); toast(vis === "acik" ? "Not kaydedildi · arkadaşın senkrondan sonra görür" : "Not kaydedildi");
+  };
+  const del = $("#ndel", bg);
+  if (del) del.onclick = () => { const X = Object.assign({}, PS.get("sn", {})); X[nid] = { del: 1, at: Date.now() }; PS.set("sn", X); bg.close(); redraw && redraw(); toast("Not silindi"); };
 }
 /* ---------- cihaza indir: sayfa görsellerinden PDF (cihazda yapılır, internete bir şey gitmez) ---------- */
 async function docPDF(it, prog) {
@@ -1502,7 +1557,7 @@ function viewDoc(id, page, q) {
   const rel = S.cat.items.filter(t => t.k === "test" && (t.dk || []).some(d => d[0] === it.id));
   const first = !PS.get("rd", {})[it.id], nq = deckQn(it.id), canRead = it.k !== "cikmis" && it.k !== "soru";
   const hvL = hvList(it);
-  const foot = '<div class="doc-foot">'
+  const foot = '<div class="doc-foot"><div id="dnotes"></div>'
     + (hvL.length ? '<b>Hocanın derste vurguladıkları</b><div class="hvl">' + hvRows(it, hvL, 1) + "</div>" : "")
     + (canRead || nq ? '<div class="rdrow">' + (canRead ? '<button class="btn" id="rdok"></button>' : "")
       + (nq ? '<button class="btn" id="dq10">' + icon("test") + "Bu " + (it.k === "slayt" ? "desteden" : "dosyadan") + " " + Math.min(10, nq) + " soru</button>" : "") + "</div>" : "")
@@ -1513,7 +1568,13 @@ function viewDoc(id, page, q) {
   const hl = hraw.map(x => +x.replace("~", "")).filter(Boolean), hest = new Set(hraw.filter(x => x[0] === "~").map(x => +x.slice(1)));
   let saveT = 0;
   const V = mountDoc($("#doc"), it, page, {
-    highlight: hl, est: q && q.get("e") === "1" ? true : hest, foot,
+    highlight: hl, est: q && q.get("e") === "1" ? true : hest, foot, noteAdd: true,
+    onNotes: N => {
+      const box = $("#dnotes"); if (!box) return;
+      const L = Object.keys(N).map(Number).sort((a, b) => a - b).flatMap(p => N[p]);
+      box.innerHTML = L.length ? "<b>Bu " + (it.k === "slayt" ? "destedeki" : "dosyadaki") + " notlar</b><div class=\"hvl\">" + L.map(n => '<button type="button" class="hvr" data-nj="' + n.p + '"><b>' + (it.k === "slayt" ? "Slayt " : "Sayfa ") + n.p + "</b><span>" + (n.own ? "" : esc(n.who || "Arkadaşın") + ": ") + esc(noteTitle(n.txt)) + "</span></button>").join("") + "</div>" : "";
+      $$("[data-nj]", box).forEach(b => b.onclick = () => { const p = +b.dataset.nj; V && V.goto(p, true); });
+    },
     onPage: p => {
       $("#pgc").textContent = p + " / " + it.n;
       $("#bmb").innerHTML = icon(bmHas(it.id, p) ? "bmf" : "bm");
@@ -1524,6 +1585,23 @@ function viewDoc(id, page, q) {
   });
   setLast("doc", { id: it.id, p: page }); rdSet(it.id, page);
   trkSet(it.c); S.cleanup.push(() => trkSet(""));
+  // 1.8: bilgisayarda ok tuşlarıyla sayfa atlama (← → her zaman, PageUp/PageDown; slaytta ↑ ↓ da; Home/End)
+  const onKey = e => {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target; if (t && (t.closest("input, textarea, select, [contenteditable]") || t.closest(".sheet-bg"))) return;
+    if ($(".sheet-bg")) return;
+    const k = e.key, ud = it.k === "slayt" && (S.zoom || 1) === 1;
+    let to = 0;
+    if (k === "ArrowRight" || k === "PageDown" || (ud && k === "ArrowDown")) to = V.page + 1;
+    else if (k === "ArrowLeft" || k === "PageUp" || (ud && k === "ArrowUp")) to = V.page - 1;
+    else if (k === "Home") to = 1; else if (k === "End") to = it.n;
+    if (!to) return;
+    e.preventDefault();
+    to = Math.min(Math.max(to, 1), it.n);
+    if (to !== V.page) V.goto(to);
+  };
+  document.addEventListener("keydown", onKey);
+  S.cleanup.push(() => document.removeEventListener("keydown", onKey));
   fsBind();
   $("#dlb").onclick = () => docDownload(it, $("#dlb"));
   $$("[data-hvp]").forEach(b => b.onclick = () => V.goto(+b.dataset.hvp, true));
