@@ -1184,6 +1184,8 @@ def _tk_match(e, cands, es, strict=False):
     """Takvimdeki dersi aday listesinde bulur: elle eşleme (takvim_es) önce, sonra kelime kökü örtüşmesi."""
     if e["t"] in es:
         v = es[e["t"]]
+        if v == "?":   # adı başka desteye benziyor ama dersin kendi slaytı/kaydı yok: eksik say
+            return None
         return v if v == "-" else next((c for c in cands if c.get("id") == v or c.get("name") == v), v)
     kt = _tk_stems(e["t"])
     best, bs = None, 0
@@ -1231,6 +1233,7 @@ def takvim_kontrol(V, bugun=None, drive=None, gun=None):
     ses = [x for x in (drive or []) if re.search(r"ses", x.get("folder", ""), re.I) or x.get("name", "").endswith("_original.txt")]
     lo = (datetime.date.fromisoformat(bugun) - datetime.timedelta(days=gun)).isoformat() if gun else "0000"
     miss_s, miss_a, seen = [], [], set()
+    cnames = {it["c"] for it in V.cat["items"]}
     for e in V.cat.get("takvim", []):
         if not e.get("chk") or not (lo <= e["d"] < bugun) or (e["t"], e["c"]) in seen:
             continue
@@ -1238,7 +1241,9 @@ def takvim_kontrol(V, bugun=None, drive=None, gun=None):
         m = _tk_match(e, [d for d in decks if d["c"] == e["c"]], es)
         if m is None:
             miss_s.append(e)
-        sc = [x for x in ses if norm(e["c"].split()[0]) in norm(x.get("folder", ""))] or ses
+        # dersin kendi ses klasörü + hiçbir derse ait olmayan klasörler (ör. kökteki ".._original.txt")
+        sc = [x for x in ses if norm(e["c"].split()[0]) in norm(x.get("folder", ""))
+              or not any(norm(c.split()[0]) in norm(x.get("folder", "")) for c in cnames)] or ses
         if drive is not None and not any(ses_ders(V, x.get("name", "")) is e for x in ses) \
                 and _tk_match(e, sc, V.cat.get("takvim_ses", {}), strict=True) is None:
             miss_a.append(e)
@@ -1327,7 +1332,7 @@ def main():
     tk = sp.add_parser("takvim", help="işlenen derslerin slayt/ses denetimi")
     tk.add_argument("--drive", help="Drive listesi JSON [{id,name,folder}] (ses kontrolü için)")
     tk.add_argument("--bugun"); tk.add_argument("--gun", type=int, help="yalnız son N gün")
-    tk = sp.add_parser("takvim-es", help="takvimdeki ders adını desteye elle eşle (hedef: deste id, '-' = slayt beklenmez, rm = sil)")
+    tk = sp.add_parser("takvim-es", help="takvimdeki ders adını desteye elle eşle (hedef: deste id, '-' = slayt beklenmez, '?' = benzer adlı deste var ama bu dersin slaytı yok, rm = sil)")
     tsd = sp.add_parser("takvim-ses", help='adı yalnız zaman damgası olan ses kaydının dersi: takvim-ses "Ses 261126_100553_original.txt"')
     tsd.add_argument("adlar", nargs="+")
     tk.add_argument("konu"); tk.add_argument("hedef"); tk.add_argument("--ses", action="store_true", help="ses dökümü eşlemesi (hedef: Drive adı ya da '-')")
