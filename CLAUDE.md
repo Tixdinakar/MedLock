@@ -70,6 +70,7 @@ Yeni testte konu adlarını (`t`) aynı dersin mevcut testlerindeki adlarla ayn�
 `--by`: dosyayı yükleyen (Drive'da sahibi). Buğra'nın ve arkadaşının kendi notları, özetleri ve videolarında her zaman; hoca slaytlarında yalnız Buğra dışında biri yüklediyse. Uygulamada "Yükleyen: …" olarak görünür.
 
 Seçmeli dersler (ör. TIP253 "Kanser ve Kök Hücre") ortak derstir: `--kurul ortak` (Buğra için "seçmeli" = "ortak ders"; ayrı grup açma).
+**Seçmeli/ortak derslere (Ekoloji, Kanser ve Kök Hücre, ATA 151 · Türk Dili I ve sonradan gelenler) Buğra açıkça istemedikçe hiçbir şey ekleme**: soru, test, kart, not/özet, lejant üretme, önerme de (27 Kas, Buğra'nın kuralı). Drive denetiminde bu derslere yeni dosya gelirse ekleme, raporda yalnız bildir.
 
 Ders adları: "Tıbbi Biyoloji ve Genetik", "Biyokimya", "Biyofizik", "Tıp Tarihi", "Biyoistatistik", "Davranış Bilimleri", "Anatomi" (K2, Deniz Ay; terminoloji ve Latince desteleri, 24 Kas), "ATA 151 · Türk Dili I". Drive'daki "Psikoloji" ve "DavranışBilimleri" klasörleri "Davranış Bilimleri"ne gider (`COURSE_RENAME`, `FOLDER_COURSE`). Yeni ders gelirse Drive klasör adını kullan.
 
