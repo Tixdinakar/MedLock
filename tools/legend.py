@@ -186,6 +186,7 @@ CABB = {
   "MDMA": "ekstazi", "AMATEM": "Alkol ve Madde Bağımlılığı Tedavi Merkezi", "TBC": "tüberküloz", "MSS": "merkezi sinir sistemi",
   "MAD": "madde (yönetmelik maddesi)", "CRF": "kortikotropin salgılatıcı faktör", "SDG": "Sürdürülebilir Kalkınma Hedefi (BM)",
   "TSSB": "travma sonrası stres bozukluğu",
+  "HPA": "hipotalamus–hipofiz–adrenal (ekseni)", "ACh": "asetilkolin", "GABA": "gama-aminobütirik asit",
  },
  "Kanser ve Kök Hücre": {
   "FBS": "fetal sığır serumu (besiyeri katkısı)", "LN2": "sıvı azot", "KKH": "kanser kök hücresi", "KH": "kök hücre",
